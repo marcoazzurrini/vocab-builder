@@ -66,18 +66,20 @@ begin
   values (u, c, 'recall', 'fenêtre', true, 4, 2300, '{}'::jsonb);
   raise notice 'PASS 6  correct answer graded Easy accepted';
 
-  -- 7. polysemy allowed: same lang+text, different gloss
+  -- 7. polysemy allowed: same lang+text, different gloss.
+  --    Uses `tour`, which the starter deck does not contain — fixtures must not
+  --    collide with seeded rows or this reports a false failure.
   begin
-    insert into public.words (lang, text, gloss, kind) values ('fr', 'livre', 'libro', 'word');
-    insert into public.words (lang, text, gloss, kind) values ('fr', 'livre', 'libbra', 'word');
-    raise notice 'PASS 7  polysemy (livre/libro + livre/libbra) accepted';
+    insert into public.words (lang, text, gloss, kind) values ('fr', 'tour', 'torre', 'word');
+    insert into public.words (lang, text, gloss, kind) values ('fr', 'tour', 'giro', 'word');
+    raise notice 'PASS 7  polysemy (tour/torre + tour/giro) accepted';
   exception when unique_violation then
     raise notice 'FAIL 7  polysemy rejected';
   end;
 
   -- 8. true duplicate rejected
   begin
-    insert into public.words (lang, text, gloss, kind) values ('fr', 'livre', 'libro', 'word');
+    insert into public.words (lang, text, gloss, kind) values ('fr', 'tour', 'torre', 'word');
     raise notice 'FAIL 8  duplicate word accepted';
   exception when unique_violation then
     raise notice 'PASS 8  duplicate word rejected';
