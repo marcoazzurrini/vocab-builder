@@ -1,0 +1,42 @@
+/* Baseline only. The visual direction is undecided — modern and minimal, with
+   UX weighted over decoration — so nothing here commits to a look. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100svh;
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* Answers are typed under time pressure on a phone; a 16px minimum stops iOS
+   Safari zooming the viewport on focus, which would break the card layout
+   mid-session. */
+input {
+  font-size: max(16px, 1rem);
+}
+
+main {
+  padding: 1.5rem;
+}
