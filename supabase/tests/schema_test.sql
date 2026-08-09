@@ -2,6 +2,13 @@
 \set QUIET on
 set client_min_messages to notice;
 
+-- ── cleanup ─────────────────────────────────────────────────────────────────
+-- Makes the suite re-runnable without `supabase db reset`. A test you have to
+-- reset the database to run twice is a test you stop running.
+-- Deleting the user cascades to its cards and attempts.
+delete from auth.users where id = '11111111-1111-1111-1111-111111111111';
+delete from public.words where lang = 'fr' and text in ('fenêtre', 'tour');
+
 -- ── fixtures ────────────────────────────────────────────────────────────────
 insert into auth.users (id, email, aud, role)
 values ('11111111-1111-1111-1111-111111111111', 'marco@test.local', 'authenticated', 'authenticated');

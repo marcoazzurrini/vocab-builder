@@ -78,11 +78,34 @@ What remains is only "how easily did that come?".
 - Grading happens *before* the answer is revealed. Retrieval ease is known the moment
   you finish typing, and the rating stays uncontaminated by the outcome.
 - Enter = Good. The default path is one action and requires no grading decision.
-- Comparison is accent-strict: `fenetre` is not a French word. `œ`/`oe` is tolerated
-  — a ligature is typography, not orthography.
 - Wrong answers show the correct spelling with no diff highlighting — hunting for the
   difference is itself desirable difficulty.
 - Response latency is logged, never graded. Too noisy to carry weight.
+
+#### Answer comparison
+
+One rule decides everything here: **orthography is graded, typography is not.**
+A missing accent changes the word. A ligature, a keyboard's choice of apostrophe,
+or a space before a question mark does not.
+
+Graded — a mismatch is wrong:
+
+- **Accents.** `fenetre` is not a French word.
+- **Letters and word order**, obviously.
+
+Normalised away before comparing:
+
+- **Case and surrounding whitespace.**
+- **`œ` → `oe`.** French writes it both ways.
+- **Apostrophes**, `'` (U+0027) and `'` (U+2019) to one form. Keyboards disagree
+  about which they emit.
+- **Internal whitespace**, collapsed to single spaces. Matters for chunks.
+- **Terminal punctuation**, `? ! .` stripped from both sides.
+
+Terminal punctuation is still *stored* and *displayed*, just never graded — and it
+is stored mainly for the audio. `speechSynthesis` reads `qu'est-ce que c'est ?`
+with rising question intonation and `qu'est-ce que c'est` flat. For a formulaic
+sequence the intonation contour is part of the chunk (§7).
 
 ## Stack
 
