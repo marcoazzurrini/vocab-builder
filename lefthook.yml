@@ -1,0 +1,48 @@
+# Git hooks. Installed by `lefthook install`, which the `prepare` npm script
+# runs automatically after `npm install`.
+#
+# Split by cost: anything fast enough to not be noticed runs on commit,
+# anything slower runs on push. A hook you start skipping with --no-verify is
+# worse than no hook, because it is still there giving false assurance.
+
+pre-commit:
+  # Sequential, stopping at the first failure. Formatting rewrites the files
+  # that lint and typecheck then read, so these cannot race.
+  piped: true
+  jobs:
+    - name: format
+      run: npx oxfmt {staged_files}
+      glob:
+        - "*.ts"
+        - "*.tsx"
+        - "*.js"
+        - "*.jsx"
+        - "*.json"
+        - "*.css"
+      # Re-stages what the formatter rewrote, so the commit contains the
+      # formatted version rather than failing and asking you to stage again.
+      stage_fixed: true
+
+    - name: lint
+      run: npx oxlint {staged_files}
+      glob:
+        - "*.ts"
+        - "*.tsx"
+        - "*.js"
+        - "*.jsx"
+
+    # No files template: typechecking is whole-project by nature, since a change
+    # in one file breaks types in another. The glob only decides *whether* to
+    # run — skipped entirely when no TypeScript is staged.
+    - name: typecheck
+      run: npm run typecheck
+      glob:
+        - "*.ts"
+        - "*.tsx"
+
+pre-push:
+  jobs:
+    # On push rather than commit: it is the slower check, and it is the last
+    # point where a failure is still cheap to fix locally.
+    - name: test
+      run: npm test

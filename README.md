@@ -67,15 +67,15 @@ queue is not a scheduler — it asks what is due soonest and shows it.
 Typing gives objective pass/fail for free, which is the tedious part of self-grading.
 What remains is only "how easily did that come?".
 
-| Situation | Grade | Interaction |
-|---|---|---|
-| Pretest guess | *not rated* — logged only | one action to continue |
-| Correct | Hard / **Good** / Easy | grade buttons **are** submit — one action |
-| Wrong (incl. wrong accent) | Again | two actions: see the answer, then continue |
+| Situation                  | Grade                     | Interaction                                |
+| -------------------------- | ------------------------- | ------------------------------------------ |
+| Pretest guess              | _not rated_ — logged only | one action to continue                     |
+| Correct                    | Hard / **Good** / Easy    | grade buttons **are** submit — one action  |
+| Wrong (incl. wrong accent) | Again                     | two actions: see the answer, then continue |
 
 - The first post-exposure recall is FSRS's rating #1, so the initial-difficulty
   signal is preserved. Grading every guess `Again` would carry zero information.
-- Grading happens *before* the answer is revealed. Retrieval ease is known the moment
+- Grading happens _before_ the answer is revealed. Retrieval ease is known the moment
   you finish typing, and the rating stays uncontaminated by the outcome.
 - Enter = Good. The default path is one action and requires no grading decision.
 - Wrong answers show the correct spelling with no diff highlighting — hunting for the
@@ -97,27 +97,28 @@ Normalised away before comparing:
 
 - **Case and surrounding whitespace.**
 - **`œ` → `oe`.** French writes it both ways.
-- **Apostrophes**, `'` (U+0027) and `'` (U+2019) to one form. Keyboards disagree
+- **Apostrophes**, straight `'` (U+0027) and curly `’` (U+2019), to one form.
+  Keyboards disagree
   about which they emit.
 - **Internal whitespace**, collapsed to single spaces. Matters for chunks.
 - **Terminal punctuation**, `? ! .` stripped from both sides.
 
-Terminal punctuation is still *stored* and *displayed*, just never graded — and it
+Terminal punctuation is still _stored_ and _displayed_, just never graded — and it
 is stored mainly for the audio. `speechSynthesis` reads `qu'est-ce que c'est ?`
 with rising question intonation and `qu'est-ce que c'est` flat. For a formulaic
 sequence the intonation contour is part of the chunk (§7).
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | Vite + React SPA, no router (phase state is the router) |
-| Hosting | Cloudflare Pages |
-| Backend | none — `supabase-js` direct from the browser, RLS is the API |
-| DB | Supabase Postgres |
-| Auth | Supabase Auth, magic link |
-| Scheduling | `ts-fsrs`, client-side |
-| TTS | browser `speechSynthesis` |
+| Layer      | Choice                                                       |
+| ---------- | ------------------------------------------------------------ |
+| Frontend   | Vite + React SPA, no router (phase state is the router)      |
+| Hosting    | Cloudflare Pages                                             |
+| Backend    | none — `supabase-js` direct from the browser, RLS is the API |
+| DB         | Supabase Postgres                                            |
+| Auth       | Supabase Auth, magic link                                    |
+| Scheduling | `ts-fsrs`, client-side                                       |
+| TTS        | browser `speechSynthesis`                                    |
 
 `lang` is a first-class column from day one. Languages are learned sequentially, one
 at a time — parallel study causes interference.

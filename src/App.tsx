@@ -6,5 +6,5 @@ export default function App() {
       <h1>vocab-builder</h1>
       <p>Scaffold only — no pipeline yet.</p>
     </main>
-  )
+  );
 }
