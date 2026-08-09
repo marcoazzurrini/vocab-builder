@@ -20,8 +20,9 @@ const DAY = 24 * HOUR;
 
 // A card scheduled beyond this leaves today's session.
 const SESSION_HORIZON = 12 * HOUR;
-// Seconds of thinking + typing per answer.
-const ANSWER_SECONDS = 8;
+// Seconds of thinking + typing per answer. Override from the command line:
+//   node --experimental-strip-types spikes/scheduler.ts 18
+const ANSWER_SECONDS = Number(process.argv[2] ?? 18);
 
 const f = fsrs({
   learning_steps: ["1m", "10m"],
@@ -331,6 +332,40 @@ for (const steps of [
       `${steps.join(",").padEnd(16)} ${String(n).padStart(5)} ${String(r.reps).padStart(5)} ` +
         `${r.wallClock.padStart(11)} ${r.idle.toFixed(1).padStart(10)} ` +
         `${((r.idle / totalMin) * 100).toFixed(0).padStart(6)}% ${r.repsPerCard.padStart(10)}`,
+    );
+  }
+}
+
+// ── 9. Zero-idle policy ─────────────────────────────────────────────────────
+// Waiting is never acceptable. When nothing is due, pull the soonest card
+// forward. FSRS scores on actual elapsed time, so an early review is scored
+// correctly -- it simply earns less stability than a longer gap would have.
+//
+// The question is what this does to the real gap between repeats, and whether
+// the configured learning step still matters once the policy is in place.
+rule("9. Zero-idle policy — always pull forward, never wait");
+console.log("steps       cards  reps  wall-clock  idle  effective gap (cards) min/med/max");
+for (const steps of [
+  ["1m", "3m"],
+  ["1m", "10m"],
+] as const) {
+  for (const n of [10, 30] as const) {
+    const scheduler = fsrs({
+      learning_steps: [...steps],
+      relearning_steps: ["10m"],
+      enable_short_term: true,
+      enable_fuzz: false,
+    });
+    const r = simulateWith(scheduler, {
+      newCards: n,
+      floor: 0,
+      ratingFor: realistic,
+      learnAheadMs: Number.POSITIVE_INFINITY,
+    });
+    console.log(
+      `${steps.join(",").padEnd(11)} ${String(n).padStart(5)} ${String(r.reps).padStart(5)} ` +
+        `${r.wallClock.padStart(11)} ${`${r.idle.toFixed(1)}m`.padStart(5)} ` +
+        `${`${r.minGap}/${r.medGap}/${r.maxGap}`.padStart(28)}`,
     );
   }
 }

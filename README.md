@@ -54,13 +54,42 @@ FSRS       one scheduler owns the whole lifecycle                   (§4)
 ### Scheduling
 
 One scheduler, not two. `ts-fsrs` with `learning_steps` and `enable_short_term`
-handles both same-session reps (minute-scale) and across-day reviews. The session
-queue is not a scheduler — it asks what is due soonest and shows it.
+handles both same-session reps and across-day reviews. Gaps come from FSRS's
+difficulty/stability estimate, never a hardcoded ladder, and graduation is not a
+step count — it is the interval genuinely exceeding a day.
 
-- Gaps come from FSRS's difficulty/stability estimate, never a hardcoded ladder.
-- A minimum interleave floor (~2–3 intervening cards) prevents degenerate massed
-  repetition when the queue runs thin.
-- Graduation is not a step count — it is the interval genuinely exceeding a day.
+**The session never waits.** A due time is not an appointment. When nothing is
+due yet, the answer is never to sit and watch a timer, so the next card is chosen
+by this rule:
+
+1. Something is due → show it.
+2. Nothing due, today's new-word allowance not used up → introduce a new word.
+3. Nothing due, allowance used up → show the soonest-due card early.
+4. Nothing left within today → the session is genuinely over.
+
+Pulling a card forward is safe: FSRS scores on *actual* elapsed time, not
+scheduled time, so an early review is scored correctly. It simply earns less
+stability than the longer gap would have — a small, one-off cost, unlike dead air.
+
+New words come before pulling forward, and the daily allowance is never exceeded
+to fill time. That limit exists to control future workload; overshooting it today
+makes every later day heavier, compounding. An early review costs a little
+stability once.
+
+Two things `spikes/scheduler.ts` established by measurement, against earlier
+guesses written here:
+
+- **A minimum-interleave floor does nothing.** Floors of 0, 2 and 3 produce
+  identical sessions and the floor never binds, because the learning step already
+  forces far larger gaps. The idea is dropped.
+- **Once the session never waits, the configured learning step barely matters.**
+  `1m,3m` and `1m,10m` yield near-identical sessions, because real spacing is set
+  by how many cards are in rotation, not by the clock — the step is a ceiling that
+  rarely binds. So FSRS's defaults stand, and spacing widens on its own as the
+  collection grows.
+
+Measured at ~18s per answer: 10 new words ≈ 8 minutes and 28 answers, 30 new
+words ≈ 25 minutes, both with zero idle time.
 
 ### Grading
 
