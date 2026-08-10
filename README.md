@@ -64,8 +64,23 @@ by this rule:
 
 1. Something is due → show it.
 2. Nothing due, today's new-word allowance not used up → introduce a new word.
-3. Nothing due, allowance used up → show the soonest-due card early.
-4. Nothing left within today → the session is genuinely over.
+3. Nothing due, allowance used up → pull forward the soonest-due card **that is
+   still in its learning steps today**.
+4. Nothing left within today → the session is over.
+
+Step 3 is deliberately bounded. Pulling forward a card due in five minutes is
+nearly free — it is mid-learning and the gap was minutes either way. Pulling
+forward a card due in three days throws away three days of earned spacing, and
+spacing is where nearly all of the retention comes from. It also empties
+tomorrow, which invites doing it again, and the collection drifts toward massing.
+Anki draws its line in the same place: learn-ahead applies only to learning
+cards, never to mature reviews from future days.
+
+So a session that has run out is over, not padded. On day one, 15 new words with
+no backlog is about nine minutes of work and then genuinely nothing to do,
+because every card is correctly parked two days out. Filling that time by
+dragging tomorrow's cards forward trades a durable gain for a few minutes of
+activity, and it compounds.
 
 Pulling a card forward is safe: FSRS scores on *actual* elapsed time, not
 scheduled time, so an early review is scored correctly. It simply earns less
