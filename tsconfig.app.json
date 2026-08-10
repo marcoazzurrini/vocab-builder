@@ -20,7 +20,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    // Not part of `strict`, and the one remaining hole of its size: without it
+    // `words[0]` is typed `Word` even when the array is empty, so the frequency
+    // ordering and the earliest-due picks all read as total when they are not.
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src"]
 }

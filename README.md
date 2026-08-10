@@ -208,10 +208,13 @@ Graded — a mismatch is wrong:
 Normalised away before comparing:
 
 - **Case and surrounding whitespace.**
+- **Unicode composition**, to NFC. `ê` can arrive as one character or as `e`
+  plus a combining circumflex; they render identically and compare unequal.
+  Wrong answers are shown without diff highlighting on purpose, so this is the
+  one mismatch the user could not possibly be expected to find.
 - **`œ` → `oe`.** French writes it both ways.
-- **Apostrophes**, straight `'` (U+0027) and curly `’` (U+2019), to one form.
-  Keyboards disagree
-  about which they emit.
+- **Apostrophes**, straight `'` (U+0027), curly `’` (U+2019) and the four other
+  single quotes keyboards emit, to one form.
 - **Internal whitespace**, collapsed to single spaces. Matters for chunks.
 - **Terminal punctuation**, `? ! .` stripped from both sides.
 

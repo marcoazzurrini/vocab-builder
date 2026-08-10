@@ -59,6 +59,23 @@ describe("answer matching", () => {
     it("collapses doubled spaces inside a chunk", () => {
       expect(matches("je  ne   sais pas", "je ne sais pas")).toBe(true);
     });
+
+    it("accepts an accent that arrived decomposed", () => {
+      // Identical on screen, different strings. Pasted text is the usual source.
+      const decomposed = "fenêtre".normalize("NFD");
+      expect(decomposed).not.toBe("fenêtre");
+      expect(matches(decomposed, "fenêtre")).toBe(true);
+    });
+
+    it("accepts a decomposed expected answer too", () => {
+      expect(matches("fenêtre", "fenêtre".normalize("NFD"))).toBe(true);
+    });
+
+    it("accepts the other single quotes a keyboard might emit", () => {
+      for (const apostrophe of ["'", "’", "‘", "ʼ", "´", "`", "′"]) {
+        expect(matches(`qu${apostrophe}est-ce que c'est`, "qu'est-ce que c'est ?")).toBe(true);
+      }
+    });
   });
 
   describe("normalise", () => {

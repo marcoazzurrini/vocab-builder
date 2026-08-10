@@ -8,7 +8,7 @@
  */
 
 /** `'` and friends. Phone and desktop keyboards disagree about which they emit. */
-const APOSTROPHES = /[’ʼʹ´`]/g;
+const APOSTROPHES = /[’‘ʼʹ´`′]/g;
 
 /** Stored and shown for TTS prosody (§7), never typed by the user. */
 const TERMINAL_PUNCTUATION = /[?!.]+$/;
@@ -18,6 +18,16 @@ export function normalise(input: string): string {
     input
       .trim()
       .toLowerCase()
+      // Compose the accents before comparing them.
+      //
+      // `ê` can arrive as one character or as `e` followed by a combining
+      // circumflex, and the two are different strings that render identically.
+      // Everything in this module turns on accents being graded strictly, and
+      // wrong answers are shown without diff highlighting on purpose — so
+      // without this the app can reject an answer that is visibly, letter for
+      // letter, the right one, and there is nothing on screen to explain it.
+      // Keyboards mostly emit the composed form; paste does not always.
+      .normalize("NFC")
       .replace(APOSTROPHES, "'")
       // French writes cœur and coeur both ways; only the ligature is optional,
       // never the accents.

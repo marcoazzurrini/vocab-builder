@@ -169,6 +169,20 @@ export function createSession(options: SessionOptions): Session {
     options.onAttempt?.(attempt);
   }
 
+  /**
+   * How long the prompt was on screen, within reason.
+   *
+   * `attempts.latency_ms` is an `integer`, so a tab left open for a month
+   * overflows it and Postgres rejects the whole row — losing the answer itself
+   * over a number that is only ever read for analysis. A clock that steps
+   * backwards, which phones do, would send a negative one. Neither is a real
+   * measurement, and neither is worth losing a rep over.
+   */
+  function latencySince(shownAt: Date, now: Date): number {
+    const A_DAY = 24 * 60 * 60_000;
+    return Math.min(Math.max(0, now.getTime() - shownAt.getTime()), A_DAY);
+  }
+
   advance();
 
   return {
@@ -207,7 +221,7 @@ export function createSession(options: SessionOptions): Session {
         typed,
         correct: matches(typed, word.text),
         rating: null,
-        latencyMs: now.getTime() - promptShownAt.getTime(),
+        latencyMs: latencySince(promptShownAt, now),
         stateBefore: card.fsrs,
         reviewedAt: now,
       });
@@ -241,7 +255,7 @@ export function createSession(options: SessionOptions): Session {
         typed,
         correct,
         rating,
-        latencyMs: now.getTime() - promptShownAt.getTime(),
+        latencyMs: latencySince(promptShownAt, now),
         stateBefore,
         reviewedAt: now,
       });
