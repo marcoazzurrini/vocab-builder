@@ -92,8 +92,9 @@ to fill time. That limit exists to control future workload; overshooting it toda
 makes every later day heavier, compounding. An early review costs a little
 stability once.
 
-Two things `spikes/scheduler.ts` established by measurement, against earlier
-guesses written here:
+Two things a throwaway simulation established by measurement, against earlier
+guesses written here. The simulation itself was deleted in `fb6c255` once it had
+diverged from the real rule; `d317d5b` still holds it:
 
 - **A minimum-interleave floor of 2 or 3 does nothing.** Floors of 0, 2 and 3
   produce identical sessions and never bind, because the learning step already
