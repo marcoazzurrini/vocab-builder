@@ -19,19 +19,34 @@ const EFFORT_LABEL: Record<Effort, string> = {
   easy: "Facile",
 };
 
+const startOfDay = (d: Date) => new Date(d).setHours(0, 0, 0, 0);
+
 export function SessionScreen({ userId }: { userId: string }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
-  /** Bumped to rebuild the session from storage. */
+  /** Bumped to rebuild the session from storage. See the reload effect below. */
   const [reloadCount, reload] = useReducer((n: number) => n + 1, 0);
 
   // The session is a mutable object, not React state — calling a method changes
   // it in place, so the component asks for a re-render rather than replacing it.
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Read by the reload effect, which must not re-subscribe on every answer. */
+  const sessionRef = useRef<Session | null>(null);
+  const loadedOnRef = useRef(startOfDay(new Date()));
+  /**
+   * Whether a write conflict has already been answered with a reload.
+   *
+   * Reloading is meant to adopt the row that won, after which the word is no
+   * longer a candidate and the conflict cannot recur. If it recurs anyway the
+   * assumption was wrong, and repeating the reload is a loop that reintroduces
+   * the same word and hits the same constraint as fast as the network allows.
+   * Once, then say so.
+   */
+  const conflictReloadedRef = useRef(false);
 
   useEffect(() => {
     warmUpVoices();
@@ -39,24 +54,31 @@ export function SessionScreen({ userId }: { userId: string }) {
     const queue = createWriteQueue((error) => {
       // Not something to report — the row exists, this session simply holds the
       // wrong id for it. Reloading adopts the one that won.
-      if (error instanceof CardAlreadyExistsError) reload();
-      else setWriteError(error.message);
+      if (error instanceof CardAlreadyExistsError && !conflictReloadedRef.current) {
+        conflictReloadedRef.current = true;
+        reload();
+      } else {
+        setWriteError(error.message);
+      }
     });
 
-    loadDeck(LANG, new Date())
+    const now = new Date();
+    loadedOnRef.current = startOfDay(now);
+
+    loadDeck(LANG, now)
       .then((deck) => {
         if (cancelled) return;
         setWriteError(null);
-        setSession(
-          createSession({
-            words: deck.words,
-            cards: deck.cards,
-            newPerDay: NEW_PER_DAY,
-            introducedToday: deck.introducedToday,
-            onCardChange: (card) => queue.push(() => upsertCard(card, userId)),
-            onAttempt: (attempt) => queue.push(() => insertAttempt(attempt, userId)),
-          }),
-        );
+        const created = createSession({
+          words: deck.words,
+          cards: deck.cards,
+          newPerDay: NEW_PER_DAY,
+          introducedToday: deck.introducedToday,
+          onCardChange: (card) => queue.push(() => upsertCard(card, userId)),
+          onAttempt: (attempt) => queue.push(() => insertAttempt(attempt, userId)),
+        });
+        sessionRef.current = created;
+        setSession(created);
       })
       .catch((e: unknown) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e));
@@ -66,6 +88,31 @@ export function SessionScreen({ userId }: { userId: string }) {
       cancelled = true;
     };
   }, [userId, reloadCount]);
+
+  /**
+   * Come back to a session that is still true.
+   *
+   * The deck is read once, and `done` is final — so a phone left on the end
+   * screen overnight still shows yesterday's "Bravo" in the morning, with the
+   * day's cards waiting behind it and nothing to say so. A session left open
+   * across midnight is worse: the rule starts serving tomorrow's reviews while
+   * the allowance is still yesterday's, because that number was read at load.
+   *
+   * Rebuilding is cheap and loses nothing — every answer is already written — so
+   * the only question is when it is safe. Mid-card it is not: it would throw away
+   * the prompt on screen. Between cards it always is.
+   */
+  useEffect(() => {
+    function recheck() {
+      if (document.visibilityState !== "visible") return;
+      const newDay = startOfDay(new Date()) !== loadedOnRef.current;
+      const between = sessionRef.current?.view.phase === "done";
+      if (newDay || between) reload();
+    }
+
+    document.addEventListener("visibilitychange", recheck);
+    return () => document.removeEventListener("visibilitychange", recheck);
+  }, []);
 
   const view = session?.view;
   const phase = view?.phase;

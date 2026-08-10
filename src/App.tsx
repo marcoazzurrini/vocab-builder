@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { SessionScreen } from "./SessionScreen";
 import { redirectTo, supabase } from "./lib/supabase";
 
@@ -65,7 +66,11 @@ export default function App() {
         </p>
       )}
 
-      {auth.status === "signedIn" && <SessionScreen userId={auth.session.user.id} />}
+      {auth.status === "signedIn" && (
+        <ErrorBoundary>
+          <SessionScreen userId={auth.session.user.id} />
+        </ErrorBoundary>
+      )}
 
       {error && <p role="alert">Errore: {error}</p>}
     </main>
