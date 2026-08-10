@@ -63,14 +63,31 @@ step count — it is the interval genuinely exceeding a day.
 due yet, the answer is never to sit and watch a timer, so the next card is chosen
 by this rule:
 
-1. A rated card is due → show it.
+1. A rated learning card is due → ask for it.
 2. A word was introduced but never guessed → resume it, without spending allowance.
 3. Today's new-word allowance is not used up → introduce a new word.
-4. A review is due today → show it.
-5. A word is waiting for its first recall → show it.
-6. Otherwise, pull forward the soonest-due card **that is still in its learning
+4. A review is due today → ask for it.
+5. A word is waiting for its first recall and this sitting has not shown it →
+   show it.
+6. A word has been shown and is waiting to be asked for → ask for it, unless it
+   is the one just shown.
+7. Otherwise, pull forward the soonest-due card **that is still in its learning
    steps today**, never the one just answered.
-7. Nothing left within today → the session is over.
+8. A word just shown, when there is nothing else at all → ask for it.
+9. Nothing left within today → the session is over.
+
+This list is the code. `src/session/queue.ts` holds one named rule per line and
+an array in this order, because prose and precedence living in different places
+is how they came to disagree.
+
+**A card's stage is a value, not an inference.** `unseen` (a row exists, nothing
+has happened), `awaiting` (guessed, and FSRS has still never rated it),
+`scheduled` (rated). FSRS cannot own the first two: it has no opinion about a
+card it has never rated, since the first rating is its input and not its output.
+Every bug this pipeline has shipped came from two places deriving that stage
+differently from `reps`, `state`, `due`, `guessed` and a set of ids held in the
+session — so it is derived once now, and the rule asks what a card _is_ rather
+than reconstructing it from parts.
 
 **The exposure returns to the queue, it does not fall through to the recall.**
 Producing a word two seconds after being shown it is trivial, and the rating it
@@ -78,18 +95,29 @@ yields is FSRS's _first_ — the one that sets the card's initial difficulty. An
 immediate recall makes that rating measure short-term memory rather than the
 word, which wastes the very signal we protect by refusing to rate guesses.
 
-Step 5 sits after the reviews, so a batch of new words is introduced, the day's
-reviews are worked through, and only then are the new words asked for. FSRS has
-no opinion about a card it has never rated — the first rating is its input, not
-its output — so this placement is ours, and ordering is the honest lever rather
-than an interval we invented to sit alongside FSRS.
+Steps 5 and 6 are separate for the same reason. Returning to the queue only helps
+if the queue can tell that the exposure happened, and it could not: an exposure
+changed nothing the rule could see, so it handed the same card straight back on
+every resumed sitting. Splitting the two means a batch of resumed words is shown
+through before any of them is asked for — the shape a fresh sitting already had.
+
+Both sit after the reviews, so a batch is introduced, the day's reviews are
+worked through, and only then are the new words asked for. Ordering is the honest
+lever here rather than an interval we invented to sit alongside FSRS.
 
 An unrated card is not a scheduled card — it is a word that has not been
 introduced yet, so step 2 hands it back to the introduction path. Scheduling it
 instead is what once asked for a word that had never been shown, since every
-scheduled card goes straight to recall. See Known gaps.
+scheduled card goes straight to recall.
 
-Step 5 is deliberately bounded. Pulling forward a card due in five minutes is
+Step 8 exists so that step 6's exclusion cannot starve a word: with one card and
+nothing else to do, coming straight back is right, because refusing would show a
+word and never ask for it, again on the next sitting and the one after. It is
+last so that everything else — including pulling a learning card forward — goes
+first. An early review costs a little stability once; a rating #1 taken from the
+short-term buffer misprices the card for its whole life.
+
+Step 7 is deliberately bounded. Pulling forward a card due in five minutes is
 nearly free — it is mid-learning and the gap was minutes either way. Pulling
 forward a card due in three days throws away three days of earned spacing, and
 spacing is where nearly all of the retention comes from. It also empties
@@ -121,7 +149,7 @@ diverged from the real rule; `d317d5b` still holds it:
   forces far larger gaps.
 
   That measurement was taken on sessions of ten cards or more, and it does not
-  extend to the tail. With two or three cards left, step 5 will hand back the
+  extend to the tail. With two or three cards left, step 7 will hand back the
   card just answered — massing with extra steps. So a floor of exactly **1**
   survives: never the same card twice in a row. When that leaves nothing, the
   session ends, because the gap it wanted cannot be filled today and tomorrow
@@ -206,10 +234,9 @@ FSRS weights and learning steps to be retrained on real data
 ### None currently blocking
 
 The introduction gap described here previously — `reps === 0` being unable to
-tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is closed.
-`attempts` is consulted directly: `loadDeck` reads which cards have a guess
-logged, and the session uses that rather than inferring from FSRS state, which
-cannot know because guesses are never rated.
+tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is closed
+twice over: `attempts` is consulted directly for the guess, and a card's stage is
+now a named value rather than something each branch re-derives.
 
 On a fresh session a card that was guessed but never recalled is shown again
 before being asked for. Whether its exposure was actually read before the app

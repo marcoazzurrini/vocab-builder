@@ -70,82 +70,86 @@ export function createSession(options: SessionOptions): Session {
   let promptShownAt = clock();
   let lastTyped = "";
   let justShownId: string | undefined;
-  /**
-   * Cards whose exposure has already been shown in this sitting. Not persisted:
-   * on a fresh session a card that was guessed but never recalled is shown
-   * again, since we cannot know whether the exposure was actually read before
-   * the app was closed. Re-showing costs a few seconds; skipping it would ask
-   * for a word that may never have been seen.
-   */
+  /** Passed to the rule rather than kept here — see `Queue.exposed`. */
   const exposedThisSession = new Set<string>();
   const stats: SessionStats = { introduced: 0, recalls: 0, correct: 0, wrong: 0 };
 
+  /** The word a card points at, or undefined if it has left the catalogue. */
+  function wordFor(card: Card): Word | undefined {
+    return options.words.find((w) => w.id === card.wordId);
+  }
+
   function advance(): void {
     const now = clock();
-    const next = pickNext({
+
+    // A card whose word is no longer in the catalogue cannot be shown. Dropping
+    // them up front means the rule below only ever sees showable cards, so there
+    // is no unshowable answer to recover from afterwards.
+    for (let i = cards.length - 1; i >= 0; i--) {
+      if (!wordFor(cards[i]!)) cards.splice(i, 1);
+    }
+
+    const slot = pickNext({
       cards,
       words: options.words,
       now,
       allowanceLeft,
+      exposed: exposedThisSession,
       justShownId,
     });
 
-    if (next.kind === "done") {
-      current = null;
-      phase = "done";
-      return;
-    }
+    promptShownAt = now;
 
-    if (next.kind === "introduce") {
-      // Reuse the row when resuming an abandoned introduction. Creating a
-      // second card for the same word would be rejected by
-      // unique(user_id, word_id, card_type), and the allowance was already
-      // spent when the first one was made.
-      const resuming = next.existing !== undefined;
-      const card: Card = next.existing ?? {
-        id: newCardId(),
-        wordId: next.word.id,
-        fsrs: createEmptyCard(now),
-        guessed: false,
-      };
+    switch (slot.do) {
+      case "done":
+        current = null;
+        phase = "done";
+        return;
 
-      if (!resuming) {
-        cards.push(card);
-        allowanceLeft -= 1;
-        // Announced at creation, not at the first rating. The guess attempt is
-        // recorded before any rating exists, and attempts.card_id is a foreign
-        // key — so a listener that only heard about cards when FSRS moved them
-        // would fail to insert the very first attempt of every new word.
-        options.onCardChange?.(card);
+      case "introduce": {
+        // Reuse the row when resuming an abandoned introduction. Creating a
+        // second card for the same word would be rejected by
+        // unique(user_id, word_id, card_type), and the allowance was already
+        // spent when the first one was made.
+        const resuming = slot.card !== undefined;
+        const card: Card = slot.card ?? {
+          id: newCardId(),
+          wordId: slot.word.id,
+          fsrs: createEmptyCard(now),
+          guessed: false,
+        };
+
+        if (!resuming) {
+          cards.push(card);
+          allowanceLeft -= 1;
+          // Announced at creation, not at the first rating. The guess attempt is
+          // recorded before any rating exists, and attempts.card_id is a foreign
+          // key — so a listener that only heard about cards when FSRS moved them
+          // would fail to insert the very first attempt of every new word.
+          options.onCardChange?.(card);
+        }
+
+        // A resumed introduction counts too: it is a word met for the first time
+        // in this sitting, which is what the number on the end screen means. It
+        // can exceed the allowance only by resuming a card abandoned on an
+        // earlier day, where the larger number is the honest one.
+        stats.introduced += 1;
+        current = { card, word: slot.word };
+        justShownId = card.id;
+        // A word never met starts with a guess: retrieval before exposure aids
+        // retention even when the guess is wrong, and costs nothing when it is.
+        phase = "guess";
+        return;
       }
 
-      stats.introduced += 1;
-      current = { card, word: next.word };
-      justShownId = card.id;
-      // A word never met starts with a guess: retrieval before exposure aids
-      // retention even when the guess is wrong, and costs nothing when it is.
-      phase = "guess";
-      promptShownAt = now;
-      return;
+      case "expose":
+      case "recall": {
+        current = { card: slot.card, word: wordFor(slot.card)! };
+        justShownId = slot.card.id;
+        phase = slot.do === "expose" ? "exposure" : "recall";
+        return;
+      }
     }
-
-    const word = options.words.find((w) => w.id === next.card.wordId);
-    if (!word) {
-      // A card whose word is missing from the catalogue cannot be shown. Drop it
-      // and carry on rather than stranding the session on an unanswerable card.
-      const orphan = cards.indexOf(next.card);
-      if (orphan >= 0) cards.splice(orphan, 1);
-      advance();
-      return;
-    }
-
-    current = { card: next.card, word };
-    justShownId = next.card.id;
-    // A card that has been guessed but never rated is on its way to a first
-    // recall. Show it again unless this sitting already did.
-    phase =
-      next.card.fsrs.reps === 0 && !exposedThisSession.has(next.card.id) ? "exposure" : "recall";
-    promptShownAt = now;
   }
 
   function requirePhase(expected: Phase): Current {
