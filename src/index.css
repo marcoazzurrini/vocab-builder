@@ -1,5 +1,6 @@
-/* Baseline only. The visual direction is undecided — modern and minimal, with
-   UX weighted over decoration — so nothing here commits to a look. */
+/* Baseline plus the little the session screen needs. The visual direction is
+   still open — modern and minimal, UX over decoration — so nothing here commits
+   to a look worth defending. */
 
 *,
 *::before,
@@ -15,6 +16,15 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+:root {
+  --ink: #16181d;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --paper: #fbfbfa;
+  --accent: #1d4ed8;
+  --wrong: #b3261e;
+}
+
 body {
   min-height: 100svh;
   font-family:
@@ -22,6 +32,8 @@ body {
     -apple-system,
     sans-serif;
   line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -34,12 +46,133 @@ select {
 }
 
 /* Answers are typed under time pressure on a phone; a 16px minimum stops iOS
-   Safari zooming the viewport on focus, which would break the card layout
-   mid-session. */
+   Safari zooming the viewport on focus, which would break the card mid-session. */
 input {
   font-size: max(16px, 1rem);
 }
 
 main {
-  padding: 1.5rem;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-bottom: 2rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  padding: 2rem 1.25rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.card form {
+  display: contents;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.image {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.gloss {
+  font-size: 1.5rem;
+}
+
+.hint {
+  font-size: 0.875rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.answer {
+  font-size: 2.5rem;
+  font-weight: 600;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.typed {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--wrong);
+}
+
+.note {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.wrong {
+  color: var(--wrong);
+}
+
+.card input {
+  width: min(22rem, 100%);
+  padding: 0.6rem 0.75rem;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  outline-offset: 2px;
+}
+
+.card input:focus-visible {
+  outline: 2px solid var(--accent);
+  border-color: var(--accent);
+}
+
+button {
+  padding: 0.6rem 1.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.efforts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+form label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
 }

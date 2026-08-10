@@ -97,6 +97,11 @@ export function createSession(options: SessionOptions): Session {
       cards.push(card);
       allowanceLeft -= 1;
       stats.introduced += 1;
+      // Announced at creation, not at the first rating. The guess attempt is
+      // recorded before any rating exists, and attempts.card_id is a foreign key
+      // — so a listener that only heard about cards when FSRS moved them would
+      // fail to insert the very first attempt of every new word.
+      options.onCardChange?.(card);
       current = { card, word: next.word };
       justShownId = card.id;
       // A word never met starts with a guess: retrieval before exposure aids

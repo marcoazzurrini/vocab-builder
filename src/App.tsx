@@ -1,10 +1,9 @@
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
+import { SessionScreen } from "./SessionScreen";
 import { redirectTo, supabase } from "./lib/supabase";
 
-// Proof of life, not the real UI. It answers one question: can a signed-in
-// browser reach the word list through RLS? The pipeline (src/session) is not
-// wired up yet, and the styling is deliberately nothing.
+// Auth gate only. Everything past signing in belongs to SessionScreen.
 
 type AuthState =
   | { status: "loading" }
@@ -15,7 +14,6 @@ type AuthState =
 export default function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [error, setError] = useState<string | null>(null);
-  const [wordCount, setWordCount] = useState<number | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -31,17 +29,6 @@ export default function App() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (auth.status !== "signedIn") return;
-    supabase
-      .from("words")
-      .select("id", { count: "exact", head: true })
-      .then(({ count, error: queryError }) => {
-        if (queryError) setError(queryError.message);
-        else setWordCount(count ?? 0);
-      });
-  }, [auth.status]);
 
   async function sendLink(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,15 +65,7 @@ export default function App() {
         </p>
       )}
 
-      {auth.status === "signedIn" && (
-        <>
-          <p>Ciao, {auth.session.user.email}</p>
-          <p>{wordCount === null ? "Carico le parole…" : `${wordCount} parole disponibili`}</p>
-          <button type="button" onClick={() => supabase.auth.signOut()}>
-            Esci
-          </button>
-        </>
-      )}
+      {auth.status === "signedIn" && <SessionScreen userId={auth.session.user.id} />}
 
       {error && <p role="alert">Errore: {error}</p>}
     </main>

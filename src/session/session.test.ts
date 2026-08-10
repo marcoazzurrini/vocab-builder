@@ -168,6 +168,18 @@ describe("session", () => {
       expect(recall).toMatchObject({ rating: Rating.Good });
     });
 
+    it("announces a new card before its first attempt is recorded", () => {
+      // attempts.card_id is a foreign key, and the guess is recorded before any
+      // rating exists — so the card must be announced at creation.
+      const s = makeSession([CHIEN]);
+      expect(changed).toHaveLength(1);
+      expect(changed[0]!.wordId).toBe(CHIEN.id);
+
+      s.submitGuess("cani");
+      const guess = attempts.find((a) => a.phase === "guess")!;
+      expect(changed.some((c) => c.id === guess.cardId)).toBe(true);
+    });
+
     it("captures the state from before the answer, so history can be replayed", () => {
       const s = makeSession([CHIEN]);
       introduce(s, "chien", "good");
