@@ -64,6 +64,46 @@ describe("reviving FSRS state from jsonb", () => {
     const revived = reviveFsrsCard(JSON.parse(JSON.stringify(reviewed)));
     expect(revived.last_review).toBeInstanceOf(Date);
   });
+
+  it("defaults learning_steps, which older rows predate", () => {
+    const { learning_steps: _, ...withoutSteps } = createEmptyCard(NOW);
+    expect(reviveFsrsCard(JSON.parse(JSON.stringify(withoutSteps))).learning_steps).toBe(0);
+  });
+
+  describe("refusing state it cannot read", () => {
+    // Each of these used to pass straight through the cast and become a wrong
+    // schedule that never raised anything.
+    const valid = () => JSON.parse(JSON.stringify(createEmptyCard(NOW))) as Record<string, unknown>;
+
+    it("rejects an unparseable due date", () => {
+      expect(() => reviveFsrsCard({ ...valid(), due: "soon" })).toThrow(/unreadable/i);
+    });
+
+    it("rejects a missing due date", () => {
+      const { due: _, ...noDue } = valid();
+      expect(() => reviveFsrsCard(noDue)).toThrow(/unreadable/i);
+    });
+
+    it("rejects a stability that arrived as a string", () => {
+      expect(() => reviveFsrsCard({ ...valid(), stability: "3.4" })).toThrow(/unreadable/i);
+    });
+
+    it("rejects NaN, which JSON writes as null", () => {
+      expect(() => reviveFsrsCard({ ...valid(), difficulty: null })).toThrow(/unreadable/i);
+    });
+
+    it("rejects a state outside the enum", () => {
+      expect(() => reviveFsrsCard({ ...valid(), state: 7 })).toThrow(/unreadable/i);
+    });
+
+    it("rejects a negative reps count", () => {
+      expect(() => reviveFsrsCard({ ...valid(), reps: -1 })).toThrow(/unreadable/i);
+    });
+
+    it("names the card, so the row can be found and rebuilt", () => {
+      expect(() => reviveFsrsCard({ ...valid(), due: "soon" }, "card-42")).toThrow(/card-42/);
+    });
+  });
 });
 
 describe("building the deck", () => {
