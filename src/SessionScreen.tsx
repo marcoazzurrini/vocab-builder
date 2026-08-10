@@ -54,15 +54,20 @@ export function SessionScreen({ userId }: { userId: string }) {
   }, [userId]);
 
   const view = session?.view;
+  const phase = view?.phase;
+  // Pulled out of the dependency arrays so they can be checked statically.
+  // The gloss changes whenever the card does, which is what should re-run these.
+  const exposureAnswer = view?.phase === "exposure" ? view.answer : null;
+  const promptGloss = view && "prompt" in view ? view.prompt.gloss : null;
 
   // One clean exposure: see it, hear it, say it (§2, §6).
   useEffect(() => {
-    if (view?.phase === "exposure") speak(view.answer, setAudioError);
-  }, [view?.phase, view?.phase === "exposure" ? view.answer : null]);
+    if (exposureAnswer) speak(exposureAnswer, setAudioError);
+  }, [exposureAnswer]);
 
   useEffect(() => {
-    if (view?.phase === "guess" || view?.phase === "recall") inputRef.current?.focus();
-  }, [view?.phase, typed === "" ? view : null]);
+    if (phase === "guess" || phase === "recall") inputRef.current?.focus();
+  }, [phase, promptGloss]);
 
   function act(fn: () => void) {
     fn();
