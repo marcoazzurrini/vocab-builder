@@ -1,5 +1,11 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import { createWriteQueue, insertAttempt, loadDeck, upsertCard } from "./lib/repository";
+import {
+  CardAlreadyExistsError,
+  createWriteQueue,
+  insertAttempt,
+  loadDeck,
+  upsertCard,
+} from "./lib/repository";
 import { speak, warmUpVoices } from "./lib/speak";
 import { createSession } from "./session";
 import type { Effort, Session } from "./session";
@@ -19,6 +25,8 @@ export function SessionScreen({ userId }: { userId: string }) {
   const [writeError, setWriteError] = useState<string | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  /** Bumped to rebuild the session from storage. */
+  const [reloadCount, reload] = useReducer((n: number) => n + 1, 0);
 
   // The session is a mutable object, not React state — calling a method changes
   // it in place, so the component asks for a re-render rather than replacing it.
@@ -28,11 +36,17 @@ export function SessionScreen({ userId }: { userId: string }) {
   useEffect(() => {
     warmUpVoices();
     let cancelled = false;
-    const queue = createWriteQueue(setWriteError);
+    const queue = createWriteQueue((error) => {
+      // Not something to report — the row exists, this session simply holds the
+      // wrong id for it. Reloading adopts the one that won.
+      if (error instanceof CardAlreadyExistsError) reload();
+      else setWriteError(error.message);
+    });
 
     loadDeck(LANG, new Date())
       .then((deck) => {
         if (cancelled) return;
+        setWriteError(null);
         setSession(
           createSession({
             words: deck.words,
@@ -51,7 +65,7 @@ export function SessionScreen({ userId }: { userId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, reloadCount]);
 
   const view = session?.view;
   const phase = view?.phase;

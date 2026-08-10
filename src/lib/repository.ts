@@ -145,10 +145,15 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
       .select("id, text, gloss, hint, image, kind, freq_rank")
       .eq("lang", lang)
       .order("freq_rank", { ascending: true, nullsFirst: false }),
+    // Cards are filtered by language through the word they point at. Without
+    // this every other language's cards load too: none of them match a word in
+    // the catalogue, and `introducedToday` counts them anyway — so a day spent
+    // on French would silently eat the Spanish allowance.
     supabase
       .from("cards")
-      .select("id, word_id, fsrs_state, created_at")
-      .eq("card_type", "production"),
+      .select("id, word_id, fsrs_state, created_at, words!inner(lang)")
+      .eq("card_type", "production")
+      .eq("words.lang", lang),
     // Which cards have ever been guessed. FSRS state cannot answer this —
     // guesses are never rated — and attempts is the source of truth, so ask it
     // rather than infer.
@@ -161,11 +166,31 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
 
   return buildDeck(
     (words.data ?? []) as WordRow[],
-    (cards.data ?? []) as CardRow[],
+    (cards.data ?? []) as unknown as CardRow[],
     (guesses.data ?? []).map((g) => g.card_id as string),
     now,
   );
 }
+
+/**
+ * The same word was introduced somewhere else — another tab, or a phone that
+ * was open at the same time.
+ *
+ * `unique(user_id, word_id, card_type)` is doing its job here: the row already
+ * exists under a different id, so this write is a duplicate rather than an
+ * update. Nothing is corrupted, but this session is holding an id the database
+ * does not have, so every attempt it goes on to write would fail its foreign
+ * key. Reloading adopts the row that won, which is the only way back.
+ */
+export class CardAlreadyExistsError extends Error {
+  constructor(wordId: string) {
+    super(`A card for word ${wordId} already exists on another device`);
+    this.name = "CardAlreadyExistsError";
+  }
+}
+
+/** Postgres unique_violation. */
+const UNIQUE_VIOLATION = "23505";
 
 export async function upsertCard(card: Card, userId: string): Promise<void> {
   const { error } = await supabase.from("cards").upsert(
@@ -179,7 +204,11 @@ export async function upsertCard(card: Card, userId: string): Promise<void> {
     },
     { onConflict: "id" },
   );
-  if (error) throw new Error(`Could not save card: ${error.message}`);
+  if (!error) return;
+  // Conflicting on `id` is an update; conflicting on the word is a different
+  // card for the same word, which is a different problem with a different cure.
+  if (error.code === UNIQUE_VIOLATION) throw new CardAlreadyExistsError(card.wordId);
+  throw new Error(`Could not save card: ${error.message}`);
 }
 
 export async function insertAttempt(attempt: Attempt, userId: string): Promise<void> {
@@ -205,8 +234,12 @@ export async function insertAttempt(attempt: Attempt, userId: string): Promise<v
  * ordered, because a card insert has to land before the attempt that references
  * it. Failures are reported rather than swallowed: `attempts` is the source of
  * truth, so a lost write is a lost piece of history.
+ *
+ * The error itself is handed over rather than its message, because one of them —
+ * `CardAlreadyExistsError` — is not something to show the user but something to
+ * act on.
  */
-export function createWriteQueue(onError: (message: string) => void) {
+export function createWriteQueue(onError: (error: Error) => void) {
   let chain: Promise<void> = Promise.resolve();
   let inFlight = 0;
 
@@ -215,7 +248,7 @@ export function createWriteQueue(onError: (message: string) => void) {
       inFlight += 1;
       chain = chain
         .then(task)
-        .catch((e: unknown) => onError(e instanceof Error ? e.message : String(e)))
+        .catch((e: unknown) => onError(e instanceof Error ? e : new Error(String(e))))
         .then(() => {
           inFlight -= 1;
         });

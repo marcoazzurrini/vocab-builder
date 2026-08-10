@@ -275,6 +275,12 @@ keeps serving it. Anki's answer is to suspend a card after N lapses. That is a
 product decision, not a scheduling one, so it is written down rather than
 invented here.
 
+### Cards do not carry their own language
+
+`lang` lives on `words`, so the cards query filters through a join. That is
+correct but it is a join on every load, and a card's language is a fact about the
+card. Worth a column when the second language actually lands.
+
 ### Resolved
 
 The introduction gap described here previously — `reps === 0` being unable to

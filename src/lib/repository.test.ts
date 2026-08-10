@@ -1,6 +1,13 @@
 import { createEmptyCard } from "ts-fsrs";
 import { describe, expect, it, vi } from "vitest";
-import { buildDeck, createWriteQueue, reviveFsrsCard, toCard, toWord } from "./repository";
+import {
+  buildDeck,
+  CardAlreadyExistsError,
+  createWriteQueue,
+  reviveFsrsCard,
+  toCard,
+  toWord,
+} from "./repository";
 import type { CardRow, WordRow } from "./repository";
 
 const NOW = new Date("2026-08-10T09:00:00");
@@ -174,11 +181,22 @@ describe("write queue", () => {
   it("reports a failure instead of swallowing it", async () => {
     const onError = vi.fn();
     const queue = createWriteQueue(onError);
+    const boom = new Error("network down");
     queue.push(async () => {
-      throw new Error("network down");
+      throw boom;
     });
     await queue.settled();
-    expect(onError).toHaveBeenCalledWith("network down");
+    expect(onError).toHaveBeenCalledWith(boom);
+  });
+
+  it("hands over the error itself, since one kind is acted on rather than shown", async () => {
+    const onError = vi.fn();
+    const queue = createWriteQueue(onError);
+    queue.push(async () => {
+      throw new CardAlreadyExistsError("w1");
+    });
+    await queue.settled();
+    expect(onError.mock.calls[0]![0]).toBeInstanceOf(CardAlreadyExistsError);
   });
 
   it("keeps going after a failure", async () => {
