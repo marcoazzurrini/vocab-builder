@@ -3,7 +3,7 @@ import type { Attempt, Card, Word } from "../session/types";
 import { supabase } from "./supabase";
 
 /** Rows as Postgres returns them: snake_case, dates as strings. */
-type WordRow = {
+export type WordRow = {
   id: string;
   text: string;
   gloss: string;
@@ -13,11 +13,16 @@ type WordRow = {
   freq_rank: number | null;
 };
 
-type CardRow = {
+/**
+ * `due` is deliberately absent: it exists in the table only so the due query can
+ * use an index, and `fsrs_state.due` is the value everything actually reads.
+ * Selecting it would invite the two drifting apart in a reader's head.
+ */
+export type CardRow = {
   id: string;
   word_id: string;
   fsrs_state: unknown;
-  due: string;
+  created_at: string;
 };
 
 export function toWord(row: WordRow): Word {
@@ -70,6 +75,33 @@ export type Deck = {
   introducedToday: number;
 };
 
+/**
+ * Everything `loadDeck` does except the three queries.
+ *
+ * Split out because it is the part with decisions in it — which cards count as
+ * guessed, what "today" means — and because a function that reaches for the
+ * Supabase singleton cannot be tested. The session harness rebuilds its deck
+ * through this exact function, so a test that resumes a sitting resumes it the
+ * way the app does rather than the way a fixture author imagined.
+ */
+export function buildDeck(
+  wordRows: readonly WordRow[],
+  cardRows: readonly CardRow[],
+  guessedCardIds: readonly string[],
+  now: Date,
+): Deck {
+  const guessed = new Set(guessedCardIds);
+  const midnight = startOfToday(now).getTime();
+
+  return {
+    words: wordRows.map(toWord),
+    cards: cardRows.map((r) => toCard(r, guessed.has(r.id))),
+    // Counted from the cards themselves rather than tracked separately, so
+    // reopening the app mid-day resumes the allowance instead of restarting it.
+    introducedToday: cardRows.filter((r) => new Date(r.created_at).getTime() >= midnight).length,
+  };
+}
+
 export async function loadDeck(lang: string, now: Date): Promise<Deck> {
   const [words, cards, guesses] = await Promise.all([
     supabase
@@ -79,7 +111,7 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
       .order("freq_rank", { ascending: true, nullsFirst: false }),
     supabase
       .from("cards")
-      .select("id, word_id, fsrs_state, due, created_at")
+      .select("id, word_id, fsrs_state, created_at")
       .eq("card_type", "production"),
     // Which cards have ever been guessed. FSRS state cannot answer this —
     // guesses are never rated — and attempts is the source of truth, so ask it
@@ -91,18 +123,12 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
   if (cards.error) throw new Error(`Could not load cards: ${cards.error.message}`);
   if (guesses.error) throw new Error(`Could not load attempts: ${guesses.error.message}`);
 
-  const guessed = new Set((guesses.data ?? []).map((g) => g.card_id as string));
-
-  const midnight = startOfToday(now).getTime();
-  const rows = (cards.data ?? []) as (CardRow & { created_at: string })[];
-
-  return {
-    words: (words.data ?? []).map(toWord),
-    cards: rows.map((r) => toCard(r, guessed.has(r.id))),
-    // Counted from the cards themselves rather than tracked separately, so
-    // reopening the app mid-day resumes the allowance instead of restarting it.
-    introducedToday: rows.filter((r) => new Date(r.created_at).getTime() >= midnight).length,
-  };
+  return buildDeck(
+    (words.data ?? []) as WordRow[],
+    (cards.data ?? []) as CardRow[],
+    (guesses.data ?? []).map((g) => g.card_id as string),
+    now,
+  );
 }
 
 export async function upsertCard(card: Card, userId: string): Promise<void> {

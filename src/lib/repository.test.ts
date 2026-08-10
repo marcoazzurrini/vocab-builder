@@ -1,6 +1,9 @@
 import { createEmptyCard } from "ts-fsrs";
 import { describe, expect, it, vi } from "vitest";
-import { createWriteQueue, reviveFsrsCard, toCard, toWord } from "./repository";
+import { buildDeck, createWriteQueue, reviveFsrsCard, toCard, toWord } from "./repository";
+import type { CardRow, WordRow } from "./repository";
+
+const NOW = new Date("2026-08-10T09:00:00");
 
 describe("row mapping", () => {
   it("maps a word row to the session's shape", () => {
@@ -43,7 +46,7 @@ describe("reviving FSRS state from jsonb", () => {
       id: "c1",
       word_id: "w1",
       fsrs_state: JSON.parse(JSON.stringify(fsrs)),
-      due: fsrs.due.toISOString(),
+      created_at: NOW.toISOString(),
     });
 
     expect(card.fsrs.due).toBeInstanceOf(Date);
@@ -60,6 +63,55 @@ describe("reviving FSRS state from jsonb", () => {
     const reviewed = { ...createEmptyCard(new Date()), last_review: new Date() };
     const revived = reviveFsrsCard(JSON.parse(JSON.stringify(reviewed)));
     expect(revived.last_review).toBeInstanceOf(Date);
+  });
+});
+
+describe("building the deck", () => {
+  const words: WordRow[] = [
+    {
+      id: "w1",
+      text: "chien",
+      gloss: "cane",
+      hint: null,
+      image: "🐶",
+      kind: "word",
+      freq_rank: 1,
+    },
+  ];
+
+  function cardRow(id: string, createdAt: Date): CardRow {
+    return {
+      id,
+      word_id: "w1",
+      fsrs_state: JSON.parse(JSON.stringify(createEmptyCard(createdAt))),
+      created_at: createdAt.toISOString(),
+    };
+  }
+
+  it("marks a card guessed when attempts say so, and not otherwise", () => {
+    // FSRS state cannot answer this — guesses are never rated — so the only
+    // honest source is the attempts table.
+    const deck = buildDeck(words, [cardRow("c1", NOW), cardRow("c2", NOW)], ["c1"], NOW);
+    expect(deck.cards.map((c) => c.guessed)).toEqual([true, false]);
+  });
+
+  it("counts only cards created since midnight toward the allowance", () => {
+    // Counted from the cards themselves rather than tracked separately, so
+    // reopening the app mid-day resumes the allowance instead of restarting it.
+    const yesterday = new Date(NOW.getTime() - 24 * 60 * 60_000);
+    const deck = buildDeck(words, [cardRow("c1", yesterday), cardRow("c2", NOW)], [], NOW);
+    expect(deck.introducedToday).toBe(1);
+  });
+
+  it("counts one created a minute after midnight", () => {
+    const justAfterMidnight = new Date("2026-08-10T00:01:00");
+    const deck = buildDeck(words, [cardRow("c1", justAfterMidnight)], [], NOW);
+    expect(deck.introducedToday).toBe(1);
+  });
+
+  it("revives the dates jsonb threw away", () => {
+    const deck = buildDeck(words, [cardRow("c1", NOW)], [], NOW);
+    expect(deck.cards[0]!.fsrs.due).toBeInstanceOf(Date);
   });
 });
 
