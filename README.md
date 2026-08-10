@@ -8,9 +8,9 @@ expiry date.
 
 ## Status
 
-The session logic is built and tested — `src/session/` owns the whole pipeline
-behind one function. Schema, seed content and tooling are in place. Still to do:
-the UI, Supabase wiring, and deployment.
+Deployed and usable: sign in with a magic link, answer cards, progress is saved.
+`src/session/` owns the whole pipeline behind one function. Still to do:
+pre-generated audio, and the gaps below.
 
 ## Research foundations
 
@@ -63,13 +63,20 @@ step count — it is the interval genuinely exceeding a day.
 due yet, the answer is never to sit and watch a timer, so the next card is chosen
 by this rule:
 
-1. Something is due → show it.
-2. Nothing due, today's new-word allowance not used up → introduce a new word.
-3. Nothing due, allowance used up → pull forward the soonest-due card **that is
-   still in its learning steps today**.
-4. Nothing left within today → the session is over.
+1. A rated card is due → show it.
+2. An introduction was left unfinished → resume it, without spending allowance.
+3. Today's new-word allowance is not used up → introduce a new word.
+4. A review is due today → show it.
+5. Otherwise, pull forward the soonest-due card **that is still in its learning
+   steps today**, never the one just answered.
+6. Nothing left within today → the session is over.
 
-Step 3 is deliberately bounded. Pulling forward a card due in five minutes is
+An unrated card is not a scheduled card — it is a word that has not been
+introduced yet, so step 2 hands it back to the introduction path. Scheduling it
+instead is what once asked for a word that had never been shown, since every
+scheduled card goes straight to recall. See Known gaps.
+
+Step 5 is deliberately bounded. Pulling forward a card due in five minutes is
 nearly free — it is mid-learning and the gap was minutes either way. Pulling
 forward a card due in three days throws away three days of earned spacing, and
 spacing is where nearly all of the retention comes from. It also empties
@@ -101,7 +108,7 @@ diverged from the real rule; `d317d5b` still holds it:
   forces far larger gaps.
 
   That measurement was taken on sessions of ten cards or more, and it does not
-  extend to the tail. With two or three cards left, step 3 will hand back the
+  extend to the tail. With two or three cards left, step 5 will hand back the
   card just answered — massing with extra steps. So a floor of exactly **1**
   survives: never the same card twice in a row. When that leaves nothing, the
   session ends, because the gap it wanted cannot be filled today and tomorrow
@@ -180,6 +187,33 @@ at a time — parallel study causes interference.
 Every rep is logged to an append-only `attempts` table. That history is what allows
 FSRS weights and learning steps to be retrained on real data
 (`@open-spaced-repetition/binding`) rather than running on generic defaults forever.
+
+## Known gaps
+
+### Resuming an introduction re-asks for the guess
+
+A word's introduction is guess → exposure → recall. The card is written at the
+start, because the guess attempt has a foreign key pointing at it, so quitting
+part-way leaves a card with no rating.
+
+Those cards are now handed back to the introduction path rather than scheduled
+(they were once surfaced as recalls, which asked for a word that had never been
+shown). But `reps === 0` cannot distinguish _"never guessed"_ from _"guessed,
+saw the answer, quit before typing it"_ — guesses are never rated, so both look
+identical. The second case re-asks for a guess you can no longer make honestly,
+and records it as correct.
+
+**The correct fix is to ask `attempts`**, which is the source of truth: no guess
+logged → start at the guess; a guess logged but no recall → resume at the
+exposure. That is precise, never asks for an unseen word, and never records a
+guess made with the answer already known.
+
+It costs one extra query in `loadDeck` and a per-card flag threaded into the
+session, which is why it is not done yet. The window is narrow — quitting in the
+seconds between seeing the word and typing it — and the damage is one inflated
+statistic rather than a broken schedule. Worth doing before guess-accuracy is
+ever reported as a number, since `attempts` is append-only and the contaminated
+rows cannot be cleaned up afterwards.
 
 ## Not in v1
 

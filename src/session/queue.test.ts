@@ -41,13 +41,13 @@ describe("next-card rule", () => {
     // which is the longest gap the session can give them for free.
     const review = card("c1", "w1", NOW, State.Review);
     const next = pickNext({ cards: [review], words: WORDS, now: NOW, allowanceLeft: 1 });
-    expect(next).toEqual({ kind: "new", word: WORDS[1] });
+    expect(next).toEqual({ kind: "introduce", word: WORDS[1] });
   });
 
   it("introduces new words in frequency order", () => {
     const shuffled = [word("w3", 3), word("w1", 1), word("w2", 2)];
     const next = pickNext({ cards: [], words: shuffled, now: NOW, allowanceLeft: 1 });
-    expect(next).toEqual({ kind: "new", word: expect.objectContaining({ id: "w1" }) });
+    expect(next).toEqual({ kind: "introduce", word: expect.objectContaining({ id: "w1" }) });
   });
 
   it("falls through to reviews once the allowance is spent", () => {
@@ -98,6 +98,55 @@ describe("next-card rule", () => {
       justShownId: "c1",
     });
     expect(next).toEqual({ kind: "card", card: b, pulledForward: true });
+  });
+
+  describe("an introduction left unfinished", () => {
+    // A card is written when a word is introduced, so the guess attempt has
+    // something to reference. Quit before answering and the card exists with no
+    // rating — which is a word not yet introduced, not a card to schedule.
+    const unrated = () => card("c1", "w1", NOW, State.New);
+
+    it("is handed back to the introduction path, not scheduled", () => {
+      const next = pickNext({
+        cards: [unrated()],
+        words: WORDS,
+        now: NOW,
+        allowanceLeft: 5,
+      });
+      expect(next).toEqual({
+        kind: "introduce",
+        word: expect.objectContaining({ id: "w1" }),
+        existing: expect.objectContaining({ id: "c1" }),
+      });
+    });
+
+    it("is resumed even when the allowance is spent", () => {
+      // The allowance was already spent when the card was created.
+      const next = pickNext({
+        cards: [unrated()],
+        words: WORDS,
+        now: NOW,
+        allowanceLeft: 0,
+      });
+      expect(next).toMatchObject({ kind: "introduce", existing: { id: "c1" } });
+    });
+
+    it("is finished before any new word is started", () => {
+      const next = pickNext({
+        cards: [unrated()],
+        words: WORDS,
+        now: NOW,
+        allowanceLeft: 5,
+      });
+      expect(next).toMatchObject({ existing: { id: "c1" } });
+    });
+
+    it("is never pulled forward as filler", () => {
+      const future = card("c1", "w1", new Date(NOW.getTime() + 8 * MINUTE), State.New);
+      const next = pickNext({ cards: [future], words: [], now: NOW, allowanceLeft: 0 });
+      // No word for it in the catalogue, so it cannot be introduced either.
+      expect(next).toEqual({ kind: "done" });
+    });
   });
 
   it("is done when nothing is left", () => {

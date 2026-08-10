@@ -1,4 +1,5 @@
-import { Rating, State } from "ts-fsrs";
+import { Rating, State, createEmptyCard } from "ts-fsrs";
+import type { Card as FsrsCard } from "ts-fsrs";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createSession } from "./index";
 import type { Session } from "./index";
@@ -273,6 +274,60 @@ describe("session", () => {
         phase: "done",
         stats: { introduced: 1, recalls: 1, correct: 0, wrong: 1 },
       });
+    });
+  });
+
+  describe("resuming with cards that already exist", () => {
+    // Every other test starts from an empty collection, which is only ever true
+    // on day one. These cover the case that is true every day after.
+    function cardFor(word: Word, fsrs: FsrsCard): Card {
+      return { id: `card-${word.id}`, wordId: word.id, fsrs };
+    }
+
+    it("re-introduces an unrated card instead of demanding a recall", () => {
+      // The bug this guards: a card written at introduction, abandoned before
+      // the guess, came back as a recall — asking for a word never shown.
+      const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
+      expect(s.view.phase).toBe("guess");
+    });
+
+    it("shows the word again on the way through", () => {
+      const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
+      s.submitGuess("cani");
+      expect(s.view).toMatchObject({ phase: "exposure", answer: "chien" });
+    });
+
+    it("does not spend allowance again on a resumed introduction", () => {
+      // loadDeck counts cards created today, so a card left unfinished earlier
+      // today already shows up in introducedToday. Resuming it must not take a
+      // second slot on top of that.
+      const s = createSession({
+        words: [CHIEN, FENETRE],
+        cards: [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))],
+        newPerDay: 1,
+        introducedToday: 1,
+        clock: () => new Date(clockMs),
+        newCardId: () => `card-${++idCounter}`,
+        onAttempt: (a) => attempts.push(a),
+        onCardChange: (c) => changed.push(c),
+      });
+      expect(s.view.phase).toBe("guess");
+      introduce(s, "chien", "good");
+      // fenêtre must not follow: the single slot was spent on chien already.
+      expect(s.view.phase).toBe("done");
+    });
+
+    it("does not write the card again when resuming", () => {
+      makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
+      expect(changed).toHaveLength(0);
+    });
+
+    it("sends a card that has been rated straight to recall", () => {
+      const rated = createEmptyCard(new Date(clockMs));
+      const s = makeSession([CHIEN], 0, [
+        cardFor(CHIEN, { ...rated, reps: 1, state: State.Learning }),
+      ]);
+      expect(s.view.phase).toBe("recall");
     });
   });
 

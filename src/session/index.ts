@@ -88,20 +88,29 @@ export function createSession(options: SessionOptions): Session {
       return;
     }
 
-    if (next.kind === "new") {
-      const card: Card = {
+    if (next.kind === "introduce") {
+      // Reuse the row when resuming an abandoned introduction. Creating a
+      // second card for the same word would be rejected by
+      // unique(user_id, word_id, card_type), and the allowance was already
+      // spent when the first one was made.
+      const resuming = next.existing !== undefined;
+      const card: Card = next.existing ?? {
         id: newCardId(),
         wordId: next.word.id,
         fsrs: createEmptyCard(now),
       };
-      cards.push(card);
-      allowanceLeft -= 1;
+
+      if (!resuming) {
+        cards.push(card);
+        allowanceLeft -= 1;
+        // Announced at creation, not at the first rating. The guess attempt is
+        // recorded before any rating exists, and attempts.card_id is a foreign
+        // key — so a listener that only heard about cards when FSRS moved them
+        // would fail to insert the very first attempt of every new word.
+        options.onCardChange?.(card);
+      }
+
       stats.introduced += 1;
-      // Announced at creation, not at the first rating. The guess attempt is
-      // recorded before any rating exists, and attempts.card_id is a foreign key
-      // — so a listener that only heard about cards when FSRS moved them would
-      // fail to insert the very first attempt of every new word.
-      options.onCardChange?.(card);
       current = { card, word: next.word };
       justShownId = card.id;
       // A word never met starts with a guess: retrieval before exposure aids
