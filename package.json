@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "ci": "npm run check && vite build",
     "preview": "vite preview",
     "prepare": "lefthook install",
     "lint": "oxlint",
