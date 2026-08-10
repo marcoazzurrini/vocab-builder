@@ -156,11 +156,22 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+# Production origin. `config push` sends this to the linked project, so it must
+# be the deployed URL rather than a local one.
+site_url = "https://vocab-builder.marco-azzurrini-art.workers.dev"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# Exact URLs auth may redirect back to. The client always asks for
+# `window.location.origin`, so whichever origin you signed in from is where the
+# link returns you -- but only if it is listed here. A missing entry fails
+# silently: the email arrives, the link "does nothing", and there is no error
+# anywhere to find.
+additional_redirect_urls = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://vocab-builder.marco-azzurrini-art.workers.dev",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -227,9 +238,14 @@ enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+# Throttle between auth emails. The local default of 1s exists so testing is not
+# painful; on a public URL it lets anyone who knows the address trigger mail
+# repeatedly and burn the hourly quota.
+max_frequency = "60s"
 # Number of characters used in the email OTP.
-otp_length = 6
+# Length of the magic-link / OTP code. 6 is the local default; 8 is what the
+# platform ships in production.
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
@@ -307,7 +323,9 @@ verify_enabled = false
 [auth.mfa.phone]
 enroll_enabled = false
 verify_enabled = false
-otp_length = 6
+# Length of the magic-link / OTP code. 6 is the local default; 8 is what the
+# platform ships in production.
+otp_length = 8
 template = "Your code is {{ .Code }}"
 max_frequency = "5s"
 

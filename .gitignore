@@ -10,10 +10,14 @@ dist-ssr/
 build/
 *.local
 
-# Environment — never commit keys (Supabase service role, future Azure, etc.)
-.env
-.env.*
-!.env.example
+# Environment
+#
+# *.local files hold real secrets (service role keys, the Azure key later) and
+# never leave the machine. Plain .env files hold the Supabase URL and publishable
+# key, which are compiled into the client bundle and served to every visitor —
+# public by construction, protected by RLS rather than by secrecy.
+.env.local
+.env.*.local
 
 # Logs
 logs/

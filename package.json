@@ -20,6 +20,7 @@
     "db:test": "docker exec -i supabase_db_vocab-builder psql -U postgres -d postgres -q < supabase/tests/schema_test.sql"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "ts-fsrs": "^5.4.1"
