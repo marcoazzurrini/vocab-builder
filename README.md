@@ -8,8 +8,9 @@ expiry date.
 
 ## Status
 
-Pre-implementation. Pipeline and grading model are settled (below); data model,
-seed content, and scaffolding are next.
+The session logic is built and tested — `src/session/` owns the whole pipeline
+behind one function. Schema, seed content and tooling are in place. Still to do:
+the UI, Supabase wiring, and deployment.
 
 ## Research foundations
 
@@ -82,7 +83,7 @@ because every card is correctly parked two days out. Filling that time by
 dragging tomorrow's cards forward trades a durable gain for a few minutes of
 activity, and it compounds.
 
-Pulling a card forward is safe: FSRS scores on *actual* elapsed time, not
+Pulling a card forward is safe: FSRS scores on _actual_ elapsed time, not
 scheduled time, so an early review is scored correctly. It simply earns less
 stability than the longer gap would have — a small, one-off cost, unlike dead air.
 
@@ -94,9 +95,17 @@ stability once.
 Two things `spikes/scheduler.ts` established by measurement, against earlier
 guesses written here:
 
-- **A minimum-interleave floor does nothing.** Floors of 0, 2 and 3 produce
-  identical sessions and the floor never binds, because the learning step already
-  forces far larger gaps. The idea is dropped.
+- **A minimum-interleave floor of 2 or 3 does nothing.** Floors of 0, 2 and 3
+  produce identical sessions and never bind, because the learning step already
+  forces far larger gaps.
+
+  That measurement was taken on sessions of ten cards or more, and it does not
+  extend to the tail. With two or three cards left, step 3 will hand back the
+  card just answered — massing with extra steps. So a floor of exactly **1**
+  survives: never the same card twice in a row. When that leaves nothing, the
+  session ends, because the gap it wanted cannot be filled today and tomorrow
+  will fill it properly.
+
 - **Once the session never waits, the configured learning step barely matters.**
   `1m,3m` and `1m,10m` yield near-identical sessions, because real spacing is set
   by how many cards are in rotation, not by the clock — the step is a ceiling that
