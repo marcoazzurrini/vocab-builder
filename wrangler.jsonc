@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocab-builder",
+  "compatibility_date": "2026-08-10",
+  "assets": {
+    "directory": "./dist",
+    // No router — the phase state is the router — so every path must serve
+    // index.html rather than 404. Also what makes a magic-link redirect work
+    // when it lands on a path the bundle has not "registered".
+    "not_found_handling": "single-page-application",
+  },
+}
