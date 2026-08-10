@@ -64,12 +64,25 @@ due yet, the answer is never to sit and watch a timer, so the next card is chose
 by this rule:
 
 1. A rated card is due → show it.
-2. An introduction was left unfinished → resume it, without spending allowance.
+2. A word was introduced but never guessed → resume it, without spending allowance.
 3. Today's new-word allowance is not used up → introduce a new word.
 4. A review is due today → show it.
-5. Otherwise, pull forward the soonest-due card **that is still in its learning
+5. A word is waiting for its first recall → show it.
+6. Otherwise, pull forward the soonest-due card **that is still in its learning
    steps today**, never the one just answered.
-6. Nothing left within today → the session is over.
+7. Nothing left within today → the session is over.
+
+**The exposure returns to the queue, it does not fall through to the recall.**
+Producing a word two seconds after being shown it is trivial, and the rating it
+yields is FSRS's _first_ — the one that sets the card's initial difficulty. An
+immediate recall makes that rating measure short-term memory rather than the
+word, which wastes the very signal we protect by refusing to rate guesses.
+
+Step 5 sits after the reviews, so a batch of new words is introduced, the day's
+reviews are worked through, and only then are the new words asked for. FSRS has
+no opinion about a card it has never rated — the first rating is its input, not
+its output — so this placement is ours, and ordering is the honest lever rather
+than an interval we invented to sit alongside FSRS.
 
 An unrated card is not a scheduled card — it is a word that has not been
 introduced yet, so step 2 hands it back to the introduction path. Scheduling it
@@ -190,30 +203,18 @@ FSRS weights and learning steps to be retrained on real data
 
 ## Known gaps
 
-### Resuming an introduction re-asks for the guess
+### None currently blocking
 
-A word's introduction is guess → exposure → recall. The card is written at the
-start, because the guess attempt has a foreign key pointing at it, so quitting
-part-way leaves a card with no rating.
+The introduction gap described here previously — `reps === 0` being unable to
+tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is closed.
+`attempts` is consulted directly: `loadDeck` reads which cards have a guess
+logged, and the session uses that rather than inferring from FSRS state, which
+cannot know because guesses are never rated.
 
-Those cards are now handed back to the introduction path rather than scheduled
-(they were once surfaced as recalls, which asked for a word that had never been
-shown). But `reps === 0` cannot distinguish _"never guessed"_ from _"guessed,
-saw the answer, quit before typing it"_ — guesses are never rated, so both look
-identical. The second case re-asks for a guess you can no longer make honestly,
-and records it as correct.
-
-**The correct fix is to ask `attempts`**, which is the source of truth: no guess
-logged → start at the guess; a guess logged but no recall → resume at the
-exposure. That is precise, never asks for an unseen word, and never records a
-guess made with the answer already known.
-
-It costs one extra query in `loadDeck` and a per-card flag threaded into the
-session, which is why it is not done yet. The window is narrow — quitting in the
-seconds between seeing the word and typing it — and the damage is one inflated
-statistic rather than a broken schedule. Worth doing before guess-accuracy is
-ever reported as a number, since `attempts` is append-only and the contaminated
-rows cannot be cleaned up afterwards.
+On a fresh session a card that was guessed but never recalled is shown again
+before being asked for. Whether its exposure was actually read before the app
+closed is unknowable, and re-showing costs seconds where skipping it would ask
+for a word that may never have been seen.
 
 ## Not in v1
 

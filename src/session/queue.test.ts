@@ -19,11 +19,12 @@ function word(id: string, freqRank: number): Word {
   };
 }
 
-function card(id: string, wordId: string, due: Date, state: State): Card {
+function card(id: string, wordId: string, due: Date, state: State, guessed = false): Card {
   return {
     id,
     wordId,
     fsrs: { ...createEmptyCard(NOW), due, state, reps: state === State.New ? 0 : 1 },
+    guessed,
   };
 }
 

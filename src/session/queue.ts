@@ -7,11 +7,12 @@ import type { Card, Word } from "./types";
  * allowed to be in.
  *
  *   1. A rated learning card that is actually due  — minute-scale, time-critical
- *   2. An introduction left unfinished             — see "unrated cards" below
+ *   2. A word introduced but never guessed         — see "unrated cards" below
  *   3. A new word, while today's allowance lasts
  *   4. A review due today                          — day-scale, order barely matters
- *   5. A rated learning card due later today       — filler, bounded on purpose
- *   6. Nothing → the session is over
+ *   5. A word waiting for its first recall
+ *   6. A rated learning card due later today       — filler, bounded on purpose
+ *   7. Nothing → the session is over
  *
  * New words come before reviews so that their second recall lands *inside* the
  * review block, which is the longest gap the session can offer them for free.
@@ -104,8 +105,9 @@ export function pickNext({
 
   // Finish what was started before starting anything else, and without
   // spending allowance — this word was already counted when its card was made.
-  const unfinished = cards.filter((c) => !isRated(c));
-  for (const card of unfinished.sort((a, b) => a.fsrs.due.getTime() - b.fsrs.due.getTime())) {
+  // Not yet guessed: this word has not been introduced at all.
+  const unstarted = cards.filter((c) => !isRated(c) && !c.guessed);
+  for (const card of unstarted.sort((a, b) => a.fsrs.due.getTime() - b.fsrs.due.getTime())) {
     const word = words.find((w) => w.id === card.wordId);
     if (word) return { kind: "introduce", word, existing: card };
   }
@@ -120,6 +122,19 @@ export function pickNext({
     rated.filter((c) => c.fsrs.state === State.Review && c.fsrs.due <= eod),
   );
   if (reviewDue) return { kind: "card", card: reviewDue, pulledForward: false };
+
+  // Guessed and shown, waiting for its first rating. Placed after the reviews so
+  // the gap between seeing a word and producing it is filled with real work
+  // rather than an interval we invented — FSRS has no opinion about a card it
+  // has never rated, so the placement is ours, and ordering is the honest lever.
+  // justShownId is deliberately NOT applied here. An exposure is not an answer,
+  // so coming straight back to the same card is correct when nothing else is
+  // available — excluding it would expose a lone new word and then never ask
+  // for it.
+  const awaitingFirstRecall = earliestDue(cards.filter((c) => !isRated(c) && c.guessed));
+  if (awaitingFirstRecall) {
+    return { kind: "card", card: awaitingFirstRecall, pulledForward: false };
+  }
 
   const learningToday = earliestDue(
     rated.filter((c) => isLearning(c) && c.fsrs.due <= eod && c.id !== justShownId),

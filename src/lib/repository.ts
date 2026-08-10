@@ -49,8 +49,13 @@ export function reviveFsrsCard(raw: unknown): FsrsCard {
   };
 }
 
-export function toCard(row: CardRow): Card {
-  return { id: row.id, wordId: row.word_id, fsrs: reviveFsrsCard(row.fsrs_state) };
+export function toCard(row: CardRow, guessed = false): Card {
+  return {
+    id: row.id,
+    wordId: row.word_id,
+    fsrs: reviveFsrsCard(row.fsrs_state),
+    guessed,
+  };
 }
 
 function startOfToday(now: Date): Date {
@@ -66,7 +71,7 @@ export type Deck = {
 };
 
 export async function loadDeck(lang: string, now: Date): Promise<Deck> {
-  const [words, cards] = await Promise.all([
+  const [words, cards, guesses] = await Promise.all([
     supabase
       .from("words")
       .select("id, text, gloss, hint, image, kind, freq_rank")
@@ -76,17 +81,24 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
       .from("cards")
       .select("id, word_id, fsrs_state, due, created_at")
       .eq("card_type", "production"),
+    // Which cards have ever been guessed. FSRS state cannot answer this —
+    // guesses are never rated — and attempts is the source of truth, so ask it
+    // rather than infer.
+    supabase.from("attempts").select("card_id").eq("phase", "guess"),
   ]);
 
   if (words.error) throw new Error(`Could not load words: ${words.error.message}`);
   if (cards.error) throw new Error(`Could not load cards: ${cards.error.message}`);
+  if (guesses.error) throw new Error(`Could not load attempts: ${guesses.error.message}`);
+
+  const guessed = new Set((guesses.data ?? []).map((g) => g.card_id as string));
 
   const midnight = startOfToday(now).getTime();
   const rows = (cards.data ?? []) as (CardRow & { created_at: string })[];
 
   return {
     words: (words.data ?? []).map(toWord),
-    cards: rows.map(toCard),
+    cards: rows.map((r) => toCard(r, guessed.has(r.id))),
     // Counted from the cards themselves rather than tracked separately, so
     // reopening the app mid-day resumes the allowance instead of restarting it.
     introducedToday: rows.filter((r) => new Date(r.created_at).getTime() >= midnight).length,

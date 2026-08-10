@@ -16,6 +16,14 @@ export type Card = {
   id: string;
   wordId: string;
   fsrs: FsrsCard;
+  /**
+   * Whether a guess has ever been logged for this card, read from `attempts`.
+   *
+   * Guesses are never rated, so FSRS state cannot tell "never introduced" from
+   * "guessed and shown, waiting for its first recall". Only the attempts table
+   * knows, and it is the source of truth — so it is asked rather than guessed at.
+   */
+  guessed: boolean;
 };
 
 /**

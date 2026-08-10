@@ -62,6 +62,16 @@ function introduce(session: Session, typed: string, effort: "hard" | "good" | "e
   session.submitRecall(typed, effort);
 }
 
+/** Work through introductions until a recall is asked for. */
+function stepUntilRecall(session: Session) {
+  for (let i = 0; i < 50; i++) {
+    const view = session.view;
+    if (view.phase === "guess") session.submitGuess("");
+    else if (view.phase === "exposure") session.exposureDone();
+    else return;
+  }
+}
+
 /** Answer everything until the session says it is over. */
 function drain(session: Session, answerFor: (gloss: string) => string) {
   for (let guard = 0; guard < 200; guard++) {
@@ -129,11 +139,11 @@ describe("session", () => {
       expect(s.view).toMatchObject({ phase: "recall", efforts: ["hard", "good"] });
     });
 
-    it("offers Easy from the second recall onward", () => {
-      const s = makeSession([CHIEN, FENETRE], 2);
-      introduce(s, "chien", "good");
-      introduce(s, "fenêtre", "good");
-      tick(11 * 60_000);
+    it("offers Easy once the card has been rated", () => {
+      const rated = { ...createEmptyCard(new Date(clockMs)), reps: 1, state: State.Learning };
+      const s = makeSession([CHIEN], 0, [
+        { id: "c1", wordId: CHIEN.id, fsrs: rated, guessed: true },
+      ]);
       expect(s.view).toMatchObject({ phase: "recall", efforts: ["hard", "good", "easy"] });
     });
   });
@@ -195,9 +205,10 @@ describe("session", () => {
   describe("flow", () => {
     it("moves straight on after a correct answer", () => {
       const s = makeSession([CHIEN, FENETRE], 2);
-      introduce(s, "chien", "good");
+      stepUntilRecall(s);
+      s.submitRecall("chien", "good");
       // No feedback screen to dismiss — there is nothing to read.
-      expect(s.view.phase).toBe("guess");
+      expect(s.view.phase).not.toBe("feedback");
     });
 
     it("pauses on a wrong answer and shows the correct spelling", () => {
@@ -212,7 +223,9 @@ describe("session", () => {
 
     it("carries on after the feedback is dismissed", () => {
       const s = makeSession([CHIEN, FENETRE], 2);
-      introduce(s, "chein", "good");
+      stepUntilRecall(s);
+      s.submitRecall("chein", "good");
+      expect(s.view.phase).toBe("feedback");
       s.dismissFeedback();
       expect(s.view.phase).not.toBe("feedback");
     });
@@ -280,8 +293,8 @@ describe("session", () => {
   describe("resuming with cards that already exist", () => {
     // Every other test starts from an empty collection, which is only ever true
     // on day one. These cover the case that is true every day after.
-    function cardFor(word: Word, fsrs: FsrsCard): Card {
-      return { id: `card-${word.id}`, wordId: word.id, fsrs };
+    function cardFor(word: Word, fsrs: FsrsCard, guessed = false): Card {
+      return { id: `card-${word.id}`, wordId: word.id, fsrs, guessed };
     }
 
     it("re-introduces an unrated card instead of demanding a recall", () => {
@@ -332,7 +345,10 @@ describe("session", () => {
   });
 
   describe("a session that spans several words", () => {
-    it("introduces every word before repeating any of them", () => {
+    it("introduces every word before asking for any of them back", () => {
+      // The first recall of a word must not follow its exposure directly:
+      // producing it two seconds after seeing it is trivial, and that rating is
+      // FSRS's first — the one that sets initial difficulty.
       const words = Array.from({ length: 5 }, (_, i) => ({
         ...CHIEN,
         id: `w${i}`,
@@ -341,20 +357,21 @@ describe("session", () => {
         freqRank: i,
       }));
       const s = makeSession(words, 5);
-      const seen: string[] = [];
+      const phases: string[] = [];
 
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 10; i++) {
         const view = s.view;
-        expect(view.phase).toBe("guess");
-        s.submitGuess("");
-        s.exposureDone();
-        seen.push((s.view as { prompt: { gloss: string } }).prompt.gloss);
-        s.submitRecall(`mot${i}`, "good");
-        tick(20_000);
+        phases.push(view.phase);
+        if (view.phase === "guess") s.submitGuess("");
+        else if (view.phase === "exposure") s.exposureDone();
+        else break;
       }
 
-      expect(seen).toHaveLength(5);
-      expect(new Set(seen).size).toBe(5);
+      // Ten steps: five guesses and five exposures, no recall among them.
+      expect(phases).toHaveLength(10);
+      expect(phases).not.toContain("recall");
+      expect(phases.filter((p) => p === "guess")).toHaveLength(5);
+      expect(s.view.phase).toBe("recall");
     });
   });
 });

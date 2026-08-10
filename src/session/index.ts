@@ -70,6 +70,14 @@ export function createSession(options: SessionOptions): Session {
   let promptShownAt = clock();
   let lastTyped = "";
   let justShownId: string | undefined;
+  /**
+   * Cards whose exposure has already been shown in this sitting. Not persisted:
+   * on a fresh session a card that was guessed but never recalled is shown
+   * again, since we cannot know whether the exposure was actually read before
+   * the app was closed. Re-showing costs a few seconds; skipping it would ask
+   * for a word that may never have been seen.
+   */
+  const exposedThisSession = new Set<string>();
   const stats: SessionStats = { introduced: 0, recalls: 0, correct: 0, wrong: 0 };
 
   function advance(): void {
@@ -98,6 +106,7 @@ export function createSession(options: SessionOptions): Session {
         id: newCardId(),
         wordId: next.word.id,
         fsrs: createEmptyCard(now),
+        guessed: false,
       };
 
       if (!resuming) {
@@ -132,7 +141,10 @@ export function createSession(options: SessionOptions): Session {
 
     current = { card: next.card, word };
     justShownId = next.card.id;
-    phase = "recall";
+    // A card that has been guessed but never rated is on its way to a first
+    // recall. Show it again unless this sitting already did.
+    phase =
+      next.card.fsrs.reps === 0 && !exposedThisSession.has(next.card.id) ? "exposure" : "recall";
     promptShownAt = now;
   }
 
@@ -190,13 +202,19 @@ export function createSession(options: SessionOptions): Session {
         stateBefore: card.fsrs,
         reviewedAt: now,
       });
+      card.guessed = true;
       phase = "exposure";
     },
 
     exposureDone(): void {
-      requirePhase("exposure");
-      phase = "recall";
-      promptShownAt = clock();
+      const { card } = requirePhase("exposure");
+      exposedThisSession.add(card.id);
+      // Back to the queue rather than straight to recall. Producing a word two
+      // seconds after being shown it is trivial, so the rating it yields — which
+      // is FSRS's first, the one that sets initial difficulty — would measure
+      // short-term memory rather than the word. The next-card rule puts real
+      // work in between instead.
+      advance();
     },
 
     submitRecall(typed: string, effort: Effort): void {
