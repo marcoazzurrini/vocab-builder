@@ -72,7 +72,7 @@ by this rule:
 6. A word has been shown and is waiting to be asked for → ask for it, unless it
    is the one just shown.
 7. Otherwise, pull forward the soonest-due card **that is still in its learning
-   steps today**, never the one just answered.
+   steps today**, never the one just answered and never twice in a sitting.
 8. A word just shown, when there is nothing else at all → ask for it.
 9. Nothing left within today → the session is over.
 
@@ -117,13 +117,23 @@ last so that everything else — including pulling a learning card forward — g
 first. An early review costs a little stability once; a rating #1 taken from the
 short-term buffer misprices the card for its whole life.
 
-Step 7 is deliberately bounded. Pulling forward a card due in five minutes is
-nearly free — it is mid-learning and the gap was minutes either way. Pulling
-forward a card due in three days throws away three days of earned spacing, and
-spacing is where nearly all of the retention comes from. It also empties
-tomorrow, which invites doing it again, and the collection drifts toward massing.
-Anki draws its line in the same place: learn-ahead applies only to learning
-cards, never to mature reviews from future days.
+Step 7 is bounded twice over.
+
+**To learning cards.** Pulling forward a card due in five minutes is nearly free
+— it is mid-learning and the gap was minutes either way. Pulling forward a card
+due in three days throws away three days of earned spacing, and spacing is where
+nearly all of the retention comes from. It also empties tomorrow, which invites
+doing it again, and the collection drifts toward massing. Anki draws its line in
+the same place: learn-ahead applies only to learning cards, never to mature
+reviews from future days.
+
+**To once per card per sitting**, which is what lets a session end at all. A card
+dragged forward is answered, which schedules it a minute out, which is still
+today, so it is dragged forward again. "Never the same card twice running" stops
+the one-card cycle and nothing else, because two cards simply alternate — an hour
+later the session is still going, which is the padding this design exists to
+refuse. A card that genuinely comes due is served by step 1, which is uncapped
+and has earned it.
 
 So a session that has run out is over, not padded. On day one, 15 new words with
 no backlog is about nine minutes of work and then genuinely nothing to do,
@@ -229,9 +239,43 @@ Every rep is logged to an append-only `attempts` table. That history is what all
 FSRS weights and learning steps to be retrained on real data
 (`@open-spaced-repetition/binding`) rather than running on generic defaults forever.
 
+## How this is tested
+
+Three layers, because the bugs came in three kinds.
+
+**Examples** for the rules we decided on — one per claim, each carrying the
+reason it exists.
+
+**A round-trip harness** (`session/harness.ts`) for the rest. Every earlier test
+built its starting cards by hand, and a hand-built fixture can only hold the
+states someone already thought of — which is exactly the set with no bugs in it.
+The harness never writes a card: it runs a sitting, keeps what the session
+emitted, pushes it through the same JSON round trip `jsonb` does, and rebuilds
+the next sitting with the same `buildDeck` the app uses. Closing the app at every
+step of a sitting is then one loop rather than an act of imagination.
+
+**Properties** (`session/properties.test.ts`) over generated histories, because a
+reachable state nobody imagined is found by generating the ways of reaching it,
+not by thinking harder. The invariants in `session/invariants.ts` are the claims
+this document makes: a first recall is always preceded by its exposure in the
+same sitting, no card appears twice running, every card's history opens with
+exactly one guess, `Again` if and only if the answer was wrong, a review is never
+dragged back from a future day, and the session ends. That last one found a real
+defect the day it was written — two cards alternating forever, each dragged
+forward inside its own learning step.
+
 ## Known gaps
 
-### None currently blocking
+### The session has no leech threshold
+
+A card answered wrong is rated `Again` and comes back due in a minute, which is
+the scheduler working. It does mean a learner who never gets a word right is
+never told the session is over: the card keeps genuinely coming due, so step 1
+keeps serving it. Anki's answer is to suspend a card after N lapses. That is a
+product decision, not a scheduling one, so it is written down rather than
+invented here.
+
+### Resolved
 
 The introduction gap described here previously — `reps === 0` being unable to
 tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is closed

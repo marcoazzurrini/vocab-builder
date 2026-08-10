@@ -70,8 +70,9 @@ export function createSession(options: SessionOptions): Session {
   let promptShownAt = clock();
   let lastTyped = "";
   let justShownId: string | undefined;
-  /** Passed to the rule rather than kept here — see `Queue.exposed`. */
+  /** Both passed to the rule rather than kept here — see `Queue.exposed`. */
   const exposedThisSession = new Set<string>();
+  const pulledForwardThisSession = new Set<string>();
   const stats: SessionStats = { introduced: 0, recalls: 0, correct: 0, wrong: 0 };
 
   /** The word a card points at, or undefined if it has left the catalogue. */
@@ -95,6 +96,7 @@ export function createSession(options: SessionOptions): Session {
       now,
       allowanceLeft,
       exposed: exposedThisSession,
+      pulledForward: pulledForwardThisSession,
       justShownId,
     });
 
@@ -144,6 +146,9 @@ export function createSession(options: SessionOptions): Session {
 
       case "expose":
       case "recall": {
+        if (slot.do === "recall" && slot.pulledForward) {
+          pulledForwardThisSession.add(slot.card.id);
+        }
         current = { card: slot.card, word: wordFor(slot.card)! };
         justShownId = slot.card.id;
         phase = slot.do === "expose" ? "exposure" : "recall";

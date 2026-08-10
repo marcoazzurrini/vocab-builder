@@ -57,6 +57,7 @@ function ask(q: Partial<Queue> & Pick<Queue, "cards">): Slot {
     now: NOW,
     allowanceLeft: 0,
     exposed: new Set(),
+    pulledForward: new Set(),
     ...q,
   });
 }
@@ -206,6 +207,7 @@ describe("the next-card rule", () => {
       expect(ask({ cards: [shown, soon], exposed: new Set(["c1"]), justShownId: "c1" })).toEqual({
         do: "recall",
         card: soon,
+        pulledForward: true,
       });
     });
   });
@@ -225,7 +227,11 @@ describe("the next-card rule", () => {
   describe("7. pulling a learning card forward", () => {
     it("fills the gap rather than waiting", () => {
       const soon = scheduled("c1", "w1", State.Learning, new Date(NOW.getTime() + 8 * MINUTE));
-      expect(ask({ cards: [soon], words: [] })).toEqual({ do: "recall", card: soon });
+      expect(ask({ cards: [soon], words: [] })).toEqual({
+        do: "recall",
+        card: soon,
+        pulledForward: true,
+      });
     });
 
     it("never hands back the card just answered", () => {
@@ -241,6 +247,27 @@ describe("the next-card rule", () => {
       expect(ask({ cards: [a, b], words: [], justShownId: "c1" })).toEqual({
         do: "recall",
         card: b,
+        pulledForward: true,
+      });
+    });
+
+    it("gives each card one free ride and no more", () => {
+      // Otherwise the session cannot end: the answer schedules the card a minute
+      // out, which is still today, so it is dragged forward again — and with two
+      // cards they alternate forever, never repeating and never finishing.
+      const a = scheduled("c1", "w1", State.Learning, new Date(NOW.getTime() + 8 * MINUTE));
+      const b = scheduled("c2", "w2", State.Learning, new Date(NOW.getTime() + 9 * MINUTE));
+      expect(ask({ cards: [a, b], words: [], pulledForward: new Set(["c1", "c2"]) })).toEqual({
+        do: "done",
+      });
+    });
+
+    it("still serves a card that has genuinely come due", () => {
+      // The first rule is uncapped: a card that earned its place is not filler.
+      const due = scheduled("c1", "w1", State.Learning, new Date(NOW.getTime() - MINUTE));
+      expect(ask({ cards: [due], words: [], pulledForward: new Set(["c1"]) })).toEqual({
+        do: "recall",
+        card: due,
       });
     });
   });

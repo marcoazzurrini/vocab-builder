@@ -48,7 +48,8 @@ export type Slot =
   /** `card` is set when resuming an introduction that was abandoned. */
   | { do: "introduce"; word: Word; card?: Card }
   | { do: "expose"; card: Card }
-  | { do: "recall"; card: Card }
+  /** `pulledForward` marks filler: a card shown before it was actually due. */
+  | { do: "recall"; card: Card; pulledForward?: true }
   | { do: "done" };
 
 export type Queue = {
@@ -67,6 +68,22 @@ export type Queue = {
    * caller keeping it to itself is what caused the third bug above.
    */
   exposed: ReadonlySet<string>;
+  /**
+   * Cards already pulled forward once in this sitting.
+   *
+   * Without this the session cannot end. A card dragged forward is answered,
+   * which schedules it a minute out, which is still today — so it is dragged
+   * forward again, and again. Never the same card twice running stops the
+   * one-card cycle and nothing else: with two cards they simply alternate, and
+   * an hour later the session is still going, which is the padding this design
+   * exists to refuse.
+   *
+   * Once is the honest ceiling. A card that genuinely comes due is served by the
+   * first rule, which is uncapped and has earned it; a card that has already had
+   * its free ride and is still not due is asking for spacing that today cannot
+   * give it, and tomorrow can.
+   */
+  pulledForward: ReadonlySet<string>;
   /**
    * The card answered a moment ago.
    *
@@ -197,9 +214,12 @@ const awaitingRecall: Rule = (q) => {
 const learnAhead: Rule = (q) => {
   const eod = endOfDay(q.now);
   const card = earliestDue(
-    at(q, "scheduled").filter((c) => isLearning(c) && c.fsrs.due <= eod && c.id !== q.justShownId),
+    at(q, "scheduled").filter(
+      (c) =>
+        isLearning(c) && c.fsrs.due <= eod && c.id !== q.justShownId && !q.pulledForward.has(c.id),
+    ),
   );
-  return card ? { do: "recall", card } : null;
+  return card ? { do: "recall", card, pulledForward: true } : null;
 };
 
 /**

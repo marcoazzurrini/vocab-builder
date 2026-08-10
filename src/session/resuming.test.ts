@@ -84,6 +84,41 @@ describe("a sitting that resumes an earlier one", () => {
   });
 });
 
+describe("a word that is never got right", () => {
+  it("keeps coming back, so the session does not end on its own", () => {
+    // Not a bug, and worth pinning so nobody 'fixes' it: Again schedules the
+    // card a minute out, and a minute later it is genuinely due, so it is served
+    // by the first rule rather than as filler. A card you keep failing keeps
+    // coming back, which is the scheduler working.
+    //
+    // It does mean a learner who never gets three words right is never told the
+    // session is over. Anki's answer is a leech threshold — suspend a card after
+    // N lapses — which is a product decision rather than a scheduling one.
+    const l = createLearner({
+      words: catalogue(3),
+      newPerDay: 3,
+      start: START,
+      behaviour: { correct: () => false },
+    });
+
+    const steps = l.sit(120);
+    expect(steps.filter((s) => s.at === "recall").length).toBeGreaterThan(30);
+    expect(steps.at(-1)).toEqual({ at: "closed" }); // cut short, never finished
+  });
+
+  it("still never repeats a card back to back while doing it", () => {
+    const l = createLearner({
+      words: catalogue(3),
+      newPerDay: 3,
+      start: START,
+      behaviour: { correct: () => false },
+    });
+    l.sit(120);
+
+    expect(repeatsInARow(l.trace)).toEqual([]);
+  });
+});
+
 describe("a sitting that starts from nothing", () => {
   it("introduces the whole batch before asking for any of it", () => {
     const l = learner(5, 5);
