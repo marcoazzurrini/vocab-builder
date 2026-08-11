@@ -18,12 +18,14 @@ export type SessionOptions = {
   introducedToday?: number;
   /** Emitted per answered prompt, guesses included. Persisting them is the caller's job. */
   onAttempt?: (attempt: Attempt) => void;
-  /** Emitted whenever FSRS moves a card. Carries the card to persist. */
+  /**
+   * Emitted whenever FSRS moves a card — which includes the first rating, the
+   * moment the card row is born. Nothing is announced before that: attempts
+   * are keyed by word, so the guess needs no row to point at.
+   */
   onCardChange?: (card: Card) => void;
   /** Injectable so tests are deterministic and latency is measurable. */
   clock?: () => Date;
-  /** Injectable for deterministic ids in tests. */
-  newCardId?: () => string;
   scheduler?: FSRS;
 };
 
@@ -59,7 +61,6 @@ function promptOf(word: Word): Prompt {
  */
 export function createSession(options: SessionOptions): Session {
   const clock = options.clock ?? (() => new Date());
-  const newCardId = options.newCardId ?? (() => crypto.randomUUID());
   const scheduler = options.scheduler ?? fsrs({ enable_short_term: true });
 
   const cards: Card[] = [...options.cards];
@@ -75,9 +76,11 @@ export function createSession(options: SessionOptions): Session {
   const pulledForwardThisSession = new Set<string>();
   const stats: SessionStats = { introduced: 0, recalls: 0, correct: 0, wrong: 0 };
 
+  const wordById = new Map(options.words.map((w) => [w.id, w]));
+
   /** The word a card points at, or undefined if it has left the catalogue. */
   function wordFor(card: Card): Word | undefined {
-    return options.words.find((w) => w.id === card.wordId);
+    return wordById.get(card.wordId);
   }
 
   function advance(): void {
@@ -109,35 +112,11 @@ export function createSession(options: SessionOptions): Session {
         return;
 
       case "introduce": {
-        // Reuse the row when resuming an abandoned introduction. Creating a
-        // second card for the same word would be rejected by
-        // unique(user_id, word_id, card_type), and the allowance was already
-        // spent when the first one was made.
-        const resuming = slot.card !== undefined;
-        const card: Card = slot.card ?? {
-          id: newCardId(),
-          wordId: slot.word.id,
-          fsrs: createEmptyCard(now),
-          guessed: false,
-        };
-
-        if (!resuming) {
-          cards.push(card);
-          allowanceLeft -= 1;
-          // Announced at creation, not at the first rating. The guess attempt is
-          // recorded before any rating exists, and attempts.card_id is a foreign
-          // key — so a listener that only heard about cards when FSRS moved them
-          // would fail to insert the very first attempt of every new word.
-          options.onCardChange?.(card);
-        }
-
-        // A resumed introduction counts too: it is a word met for the first time
-        // in this sitting, which is what the number on the end screen means. It
-        // can exceed the allowance only by resuming a card abandoned on an
-        // earlier day, where the larger number is the honest one.
-        stats.introduced += 1;
-        current = { card, word: slot.word };
-        justShownId = card.id;
+        // Nothing is pushed or spent yet: the word only becomes real at the
+        // guess. Abandon this screen and no trace remains anywhere — which is
+        // the truth of what happened.
+        current = { card: { wordId: slot.word.id, fsrs: createEmptyCard(now) }, word: slot.word };
+        justShownId = slot.word.id;
         // A word never met starts with a guess: retrieval before exposure aids
         // retention even when the guess is wrong, and costs nothing when it is.
         phase = "guess";
@@ -147,10 +126,10 @@ export function createSession(options: SessionOptions): Session {
       case "expose":
       case "recall": {
         if (slot.do === "recall" && slot.pulledForward) {
-          pulledForwardThisSession.add(slot.card.id);
+          pulledForwardThisSession.add(slot.card.wordId);
         }
         current = { card: slot.card, word: wordFor(slot.card)! };
-        justShownId = slot.card.id;
+        justShownId = slot.card.wordId;
         phase = slot.do === "expose" ? "exposure" : "recall";
         return;
       }
@@ -216,7 +195,7 @@ export function createSession(options: SessionOptions): Session {
       // at the same stability and destroy the initial-difficulty signal. An
       // empty string is a valid answer — a shrug is a legitimate pretest.
       record({
-        cardId: card.id,
+        wordId: card.wordId,
         phase: "guess",
         typed,
         correct: matches(typed, word.text),
@@ -225,13 +204,18 @@ export function createSession(options: SessionOptions): Session {
         stateBefore: card.fsrs,
         reviewedAt: now,
       });
-      card.guessed = true;
+      // The guess is the moment the word becomes real: the attempt is on
+      // record, so the card joins the deck and the allowance is spent — not at
+      // the introduce slot, where abandoning would have left a ghost.
+      cards.push(card);
+      allowanceLeft -= 1;
+      stats.introduced += 1;
       phase = "exposure";
     },
 
     exposureDone(): void {
       const { card } = requirePhase("exposure");
-      exposedThisSession.add(card.id);
+      exposedThisSession.add(card.wordId);
       // Back to the queue rather than straight to recall. Producing a word two
       // seconds after being shown it is trivial, so the rating it yields — which
       // is FSRS's first, the one that sets initial difficulty — would measure
@@ -250,7 +234,7 @@ export function createSession(options: SessionOptions): Session {
       options.onCardChange?.(card);
 
       record({
-        cardId: card.id,
+        wordId: card.wordId,
         phase: "recall",
         typed,
         correct,

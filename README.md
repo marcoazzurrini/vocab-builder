@@ -66,32 +66,35 @@ by this rule:
 
 1. A rated learning card is due → ask for it, unless it is the one just
    answered.
-2. A word was introduced but never guessed → resume it, without spending allowance.
-3. Today's new-word allowance is not used up → introduce a new word.
-4. A review is due today → ask for it.
-5. A word is waiting for its first recall and this sitting has not shown it →
+2. Today's new-word allowance is not used up → introduce a new word.
+3. A review is due today → ask for it.
+4. A word is waiting for its first recall and this sitting has not shown it →
    show it.
-6. A word has been shown and is waiting to be asked for → ask for it, unless it
+5. A word has been shown and is waiting to be asked for → ask for it, unless it
    is the one just shown.
-7. Otherwise, pull forward the soonest-due card **that is still in its learning
+6. Otherwise, pull forward the soonest-due card **that is still in its learning
    steps today**, never the one just answered and never twice in a sitting.
-8. A word just shown, when there is nothing else at all → ask for it.
-9. The card just answered has come due again, and there is nothing else at all →
+7. A word just shown, when there is nothing else at all → ask for it.
+8. The card just answered has come due again, and there is nothing else at all →
    ask for it.
-10. Nothing left within today → the session is over.
+9. Nothing left within today → the session is over.
 
 This list is the code. `src/session/queue.ts` holds one named rule per line and
 an array in this order, because prose and precedence living in different places
 is how they came to disagree.
 
-**A card's stage is a value, not an inference.** `unseen` (a row exists, nothing
-has happened), `awaiting` (guessed, and FSRS has still never rated it),
-`scheduled` (rated). FSRS cannot own the first two: it has no opinion about a
-card it has never rated, since the first rating is its input and not its output.
-Every bug this pipeline has shipped came from two places deriving that stage
-differently from `reps`, `state`, `due`, `guessed` and a set of ids held in the
-session — so it is derived once now, and the rule asks what a card _is_ rather
-than reconstructing it from parts.
+**A card's stage is a value, not an inference.** `awaiting` (guessed, and FSRS
+has still never rated it), `scheduled` (rated) — and before either, nothing: no
+row, no state, a word that simply has not been introduced. FSRS cannot own the
+awaiting stage: it has no opinion about a card it has never rated, since the
+first rating is its input and not its output. Every bug this pipeline has
+shipped came from two places deriving the stage differently from `reps`,
+`state`, `due`, a guessed flag and a set of ids held in the session — so it is
+derived once now, and the rule asks what a card _is_ rather than reconstructing
+it from parts. There used to be a third stage, `unseen` — a row written at
+introduction that no guess had reached, an artefact of attempts needing a card
+row for their foreign key. Attempts are keyed by word now, so nothing is
+written until the guess and the ambiguous state cannot exist.
 
 **The exposure returns to the queue, it does not fall through to the recall.**
 Producing a word two seconds after being shown it is trivial, and the rating it
@@ -99,7 +102,7 @@ yields is FSRS's _first_ — the one that sets the card's initial difficulty. An
 immediate recall makes that rating measure short-term memory rather than the
 word, which wastes the very signal we protect by refusing to rate guesses.
 
-Steps 5 and 6 are separate for the same reason. Returning to the queue only helps
+Steps 4 and 5 are separate for the same reason. Returning to the queue only helps
 if the queue can tell that the exposure happened, and it could not: an exposure
 changed nothing the rule could see, so it handed the same card straight back on
 every resumed sitting. Splitting the two means a batch of resumed words is shown
@@ -109,19 +112,19 @@ Both sit after the reviews, so a batch is introduced, the day's reviews are
 worked through, and only then are the new words asked for. Ordering is the honest
 lever here rather than an interval we invented to sit alongside FSRS.
 
-An unrated card is not a scheduled card — it is a word that has not been
-introduced yet, so step 2 hands it back to the introduction path. Scheduling it
+An unrated card is not a scheduled card — it is a word that was guessed and
+never rated, so step 4 shows it again before step 5 asks for it. Scheduling it
 instead is what once asked for a word that had never been shown, since every
 scheduled card goes straight to recall.
 
-Step 8 exists so that step 6's exclusion cannot starve a word: with one card and
+Step 7 exists so that step 5's exclusion cannot starve a word: with one card and
 nothing else to do, coming straight back is right, because refusing would show a
 word and never ask for it, again on the next sitting and the one after. It sits
 after everything else — including pulling a learning card forward — so that all
 of it goes first. An early review costs a little stability once; a rating #1
 taken from the short-term buffer misprices the card for its whole life.
 
-Step 9 is step 8's twin on the other side of a rating. Step 1 refuses the card
+Step 8 is step 7's twin on the other side of a rating. Step 1 refuses the card
 just answered even when it is genuinely due — linger on the feedback screen past
 the learning step and the failed card has come due by the time the feedback is
 dismissed, and handing it straight back when anything else could go between is
@@ -129,7 +132,7 @@ massing. When nothing else exists, refusing would end the session with a card
 due, and the session never waits in either direction — so it is asked, last of
 all.
 
-Step 7 is bounded twice over.
+Step 6 is bounded twice over.
 
 **To learning cards.** Pulling forward a card due in five minutes is nearly free
 — it is mid-learning and the gap was minutes either way. Pulling forward a card
@@ -265,49 +268,50 @@ state for one word. **`attempts`** is the append-only log of every answer.
 None of them wants merging. Folding `words` into `cards` copies the catalogue per
 user. `attempts` is the only unbackfillable thing here, so it stays whatever else
 changes. And `cards` is a materialised projection of `attempts` — derivable in
-principle, stored because replay cost grows with history forever and you cannot
-put an index on a computation, while "what is due for me right now" is the query
-that has to be fast.
+principle, stored because replay cost grows with history forever, while "what is
+due for me right now" is the question that has to be answered on every load.
 
-So the table count is not the problem. The problems are all in one narrow place.
+### Attempts are keyed by their subject
 
-### One fact in two places — TODO
+An attempt is about `(user, word, card_type)`, and that is its key. It used to
+point at the card row instead — the source of truth holding a foreign key into
+its own cache — and that one arrow was the root of every schema defect found
+here. Keyed by subject:
 
-Every schema defect found so far is the same shape, four times. Each is a value
-that exists in two places with nothing keeping the two equal, and the halves
-drift. Roughly half the bugs this app has shipped came from this list.
+- **A card has one name.** `(user_id, word_id, card_type)` is the primary key;
+  there is no uuid to disagree about. Two devices introducing the same word
+  write the same row, and the later write is an ordinary update rather than a
+  rejected duplicate.
 
-1. **A card's identity.** The primary key is a random UUID, but the table also
-   declares `unique(user_id, word_id, card_type)` — and that is the real
-   identity. Two devices introducing the same word mint different UUIDs for the
-   same logical card, and the second write is rejected. Fix: derive the id from
-   the natural key, or promote the natural key to the primary key, so both
-   devices compute the same id and the second write is an ordinary update.
+- **Nothing is written before the guess.** The card row is born at FSRS's first
+  rating; the guess attempt needs no row to point at. A word abandoned on the
+  guess screen leaves no trace, so "row with no attempts" is not a state to
+  handle but a state that cannot exist.
 
-2. **A card's stage.** Whether a word is unseen, guessed, or scheduled is half in
-   `fsrs_state.reps` and half in `attempts`, so the app re-derives it by joining
-   the two. Both of the bugs in `daa4fa4` and `e43721e` were two derivations
-   disagreeing. Fix: complete the projection — either a `stage` column kept
-   current by a trigger on `attempts`, or create the card row at the first
-   _rating_ rather than at introduction, which makes the ambiguous state
-   impossible rather than merely labelled.
+- **Deleting a card leaves history untouched.** A card is a derived cache, and
+  dropping a corrupt one to rebuild from attempts is a legitimate repair — but
+  the old cascade meant the same door erased the history itself. Now `attempts`
+  is beyond reach from the client entirely: no UPDATE, no DELETE, no cascade,
+  and words with history are delete-restricted. "Wipe my progress" became a
+  service-role operation, which is the right price for an unbackfillable table
+  that will one day be the FSRS retraining corpus.
 
-3. **A card's language.** It lives only on the word, so the cards query reaches
-   it through a join. This is safe to denormalise because it cannot go stale — a
-   card's `word_id` never changes. Fix: a `lang` column on `cards`.
+- **One pretest per word is a partial unique index**, not an application
+  promise. When two devices race an introduction, the loser's duplicate guess
+  is rejected by the index and dropped by the client as benign — the pretest is
+  already on record.
 
-4. **A card's due date.** Stored twice: in `fsrs_state.due` and in the
-   denormalised `due` column that the index needs, kept equal by application
-   code. Fix: make `due` a generated column, so divergence stops being possible.
+The grading model is in the schema too: guesses are never rated, and a recall's
+rating agrees with its correctness in both directions — a wrong answer is
+`Again`, a correct one never is.
 
-   ```sql
-   due timestamptz generated always as ((fsrs_state->>'due')::timestamptz) stored
-   ```
-
-`fsrs_state` stays `jsonb`. Its shape belongs to `ts-fsrs`, not to us — it added
-`learning_steps` and deprecated `elapsed_days` recently — and a migration every
-time upstream moves is a worse trade than validating at the boundary, which
-`reviveFsrsCard` now does.
+`fsrs_state` stays `jsonb`, and it is the whole of a card beyond its key. Its
+shape belongs to `ts-fsrs`, not to us — it added `learning_steps` and
+deprecated `elapsed_days` recently — and a migration every time upstream moves
+is a worse trade than validating at the boundary, which `reviveFsrsCard` does:
+known fields checked, unknown fields passed through untouched. The old
+denormalised `due` column is gone rather than generated — no query ever read
+it, and a column no query reads is a fact waiting to drift.
 
 ### There is nowhere to put a setting — TODO
 
@@ -315,23 +319,6 @@ time upstream moves is a worse trade than validating at the boundary, which
 `SessionScreen.tsx` as constants, so changing the daily allowance means a deploy.
 They want a settings row. This is also what multi-language needs before it can be
 anything but a recompile.
-
-### History is erasable in bulk, though not editable — TODO
-
-`attempts` has no UPDATE or DELETE policy or grant, so no row can be edited or
-removed by name. But `attempts.card_id` cascades and a user may delete their own
-cards, so deleting a card takes its history with it — through the foreign key
-rather than through any policy.
-
-That door is the reason card deletion exists: a card is a derived cache, and
-dropping a corrupt one to rebuild it from history is a legitimate repair. The
-same door lets the history be dropped.
-
-For one user on their own data this is closer to a feature than a hole — it is
-what makes "wipe my progress and start again" possible from the client. It stops
-being fine the moment `attempts` is the training corpus for retrained FSRS
-weights, because then a stray delete is unbackfillable. `on delete restrict` is
-the lever, at the cost of making card repair a server-side operation.
 
 ## How this is tested
 
@@ -391,9 +378,9 @@ for good — a product question, so it is written down rather than invented.
 ### Resolved
 
 The introduction gap described here previously — `reps === 0` being unable to
-tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is closed
-twice over: `attempts` is consulted directly for the guess, and a card's stage is
-now a named value rather than something each branch re-derives.
+tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is now
+closed structurally: nothing is written before the guess, so an unrated card
+can only mean one thing. The schema section tells the whole story.
 
 On a fresh session a card that was guessed but never recalled is shown again
 before being asked for. Whether its exposure was actually read before the app
@@ -407,15 +394,17 @@ are independent enough to reorder.
 
 1. **Reset the local database.** `npm run dev` already runs against
    `supabase start`, so what is missing is a way to drop progress and keep the
-   deck. `delete from public.cards` does it — attempts cascade, words and the
-   login survive — where `db:reset` is the heavier version that re-seeds
-   everything and takes the auth user with it.
+   deck. History no longer cascades from cards, so the reset is
+   `delete from public.attempts; delete from public.cards;` run as the table
+   owner (`psql` into the local container) — words and the login survive —
+   where `db:reset` is the heavier version that re-seeds everything and takes
+   the auth user with it.
 
-2. **An integration test layer.** See How this is tested. Nothing runs against a
+2. **The settings row.** See Schema. The last of the schema work, and what
+   multi-language needs before it can be anything but a recompile.
+
+3. **An integration test layer.** See How this is tested. Nothing runs against a
    real Postgres today.
-
-3. **The schema changes above.** Four small ones and a settings table. None is
-   urgent alone; together they close roughly half the bug classes seen so far.
 
 4. **Decide the leech policy.** See Known gaps. A decision before it is code.
 
@@ -439,8 +428,8 @@ are independent enough to reorder.
 
 9. **Retrain FSRS on real data.** The point of the append-only log, and the one
    item genuinely gated on something else: history has to be real reps rather
-   than a byproduct of testing. That same moment is when the cascade above stops
-   being a convenience and starts being a risk.
+   than a byproduct of testing. The history it trains on can no longer be
+   deleted from the client, which is what that moment needed.
 
 ## Not in v1
 

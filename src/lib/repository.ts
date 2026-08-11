@@ -1,4 +1,4 @@
-import { State } from "ts-fsrs";
+import { createEmptyCard, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import * as v from "valibot";
 import type { Attempt, Card, Word } from "../session/types";
@@ -16,15 +16,19 @@ export type WordRow = {
 };
 
 /**
- * `due` is deliberately absent: it exists in the table only so the due query can
- * use an index, and `fsrs_state.due` is the value everything actually reads.
- * Selecting it would invite the two drifting apart in a reader's head.
+ * A `cards` row: nothing but the subject and the scheduling state. The row is
+ * identified by `(user_id, word_id, card_type)` — the user is implied by RLS
+ * and the type is filtered in the query, so what arrives is this.
  */
 export type CardRow = {
-  id: string;
   word_id: string;
   fsrs_state: unknown;
-  created_at: string;
+};
+
+/** A guess attempt as the deck queries return it: which word, and when. */
+export type GuessRow = {
+  word_id: string;
+  reviewed_at: string;
 };
 
 export function toWord(row: WordRow): Word {
@@ -96,12 +100,10 @@ export function reviveFsrsCard(raw: unknown, cardId?: string): FsrsCard {
   return result.output;
 }
 
-export function toCard(row: CardRow, guessed = false): Card {
+export function toCard(row: CardRow): Card {
   return {
-    id: row.id,
     wordId: row.word_id,
-    fsrs: reviveFsrsCard(row.fsrs_state, row.id),
-    guessed,
+    fsrs: reviveFsrsCard(row.fsrs_state, row.word_id),
   };
 }
 
@@ -118,34 +120,50 @@ export type Deck = {
 };
 
 /**
- * Everything `loadDeck` does except the three queries.
+ * Everything `loadDeck` does except the queries.
  *
- * Split out because it is the part with decisions in it — which cards count as
- * guessed, what "today" means — and because a function that reaches for the
- * Supabase singleton cannot be tested. The session harness rebuilds its deck
- * through this exact function, so a test that resumes a sitting resumes it the
- * way the app does rather than the way a fixture author imagined.
+ * Split out because it is the part with decisions in it — which guesses are
+ * awaiting cards, what "today" means — and because a function that reaches for
+ * the Supabase singleton cannot be tested. The session harness rebuilds its
+ * deck through this exact function, so a test that resumes a sitting resumes
+ * it the way the app does rather than the way a fixture author imagined.
+ *
+ * `guessRows` may arrive with overlap — the awaiting query and the today query
+ * can both return the same guess — and the schema guarantees one guess per
+ * word, so deduplicating by word is exact rather than lossy.
  */
 export function buildDeck(
   wordRows: readonly WordRow[],
   cardRows: readonly CardRow[],
-  guessedCardIds: readonly string[],
+  guessRows: readonly GuessRow[],
   now: Date,
 ): Deck {
-  const guessed = new Set(guessedCardIds);
   const midnight = startOfToday(now).getTime();
+  const carded = new Set(cardRows.map((r) => r.word_id));
+  const guesses = new Map(guessRows.map((g) => [g.word_id, g]));
 
   return {
     words: wordRows.map(toWord),
-    cards: cardRows.map((r) => toCard(r, guessed.has(r.id))),
-    // Counted from the cards themselves rather than tracked separately, so
-    // reopening the app mid-day resumes the allowance instead of restarting it.
-    introducedToday: cardRows.filter((r) => new Date(r.created_at).getTime() >= midnight).length,
+    cards: [
+      ...cardRows.map(toCard),
+      // A guess with no card row is a word waiting for its first rating: the
+      // "awaiting" stage, rebuilt from the attempt that defines it. Seeded at
+      // the guess time so the exposure rule shows them in introduction order.
+      ...[...guesses.values()]
+        .filter((g) => !carded.has(g.word_id))
+        .map((g) => ({ wordId: g.word_id, fsrs: createEmptyCard(new Date(g.reviewed_at)) })),
+    ],
+    // Counted from the guesses rather than tracked separately, so reopening
+    // the app mid-day resumes the allowance instead of restarting it. Guesses
+    // are append-only, so not even deleting cards can refund a spent slot.
+    introducedToday: [...guesses.values()].filter(
+      (g) => new Date(g.reviewed_at).getTime() >= midnight,
+    ).length,
   };
 }
 
 export async function loadDeck(lang: string, now: Date): Promise<Deck> {
-  const [words, cards, guesses] = await Promise.all([
+  const [words, cards, awaiting, today] = await Promise.all([
     supabase
       .from("words")
       .select("id, text, gloss, hint, image, kind, freq_rank")
@@ -157,70 +175,67 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
     // on French would silently eat the Spanish allowance.
     supabase
       .from("cards")
-      .select("id, word_id, fsrs_state, created_at, words!inner(lang)")
+      .select("word_id, fsrs_state, words!inner(lang)")
       .eq("card_type", "production")
       .eq("words.lang", lang),
-    // Which cards have ever been guessed. FSRS state cannot answer this —
-    // guesses are never rated — and attempts is the source of truth, so ask it
-    // rather than infer.
-    supabase.from("attempts").select("card_id").eq("phase", "guess"),
+    // Guesses with no card row: words introduced but never rated. A view,
+    // because "no matching card" is an anti-join PostgREST cannot express —
+    // and it is the whole awaiting stage, so it must not be approximated.
+    supabase
+      .from("awaiting_guesses")
+      .select("word_id, reviewed_at")
+      .eq("card_type", "production")
+      .eq("lang", lang),
+    // Guesses since local midnight: what the allowance has already spent.
+    supabase
+      .from("attempts")
+      .select("word_id, reviewed_at, words!inner(lang)")
+      .eq("phase", "guess")
+      .eq("card_type", "production")
+      .eq("words.lang", lang)
+      .gte("reviewed_at", startOfToday(now).toISOString()),
   ]);
 
   if (words.error) throw new Error(`Could not load words: ${words.error.message}`);
   if (cards.error) throw new Error(`Could not load cards: ${cards.error.message}`);
-  if (guesses.error) throw new Error(`Could not load attempts: ${guesses.error.message}`);
+  if (awaiting.error) throw new Error(`Could not load awaiting words: ${awaiting.error.message}`);
+  if (today.error) throw new Error(`Could not load today's guesses: ${today.error.message}`);
 
   return buildDeck(
     (words.data ?? []) as WordRow[],
     (cards.data ?? []) as unknown as CardRow[],
-    (guesses.data ?? []).map((g) => g.card_id as string),
+    [...(awaiting.data ?? []), ...(today.data ?? [])] as unknown as GuessRow[],
     now,
   );
-}
-
-/**
- * The same word was introduced somewhere else — another tab, or a phone that
- * was open at the same time.
- *
- * `unique(user_id, word_id, card_type)` is doing its job here: the row already
- * exists under a different id, so this write is a duplicate rather than an
- * update. Nothing is corrupted, but this session is holding an id the database
- * does not have, so every attempt it goes on to write would fail its foreign
- * key. Reloading adopts the row that won, which is the only way back.
- */
-export class CardAlreadyExistsError extends Error {
-  constructor(wordId: string) {
-    super(`A card for word ${wordId} already exists on another device`);
-    this.name = "CardAlreadyExistsError";
-  }
 }
 
 /** Postgres unique_violation. */
 const UNIQUE_VIOLATION = "23505";
 
+/**
+ * The card is written under its natural key, so there is no id to disagree
+ * about: two devices introducing the same word write the same row, and the
+ * later write is an ordinary update. That was the whole collision — the old
+ * surrogate id let each device mint its own name for the same card.
+ */
 export async function upsertCard(card: Card, userId: string): Promise<void> {
   const { error } = await supabase.from("cards").upsert(
     {
-      id: card.id,
       user_id: userId,
       word_id: card.wordId,
       card_type: "production",
       fsrs_state: card.fsrs,
-      due: card.fsrs.due.toISOString(),
     },
-    { onConflict: "id" },
+    { onConflict: "user_id,word_id,card_type" },
   );
-  if (!error) return;
-  // Conflicting on `id` is an update; conflicting on the word is a different
-  // card for the same word, which is a different problem with a different cure.
-  if (error.code === UNIQUE_VIOLATION) throw new CardAlreadyExistsError(card.wordId);
-  throw new Error(`Could not save card: ${error.message}`);
+  if (error) throw new Error(`Could not save card: ${error.message}`);
 }
 
 export async function insertAttempt(attempt: Attempt, userId: string): Promise<void> {
   const { error } = await supabase.from("attempts").insert({
     user_id: userId,
-    card_id: attempt.cardId,
+    word_id: attempt.wordId,
+    card_type: "production",
     phase: attempt.phase,
     typed: attempt.typed,
     correct: attempt.correct,
@@ -229,7 +244,12 @@ export async function insertAttempt(attempt: Attempt, userId: string): Promise<v
     state_before: attempt.stateBefore,
     reviewed_at: attempt.reviewedAt.toISOString(),
   });
-  if (error) throw new Error(`Could not save attempt: ${error.message}`);
+  if (!error) return;
+  // One guess per word, enforced by a partial unique index — so a duplicate
+  // guess means another device introduced this word first and its pretest is
+  // already on record. Nothing is lost and nothing needs doing.
+  if (error.code === UNIQUE_VIOLATION && attempt.phase === "guess") return;
+  throw new Error(`Could not save attempt: ${error.message}`);
 }
 
 /**

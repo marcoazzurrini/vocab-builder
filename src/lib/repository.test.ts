@@ -1,14 +1,7 @@
 import { createEmptyCard } from "ts-fsrs";
 import { describe, expect, it, vi } from "vitest";
-import {
-  buildDeck,
-  CardAlreadyExistsError,
-  createWriteQueue,
-  reviveFsrsCard,
-  toCard,
-  toWord,
-} from "./repository";
-import type { CardRow, WordRow } from "./repository";
+import { buildDeck, createWriteQueue, reviveFsrsCard, toCard, toWord } from "./repository";
+import type { CardRow, GuessRow, WordRow } from "./repository";
 
 const NOW = new Date("2026-08-10T09:00:00");
 
@@ -50,10 +43,8 @@ describe("reviving FSRS state from jsonb", () => {
   it("survives a full round trip through a card row", () => {
     const fsrs = createEmptyCard(new Date("2026-08-10T09:00:00Z"));
     const card = toCard({
-      id: "c1",
       word_id: "w1",
       fsrs_state: JSON.parse(JSON.stringify(fsrs)),
-      created_at: NOW.toISOString(),
     });
 
     expect(card.fsrs.due).toBeInstanceOf(Date);
@@ -134,38 +125,56 @@ describe("building the deck", () => {
     },
   ];
 
-  function cardRow(id: string, createdAt: Date): CardRow {
+  function cardRow(wordId: string): CardRow {
     return {
-      id,
-      word_id: "w1",
-      fsrs_state: JSON.parse(JSON.stringify(createEmptyCard(createdAt))),
-      created_at: createdAt.toISOString(),
+      word_id: wordId,
+      fsrs_state: JSON.parse(JSON.stringify(createEmptyCard(NOW))),
     };
   }
 
-  it("marks a card guessed when attempts say so, and not otherwise", () => {
-    // FSRS state cannot answer this — guesses are never rated — so the only
-    // honest source is the attempts table.
-    const deck = buildDeck(words, [cardRow("c1", NOW), cardRow("c2", NOW)], ["c1"], NOW);
-    expect(deck.cards.map((c) => c.guessed)).toEqual([true, false]);
+  function guess(wordId: string, at: Date): GuessRow {
+    return { word_id: wordId, reviewed_at: at.toISOString() };
+  }
+
+  it("builds an awaiting card from a guess with no card row", () => {
+    // A guess with no card is a word introduced but never rated — the app
+    // closed between the exposure and the first recall. The card is rebuilt
+    // from the attempt that defines the stage.
+    const deck = buildDeck(words, [], [guess("w1", NOW)], NOW);
+    expect(deck.cards).toHaveLength(1);
+    expect(deck.cards[0]!.wordId).toBe("w1");
+    expect(deck.cards[0]!.fsrs.reps).toBe(0);
   });
 
-  it("counts only cards created since midnight toward the allowance", () => {
-    // Counted from the cards themselves rather than tracked separately, so
-    // reopening the app mid-day resumes the allowance instead of restarting it.
-    const yesterday = new Date(NOW.getTime() - 24 * 60 * 60_000);
-    const deck = buildDeck(words, [cardRow("c1", yesterday), cardRow("c2", NOW)], [], NOW);
+  it("does not double a word that has both a guess and a card row", () => {
+    const deck = buildDeck(words, [cardRow("w1")], [guess("w1", NOW)], NOW);
+    expect(deck.cards).toHaveLength(1);
+  });
+
+  it("tolerates the same guess arriving from both queries", () => {
+    // The awaiting query and the today query can overlap; one guess per word
+    // makes deduplication exact.
+    const deck = buildDeck(words, [], [guess("w1", NOW), guess("w1", NOW)], NOW);
+    expect(deck.cards).toHaveLength(1);
     expect(deck.introducedToday).toBe(1);
   });
 
-  it("counts one created a minute after midnight", () => {
+  it("counts only words guessed since midnight toward the allowance", () => {
+    // Counted from the guesses rather than tracked separately, so reopening
+    // the app mid-day resumes the allowance instead of restarting it.
+    const yesterday = new Date(NOW.getTime() - 24 * 60 * 60_000);
+    const deck = buildDeck(words, [], [guess("w1", yesterday), guess("w2", NOW)], NOW);
+    expect(deck.introducedToday).toBe(1);
+  });
+
+  it("counts one guessed a minute after midnight", () => {
     const justAfterMidnight = new Date("2026-08-10T00:01:00");
-    const deck = buildDeck(words, [cardRow("c1", justAfterMidnight)], [], NOW);
+    const deck = buildDeck(words, [], [guess("w1", justAfterMidnight)], NOW);
     expect(deck.introducedToday).toBe(1);
   });
 
   it("revives the dates jsonb threw away", () => {
-    const deck = buildDeck(words, [cardRow("c1", NOW)], [], NOW);
+    const deck = buildDeck(words, [cardRow("w1")], [], NOW);
     expect(deck.cards[0]!.fsrs.due).toBeInstanceOf(Date);
   });
 });
@@ -197,14 +206,15 @@ describe("write queue", () => {
     expect(onError).toHaveBeenCalledWith(boom);
   });
 
-  it("hands over the error itself, since one kind is acted on rather than shown", async () => {
+  it("hands over the error itself, not a copy of its message", async () => {
+    class MarkerError extends Error {}
     const onError = vi.fn();
     const queue = createWriteQueue(onError);
     queue.push(async () => {
-      throw new CardAlreadyExistsError("w1");
+      throw new MarkerError("boom");
     });
     await queue.settled();
-    expect(onError.mock.calls[0]![0]).toBeInstanceOf(CardAlreadyExistsError);
+    expect(onError.mock.calls[0]![0]).toBeInstanceOf(MarkerError);
   });
 
   it("keeps going after a failure", async () => {

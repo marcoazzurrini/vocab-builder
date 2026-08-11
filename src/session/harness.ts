@@ -16,17 +16,17 @@
  */
 
 import { buildDeck } from "../lib/repository";
-import type { CardRow, WordRow } from "../lib/repository";
+import type { CardRow, GuessRow, WordRow } from "../lib/repository";
 import { createSession } from "./index";
 import type { Attempt, Effort, Word } from "./types";
 
-/** One prompt the session put on screen, and which card it was about. */
+/** One prompt the session put on screen, and which word it was about. */
 export type Step =
-  | { at: "guess"; card: string; word: string }
-  | { at: "exposure"; card: string; word: string }
+  | { at: "guess"; word: string }
+  | { at: "exposure"; word: string }
   /** `first` marks FSRS's rating #1 — the one that sets initial difficulty. */
-  | { at: "recall"; card: string; word: string; first: boolean }
-  | { at: "feedback"; card: string; word: string }
+  | { at: "recall"; word: string; first: boolean }
+  | { at: "feedback"; word: string }
   /** The app was closed. Everything after this came from a fresh load. */
   | { at: "closed" };
 
@@ -59,9 +59,9 @@ export type Learner = {
   readonly now: Date;
   readonly trace: readonly Step[];
   readonly attempts: readonly Attempt[];
-  /** Card ids in creation order, as the database holds them. */
-  readonly cardIds: readonly string[];
-  /** Cards created since local midnight, which is what spends the allowance. */
+  /** Word ids that have a card row, in creation order, as the database holds them. */
+  readonly cardedWordIds: readonly string[];
+  /** Words guessed since local midnight, which is what spends the allowance. */
   readonly introducedToday: number;
 };
 
@@ -101,32 +101,32 @@ export function createLearner(options: {
   }
 
   const wordRows = words.map(toWordRow);
-  /** The `cards` table: insertion-ordered, values as jsonb would hold them. */
+  /** The `cards` table: keyed by word, values as jsonb would hold them. */
   const cardRows = new Map<string, CardRow>();
   /** The `attempts` table: append-only, exactly like the real one. */
   const attempts: Attempt[] = [];
   const trace: Step[] = [];
-  /** How many recalls each card has had, so `behaviour.correct` can vary. */
+  /** How many recalls each word has had, so `behaviour.correct` can vary. */
   const recallCount = new Map<string, number>();
 
   let nowMs = start.getTime();
-  let seq = 0;
 
-  function cardIdFor(wordId: string): string {
-    for (const row of cardRows.values()) if (row.word_id === wordId) return row.id;
-    throw new Error(`no card for word ${wordId} — the session showed it before writing it`);
+  /**
+   * What the deck queries would return: every guess, as a row. `buildDeck`
+   * derives the awaiting words and the spent allowance from these the same way
+   * it does from the real queries — one guess per word makes the union exact.
+   */
+  function guessRows(): GuessRow[] {
+    return attempts
+      .filter((a) => a.phase === "guess")
+      .map((a) => ({ word_id: a.wordId, reviewed_at: a.reviewedAt.toISOString() }));
   }
 
   /** Far past any real sitting: 15 new words is about 28 answers. */
   const NEVER_ENDS = 5_000;
 
   function sit(maxSteps?: number): Step[] {
-    const deck = buildDeck(
-      wordRows,
-      [...cardRows.values()],
-      attempts.filter((a) => a.phase === "guess").map((a) => a.cardId),
-      new Date(nowMs),
-    );
+    const deck = buildDeck(wordRows, [...cardRows.values()], guessRows(), new Date(nowMs));
 
     const session = createSession({
       words: deck.words,
@@ -134,15 +134,12 @@ export function createLearner(options: {
       newPerDay,
       introducedToday: deck.introducedToday,
       clock: () => new Date(nowMs),
-      newCardId: () => `card-${++seq}`,
       onCardChange: (card) => {
-        cardRows.set(card.id, {
-          id: card.id,
+        cardRows.set(card.wordId, {
           word_id: card.wordId,
           // Through JSON, because `fsrs_state` is jsonb and that is where the
           // Date objects are lost.
           fsrs_state: JSON.parse(JSON.stringify(card.fsrs)) as unknown,
-          created_at: cardRows.get(card.id)?.created_at ?? new Date(nowMs).toISOString(),
         });
       },
       onAttempt: (attempt) => attempts.push(attempt),
@@ -161,28 +158,26 @@ export function createLearner(options: {
 
       if (view.phase === "guess") {
         const word = byGloss.get(view.prompt.gloss)!;
-        steps.push({ at: "guess", card: cardIdFor(word.id), word: word.text });
+        steps.push({ at: "guess", word: word.text });
         session.submitGuess("");
       } else if (view.phase === "exposure") {
         const word = byText.get(view.answer)!;
-        steps.push({ at: "exposure", card: cardIdFor(word.id), word: word.text });
+        steps.push({ at: "exposure", word: word.text });
         session.exposureDone();
       } else if (view.phase === "recall") {
         const word = byGloss.get(view.prompt.gloss)!;
-        const card = cardIdFor(word.id);
-        const n = (recallCount.get(card) ?? 0) + 1;
-        recallCount.set(card, n);
+        const n = (recallCount.get(word.id) ?? 0) + 1;
+        recallCount.set(word.id, n);
         const right = correct(word, n);
         steps.push({
           at: "recall",
-          card,
           word: word.text,
-          first: attempts.every((a) => !(a.cardId === card && a.phase === "recall")),
+          first: attempts.every((a) => !(a.wordId === word.id && a.phase === "recall")),
         });
         session.submitRecall(right ? word.text : `${word.text}-sbagliato`, effort(word));
       } else {
         const word = byText.get(view.expected)!;
-        steps.push({ at: "feedback", card: cardIdFor(word.id), word: word.text });
+        steps.push({ at: "feedback", word: word.text });
         session.dismissFeedback();
       }
 
@@ -212,11 +207,12 @@ export function createLearner(options: {
     get attempts() {
       return attempts;
     },
-    get cardIds() {
+    get cardedWordIds() {
       return [...cardRows.keys()];
     },
     get introducedToday() {
-      return buildDeck(wordRows, [...cardRows.values()], [], new Date(nowMs)).introducedToday;
+      return buildDeck(wordRows, [...cardRows.values()], guessRows(), new Date(nowMs))
+        .introducedToday;
     },
   };
 }

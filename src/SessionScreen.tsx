@@ -1,11 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import {
-  CardAlreadyExistsError,
-  createWriteQueue,
-  insertAttempt,
-  loadDeck,
-  upsertCard,
-} from "./lib/repository";
+import { createWriteQueue, insertAttempt, loadDeck, upsertCard } from "./lib/repository";
 import { speak, warmUpVoices } from "./lib/speak";
 import { createSession } from "./session";
 import type { Effort, Session } from "./session";
@@ -38,17 +32,6 @@ export function SessionScreen({ userId }: { userId: string }) {
   const sessionRef = useRef<Session | null>(null);
   const loadedOnRef = useRef(startOfDay(new Date()));
   /**
-   * Whether a write conflict has already been answered with a reload.
-   *
-   * Reloading is meant to adopt the row that won, after which the word is no
-   * longer a candidate and the conflict cannot recur. If it recurs anyway the
-   * assumption was wrong, and repeating the reload is a loop that reintroduces
-   * the same word and hits the same constraint as fast as the network allows.
-   * Once, then say so.
-   */
-  const conflictReloadedRef = useRef(false);
-
-  /**
    * One queue for the component's whole life, not one per load.
    *
    * A queue created inside the load effect dies with it — but its writes do
@@ -57,16 +40,7 @@ export function SessionScreen({ userId }: { userId: string }) {
    * across reloads: the rebuild reads its own writes.
    */
   const queueRef = useRef<ReturnType<typeof createWriteQueue> | null>(null);
-  queueRef.current ??= createWriteQueue((error) => {
-    // Not something to report — the row exists, this session simply holds the
-    // wrong id for it. Reloading adopts the one that won.
-    if (error instanceof CardAlreadyExistsError && !conflictReloadedRef.current) {
-      conflictReloadedRef.current = true;
-      reload();
-    } else {
-      setWriteError(error.message);
-    }
-  });
+  queueRef.current ??= createWriteQueue((error) => setWriteError(error.message));
   const queue = queueRef.current;
 
   useEffect(() => {

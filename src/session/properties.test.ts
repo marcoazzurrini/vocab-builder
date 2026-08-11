@@ -189,8 +189,8 @@ describe("however the history goes", () => {
 
         for (const step of learner.trace as Step[]) {
           if (step.at === "closed") continue;
-          if (step.at === "guess") introduced.add(step.card);
-          else expect(introduced.has(step.card), `${step.at} of an unintroduced card`).toBe(true);
+          if (step.at === "guess") introduced.add(step.word);
+          else expect(introduced.has(step.word), `${step.at} of an unintroduced word`).toBe(true);
         }
       }),
       { numRuns: 200 },

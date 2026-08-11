@@ -36,8 +36,8 @@ export function recallsWithoutExposure(trace: readonly Step[]): PromptStep[] {
   for (const sitting of sittings(trace)) {
     const exposed = new Set<string>();
     for (const step of sitting) {
-      if (step.at === "exposure") exposed.add(step.card);
-      if (step.at === "recall" && step.first && !exposed.has(step.card)) bad.push(step);
+      if (step.at === "exposure") exposed.add(step.word);
+      if (step.at === "recall" && step.first && !exposed.has(step.word)) bad.push(step);
     }
   }
   return bad;
@@ -93,7 +93,7 @@ export function repeatsInARow(
     for (let i = 1; i < sitting.length; i++) {
       const previous = sitting[i - 1]!;
       const next = sitting[i]!;
-      if (previous.card !== next.card) continue;
+      if (previous.word !== next.word) continue;
       if (allowed.has(`${previous.at}→${next.at}`)) continue;
       bad.push({ previous, next });
     }
@@ -109,18 +109,18 @@ export function repeatsInARow(
  * it did not happen, whatever the session believed at the time.
  */
 export function historiesNotStartingWithOneGuess(attempts: readonly Attempt[]): string[] {
-  const byCard = new Map<string, Attempt[]>();
+  const byWord = new Map<string, Attempt[]>();
   for (const a of attempts) {
-    const list = byCard.get(a.cardId) ?? [];
+    const list = byWord.get(a.wordId) ?? [];
     list.push(a);
-    byCard.set(a.cardId, list);
+    byWord.set(a.wordId, list);
   }
 
   const bad: string[] = [];
-  for (const [cardId, history] of byCard) {
+  for (const [wordId, history] of byWord) {
     const guesses = history.filter((a) => a.phase === "guess");
-    if (history[0]?.phase !== "guess") bad.push(`${cardId}: first attempt is not a guess`);
-    else if (guesses.length !== 1) bad.push(`${cardId}: ${guesses.length} guesses`);
+    if (history[0]?.phase !== "guess") bad.push(`${wordId}: first attempt is not a guess`);
+    else if (guesses.length !== 1) bad.push(`${wordId}: ${guesses.length} guesses`);
   }
   return bad;
 }
@@ -164,7 +164,7 @@ export function violations(trace: readonly Step[], attempts: readonly Attempt[])
   return [
     ...reviewsDraggedFromTheFuture(attempts).map(
       (a) =>
-        `review on ${a.cardId} was due ${a.stateBefore.due.toISOString()} ` +
+        `review on ${a.wordId} was due ${a.stateBefore.due.toISOString()} ` +
         `but shown ${a.reviewedAt.toISOString()}`,
     ),
     ...recallsWithoutExposure(trace).map(
@@ -178,7 +178,7 @@ export function violations(trace: readonly Step[], attempts: readonly Attempt[])
     ),
     ...historiesNotStartingWithOneGuess(attempts),
     ...gradingContradictions(attempts).map(
-      (a) => `${a.phase} on ${a.cardId}: correct=${a.correct} rating=${a.rating}`,
+      (a) => `${a.phase} on ${a.wordId}: correct=${a.correct} rating=${a.rating}`,
     ),
   ];
 }

@@ -11,19 +11,22 @@ export type Word = {
   freqRank: number | null;
 };
 
-/** A row from `cards`: one word's scheduling state for one user. */
+/**
+ * One word's scheduling state for one user.
+ *
+ * Identified by its word: a card is *about* a word, and `(user, word, type)` is
+ * the natural key the schema enforces. There is no separate card id — minting
+ * one was what let two devices name the same card differently.
+ *
+ * A `cards` row exists only once FSRS has rated the card. Before that a Card
+ * here is built from the guess attempt alone: guessed but rowless is the
+ * "awaiting" stage, and a word with neither row nor guess simply is not
+ * introduced yet — a state with no representation, rather than a flag to keep
+ * consistent.
+ */
 export type Card = {
-  id: string;
   wordId: string;
   fsrs: FsrsCard;
-  /**
-   * Whether a guess has ever been logged for this card, read from `attempts`.
-   *
-   * Guesses are never rated, so FSRS state cannot tell "never introduced" from
-   * "guessed and shown, waiting for its first recall". Only the attempts table
-   * knows, and it is the source of truth — so it is asked rather than guessed at.
-   */
-  guessed: boolean;
 };
 
 /**
@@ -34,7 +37,8 @@ export type Effort = "hard" | "good" | "easy";
 
 /** A row for `attempts`. Emitted, never stored here — persistence is elsewhere. */
 export type Attempt = {
-  cardId: string;
+  /** Attempts are keyed by what they are about, not by the cache row. */
+  wordId: string;
   phase: "guess" | "recall";
   typed: string;
   correct: boolean;

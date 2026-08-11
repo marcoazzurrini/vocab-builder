@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Deck } from "./lib/repository";
 import type { Word } from "./session/types";
 
 const loadDeck = vi.fn<(lang: string, now: Date) => Promise<Deck>>();
 const upsertCard = vi.fn<() => Promise<void>>();
+const insertAttempt = vi.fn<() => Promise<void>>();
 
 vi.mock("./lib/speak", () => ({ speak: vi.fn(), warmUpVoices: vi.fn() }));
 
@@ -15,11 +16,10 @@ vi.mock("./lib/repository", async (importOriginal) => {
     ...actual,
     loadDeck: (lang: string, now: Date) => loadDeck(lang, now),
     upsertCard: () => upsertCard(),
-    insertAttempt: () => Promise.resolve(),
+    insertAttempt: () => insertAttempt(),
   };
 });
 
-const { CardAlreadyExistsError } = await import("./lib/repository");
 const { SessionScreen } = await import("./SessionScreen");
 
 const CHIEN: Word = {
@@ -44,6 +44,7 @@ describe("the session screen", () => {
   beforeEach(() => {
     loadDeck.mockReset().mockResolvedValue(deck());
     upsertCard.mockReset().mockResolvedValue(undefined);
+    insertAttempt.mockReset().mockResolvedValue(undefined);
   });
   afterEach(() => {
     // Not automatic: Testing Library only registers its own cleanup when
@@ -103,10 +104,11 @@ describe("the session screen", () => {
     vi.setSystemTime(new Date("2026-08-10T23:50:00"));
 
     let release!: () => void;
-    upsertCard.mockImplementation(() => new Promise<void>((r) => (release = r)));
+    insertAttempt.mockImplementation(() => new Promise<void>((r) => (release = r)));
 
     render(<SessionScreen userId="u1" />);
-    await screen.findByText("cane"); // introducing chien queued an upsert that is still open
+    await screen.findByText("cane");
+    fireEvent.click(screen.getByText("Continua")); // a guess, whose write hangs
 
     vi.setSystemTime(new Date("2026-08-11T07:30:00"));
     becomeVisible(); // a new day, so a rebuild is wanted — but not yet
@@ -118,33 +120,13 @@ describe("the session screen", () => {
     await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
   });
 
-  it("reloads rather than reporting when the word was introduced elsewhere", async () => {
-    // The row exists under another id; this session is holding one the database
-    // does not have, so every attempt it writes from here would fail.
-    upsertCard.mockRejectedValueOnce(new CardAlreadyExistsError("w1"));
+  it("reports a write failure it cannot act on", async () => {
+    insertAttempt.mockRejectedValue(new Error("network down"));
 
     render(<SessionScreen userId="u1" />);
     await screen.findByText("cane");
+    fireEvent.click(screen.getByText("Continua")); // the guess's write fails
 
-    await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText(/Salvataggio non riuscito/)).toBeNull();
-  });
-
-  it("reloads once and then reports, rather than looping", async () => {
-    // If the reload does not resolve the conflict, repeating it reintroduces
-    // the same word and hits the same constraint as fast as the network allows.
-    upsertCard.mockRejectedValue(new CardAlreadyExistsError("w1"));
-
-    render(<SessionScreen userId="u1" />);
-
-    expect(await screen.findByText(/already exists on another device/)).toBeDefined();
-    expect(loadDeck).toHaveBeenCalledTimes(2);
-  });
-
-  it("reports a write failure it cannot act on", async () => {
-    upsertCard.mockRejectedValue(new Error("network down"));
-
-    render(<SessionScreen userId="u1" />);
     expect(await screen.findByText(/network down/)).toBeDefined();
   });
 });

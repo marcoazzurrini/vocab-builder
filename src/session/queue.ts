@@ -17,13 +17,17 @@ import type { Card, Word } from "./types";
  *   - an exposure that changed nothing the rule could see, so on every resumed
  *     sitting the rule handed the same card straight back
  *
+ * There used to be a third stage before these two: "unseen", a row written at
+ * introduction that no guess had reached, because the guess attempt needed a
+ * card row to point its foreign key at. Attempts are keyed by word now, so
+ * nothing is written until the guess — a word abandoned on the guess screen
+ * leaves no trace, and the ambiguous state is not labelled but impossible.
+ *
  * FSRS cannot own this: it has no opinion about a card it has never rated, since
- * the first rating is its input and not its output. So the stages before that
- * first rating are ours to name, and they are named here, once.
+ * the first rating is its input and not its output. So the stage before that
+ * first rating is ours to name, and it is named here, once.
  */
 export type Stage =
-  /** A card row exists, but no guess was ever logged. Not introduced yet. */
-  | "unseen"
   /** Guessed, and waiting for the first rating. FSRS still has no opinion. */
   | "awaiting"
   /** Rated at least once. FSRS owns it from here. */
@@ -31,8 +35,7 @@ export type Stage =
 
 /** `reps` counts FSRS ratings, and guesses are never rated. */
 export function stageOf(card: Card): Stage {
-  if (card.fsrs.reps > 0) return "scheduled";
-  return card.guessed ? "awaiting" : "unseen";
+  return card.fsrs.reps > 0 ? "scheduled" : "awaiting";
 }
 
 /**
@@ -45,8 +48,7 @@ export function stageOf(card: Card): Stage {
  * nothing left to drift.
  */
 export type Slot =
-  /** `card` is set when resuming an introduction that was abandoned. */
-  | { do: "introduce"; word: Word; card?: Card }
+  | { do: "introduce"; word: Word }
   | { do: "expose"; card: Card }
   /** `pulledForward` marks filler: a card shown before it was actually due. */
   | { do: "recall"; card: Card; pulledForward?: true }
@@ -59,7 +61,7 @@ export type Queue = {
   /** Today's remaining new-word ceiling. Never exceeded to fill time. */
   allowanceLeft: number;
   /**
-   * Cards whose exposure has already been shown in this sitting.
+   * Words whose exposure has already been shown in this sitting.
    *
    * Not persisted, and deliberately so: closing the app loses the knowledge that
    * an exposure was actually read, and re-showing a word costs seconds where
@@ -69,7 +71,7 @@ export type Queue = {
    */
   exposed: ReadonlySet<string>;
   /**
-   * Cards already pulled forward once in this sitting.
+   * Words already pulled forward once in this sitting.
    *
    * Without this the session cannot end. A card dragged forward is answered,
    * which schedules it a minute out, which is still today — so it is dragged
@@ -79,13 +81,13 @@ export type Queue = {
    * exists to refuse.
    *
    * Once is the honest ceiling. A card that genuinely comes due is served by the
-   * first rule, which is uncapped and has earned it; a card that has already had
-   * its free ride and is still not due is asking for spacing that today cannot
-   * give it, and tomorrow can.
+   * first rule, which has earned it; a card that has already had its free ride
+   * and is still not due is asking for spacing that today cannot give it, and
+   * tomorrow can.
    */
   pulledForward: ReadonlySet<string>;
   /**
-   * The card answered a moment ago.
+   * The word answered a moment ago.
    *
    * A minimum-interleave floor of 2 or 3 measured as doing nothing, but that was
    * on sessions of ten cards or more. In the tail, a floor of exactly 1 — never
@@ -135,34 +137,22 @@ function at(q: Queue, stage: Stage): Card[] {
 const dueLearning: Rule = (q) => {
   const card = earliestDue(
     at(q, "scheduled").filter(
-      (c) => isLearning(c) && c.fsrs.due <= q.now && c.id !== q.justShownId,
+      (c) => isLearning(c) && c.fsrs.due <= q.now && c.wordId !== q.justShownId,
     ),
   );
   return card ? { do: "recall", card } : null;
 };
 
 /**
- * 2. Finish what was started before starting anything else.
- *
- * A card is written the moment a word is introduced, because the guess attempt
- * has a foreign key pointing at it. Quit between the two and the row is left
- * with no rating — which is not a card to schedule, it is a word that has not
- * been introduced. It costs no allowance: that was spent when the row was made.
- */
-const unstarted: Rule = (q) => {
-  const byDue = at(q, "unseen").sort((a, b) => a.fsrs.due.getTime() - b.fsrs.due.getTime());
-  for (const card of byDue) {
-    const word = q.words.find((w) => w.id === card.wordId);
-    if (word) return { do: "introduce", word, card };
-  }
-  return null;
-};
-
-/**
- * 3. A new word, while today's allowance lasts.
+ * 2. A new word, while today's allowance lasts.
  *
  * Before the reviews, so that a new word's second recall lands *inside* the
  * review block — the longest gap the session can give it for free.
+ *
+ * Nothing is written until the word is guessed, so a word abandoned on the
+ * guess screen was never introduced at all: it simply comes up again here,
+ * still new, still costing allowance. A word guessed and then abandoned is a
+ * different thing — it is "awaiting", and rules 4 and 5 own it.
  */
 const newWord: Rule = (q) => {
   if (q.allowanceLeft <= 0) return null;
@@ -173,7 +163,7 @@ const newWord: Rule = (q) => {
   return word ? { do: "introduce", word } : null;
 };
 
-/** 4. A review due today. Day-scale, so the order within the block barely matters. */
+/** 3. A review due today. Day-scale, so the order within the block barely matters. */
 const dueReview: Rule = (q) => {
   const eod = endOfDay(q.now);
   const card = earliestDue(
@@ -183,7 +173,7 @@ const dueReview: Rule = (q) => {
 };
 
 /**
- * 5. Show a word that is waiting for its first recall and has not been shown yet
+ * 4. Show a word that is waiting for its first recall and has not been shown yet
  * in this sitting.
  *
  * Ahead of the recall step, so a batch of resumed words is shown through before
@@ -191,31 +181,31 @@ const dueReview: Rule = (q) => {
  * batch is introduced before the first recall.
  */
 const needsExposure: Rule = (q) => {
-  const card = earliestDue(at(q, "awaiting").filter((c) => !q.exposed.has(c.id)));
+  const card = earliestDue(at(q, "awaiting").filter((c) => !q.exposed.has(c.wordId)));
   return card ? { do: "expose", card } : null;
 };
 
 /**
- * 6. Ask for a word that has been shown.
+ * 5. Ask for a word that has been shown.
  *
  * After the reviews, so the gap between seeing a word and producing it is filled
  * with real work rather than an interval we invented. FSRS has no opinion about
  * a card it has never rated, so this placement is ours, and ordering is the
  * honest lever.
  *
- * The card just shown is excluded here and offered again only as the last rule
- * of all, so that anything else at all — including a learning card pulled
- * forward — goes between an exposure and the recall that follows it.
+ * The card just shown is excluded here and offered again by rule 7, so that
+ * anything else at all — including a learning card pulled forward — goes
+ * between an exposure and the recall that follows it.
  */
 const awaitingRecall: Rule = (q) => {
   const card = earliestDue(
-    at(q, "awaiting").filter((c) => q.exposed.has(c.id) && c.id !== q.justShownId),
+    at(q, "awaiting").filter((c) => q.exposed.has(c.wordId) && c.wordId !== q.justShownId),
   );
   return card ? { do: "recall", card } : null;
 };
 
 /**
- * 7. A rated learning card due later today. Filler, bounded on purpose.
+ * 6. A rated learning card due later today. Filler, bounded on purpose.
  *
  * Pulling a card forward five minutes is nearly free. Pulling one forward from
  * three days out discards three days of earned spacing and empties tomorrow,
@@ -228,14 +218,17 @@ const learnAhead: Rule = (q) => {
   const card = earliestDue(
     at(q, "scheduled").filter(
       (c) =>
-        isLearning(c) && c.fsrs.due <= eod && c.id !== q.justShownId && !q.pulledForward.has(c.id),
+        isLearning(c) &&
+        c.fsrs.due <= eod &&
+        c.wordId !== q.justShownId &&
+        !q.pulledForward.has(c.wordId),
     ),
   );
   return card ? { do: "recall", card, pulledForward: true } : null;
 };
 
 /**
- * 8. Ask for the word just shown, when there is genuinely nothing else.
+ * 7. Ask for the word just shown, when there is genuinely nothing else.
  *
  * Producing a word seconds after seeing it is trivial, and the rating it yields
  * is FSRS's first — the one that sets initial difficulty — so every other rule
@@ -247,14 +240,14 @@ const learnAhead: Rule = (q) => {
  * then never ask for it — again on the next sitting, and the one after that.
  */
 const showAnyway: Rule = (q) => {
-  const card = earliestDue(at(q, "awaiting").filter((c) => q.exposed.has(c.id)));
+  const card = earliestDue(at(q, "awaiting").filter((c) => q.exposed.has(c.wordId)));
   return card ? { do: "recall", card } : null;
 };
 
 /**
- * 9. The card just answered, come due again, when there is nothing else at all.
+ * 8. The card just answered, come due again, when there is nothing else at all.
  *
- * Rule 8's twin on the other side of a rating. Rule 1 refuses the card just
+ * Rule 7's twin on the other side of a rating. Rule 1 refuses the card just
  * answered so that anything else goes between a failure and its return — but
  * when nothing else exists, refusing would end the session with a card due,
  * and the session never waits in either direction. If every other rule came up
@@ -278,7 +271,6 @@ const dueEvenIfJustShown: Rule = (q) => {
  */
 export const RULE: readonly Rule[] = [
   dueLearning,
-  unstarted,
   newWord,
   dueReview,
   needsExposure,

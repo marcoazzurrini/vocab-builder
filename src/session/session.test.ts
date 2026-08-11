@@ -30,13 +30,11 @@ const FENETRE: Word = {
 let clockMs: number;
 let attempts: Attempt[];
 let changed: Card[];
-let idCounter: number;
 
 beforeEach(() => {
   clockMs = START.getTime();
   attempts = [];
   changed = [];
-  idCounter = 0;
 });
 
 function tick(ms: number) {
@@ -49,7 +47,6 @@ function makeSession(words: Word[], newPerDay = 10, cards: Card[] = []): Session
     cards,
     newPerDay,
     clock: () => new Date(clockMs),
-    newCardId: () => `card-${++idCounter}`,
     onAttempt: (a) => attempts.push(a),
     onCardChange: (c) => changed.push(c),
   });
@@ -141,9 +138,7 @@ describe("session", () => {
 
     it("offers Easy once the card has been rated", () => {
       const rated = { ...createEmptyCard(new Date(clockMs)), reps: 1, state: State.Learning };
-      const s = makeSession([CHIEN], 0, [
-        { id: "c1", wordId: CHIEN.id, fsrs: rated, guessed: true },
-      ]);
+      const s = makeSession([CHIEN], 0, [{ wordId: CHIEN.id, fsrs: rated }]);
       expect(s.view).toMatchObject({ phase: "recall", efforts: ["hard", "good", "easy"] });
     });
   });
@@ -179,16 +174,19 @@ describe("session", () => {
       expect(recall).toMatchObject({ rating: Rating.Good });
     });
 
-    it("announces a new card before its first attempt is recorded", () => {
-      // attempts.card_id is a foreign key, and the guess is recorded before any
-      // rating exists — so the card must be announced at creation.
+    it("announces the card only when FSRS first rates it", () => {
+      // Attempts are keyed by word, so the guess needs no card row to point
+      // at. Nothing is written until there is scheduling state worth writing.
       const s = makeSession([CHIEN]);
-      expect(changed).toHaveLength(1);
-      expect(changed[0]!.wordId).toBe(CHIEN.id);
+      expect(changed).toHaveLength(0);
 
       s.submitGuess("cani");
-      const guess = attempts.find((a) => a.phase === "guess")!;
-      expect(changed.some((c) => c.id === guess.cardId)).toBe(true);
+      s.exposureDone();
+      expect(changed).toHaveLength(0);
+
+      s.submitRecall("chien", "good");
+      expect(changed).toHaveLength(1);
+      expect(changed[0]!.wordId).toBe(CHIEN.id);
     });
 
     it("captures the state from before the answer, so history can be replayed", () => {
@@ -307,41 +305,45 @@ describe("session", () => {
   describe("resuming with cards that already exist", () => {
     // Every other test starts from an empty collection, which is only ever true
     // on day one. These cover the case that is true every day after.
-    function cardFor(word: Word, fsrs: FsrsCard, guessed = false): Card {
-      return { id: `card-${word.id}`, wordId: word.id, fsrs, guessed };
+    function cardFor(word: Word, fsrs: FsrsCard): Card {
+      return { wordId: word.id, fsrs };
     }
 
-    it("re-introduces an unrated card instead of demanding a recall", () => {
-      // The bug this guards: a card written at introduction, abandoned before
-      // the guess, came back as a recall — asking for a word never shown.
+    it("resumes a guessed word at its exposure, not at a guess", () => {
+      // An unrated card in the deck can only mean the word was guessed and the
+      // app closed before its first rating: nothing is written before the
+      // guess, and a guess is logged exactly once. So the pretest is already
+      // on record and the word is shown again instead.
       const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
-      expect(s.view.phase).toBe("guess");
-    });
-
-    it("shows the word again on the way through", () => {
-      const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
-      s.submitGuess("cani");
       expect(s.view).toMatchObject({ phase: "exposure", answer: "chien" });
     });
 
-    it("does not spend allowance again on a resumed introduction", () => {
-      // loadDeck counts cards created today, so a card left unfinished earlier
-      // today already shows up in introducedToday. Resuming it must not take a
-      // second slot on top of that.
+    it("does not spend allowance again on a resumed word", () => {
+      // Its guess already counts in introducedToday, so resuming must not take
+      // a second slot on top of that.
       const s = createSession({
         words: [CHIEN, FENETRE],
         cards: [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))],
         newPerDay: 1,
         introducedToday: 1,
         clock: () => new Date(clockMs),
-        newCardId: () => `card-${++idCounter}`,
         onAttempt: (a) => attempts.push(a),
         onCardChange: (c) => changed.push(c),
       });
-      expect(s.view.phase).toBe("guess");
-      introduce(s, "chien", "good");
+      expect(s.view.phase).toBe("exposure");
+      s.exposureDone();
+      s.submitRecall("chien", "good");
       // fenêtre must not follow: the single slot was spent on chien already.
       expect(s.view.phase).toBe("done");
+    });
+
+    it("logs no second guess for a resumed word", () => {
+      // One guess per word is a schema-level promise (a partial unique index),
+      // so the session must never emit another.
+      const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
+      s.exposureDone();
+      s.submitRecall("chien", "good");
+      expect(attempts.filter((a) => a.phase === "guess")).toHaveLength(0);
     });
 
     it("does not write the card again when resuming", () => {
