@@ -33,6 +33,13 @@ type Scenario = {
   gaps: number[];
   answers: boolean[];
   efforts: Effort[];
+  /**
+   * How long each prompt takes, cycled. Up to five minutes, because a learner
+   * who lingers on one screen lets cards come due mid-sitting — the shape that
+   * made a failed card come straight back through its own feedback, which a
+   * fixed 18s pace could never produce.
+   */
+  thinks: number[];
 };
 
 function scenario(options: { maxGap: number }) {
@@ -46,15 +53,18 @@ function scenario(options: { maxGap: number }) {
       minLength: 1,
       maxLength: 8,
     }),
+    thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), { minLength: 1, maxLength: 10 }),
   });
 }
 
 function behaviourFor(s: Scenario): Behaviour {
   let answered = 0;
   let graded = 0;
+  let thought = 0;
   return {
     correct: () => s.answers[answered++ % s.answers.length]!,
     effort: () => s.efforts[graded++ % s.efforts.length]!,
+    msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
   };
 }
 
@@ -94,12 +104,17 @@ describe("however the history goes", () => {
     );
   });
 
-  it("always reaches the end of the session", () => {
-    // A learner who is wrong every time never finishes, and should not: the card
-    // is rated Again and comes back due in a minute, which is the scheduler
-    // working. This one gets one wrong every so often instead, so cards do
-    // eventually graduate. `sit()` throws rather than hangs if that never
-    // happens, so reaching the assertion at all is most of the property.
+  it("ends for any learner who eventually gets each word right", () => {
+    // A learner who keeps failing a word forever genuinely never finishes: the
+    // card is rated Again and comes back due in a minute, which is the
+    // scheduler working — that is the leech gap in the README, and a decision
+    // rather than a bug. The promise this pins is the complement: stumble on
+    // each word a bounded number of times and the session always ends. The
+    // earlier form of this property ("one wrong answer in every N") was
+    // quietly weaker — cycled across enough slow-paced cards it can pin every
+    // wrong answer onto the same word, which is the forever-failing learner
+    // again. `sit()` throws rather than hangs if the end never comes, so
+    // reaching the assertion at all is most of the property.
     fc.assert(
       fc.property(
         fc.record({
@@ -107,15 +122,23 @@ describe("however the history goes", () => {
           newPerDay: fc.integer({ min: 0, max: 12 }),
           cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
           gaps: fc.array(fc.integer({ min: 0, max: 7 * DAY }), { minLength: 1, maxLength: 8 }),
-          wrongEvery: fc.integer({ min: 2, max: 6 }),
+          stumbles: fc.array(fc.integer({ min: 0, max: 3 }), { minLength: 1, maxLength: 25 }),
+          thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), {
+            minLength: 1,
+            maxLength: 10,
+          }),
         }),
         (s) => {
-          let answered = 0;
+          let thought = 0;
+          const stumblesFor = (id: string) => s.stumbles[Number(id.slice(1)) % s.stumbles.length]!;
           const learner = createLearner({
             words: catalogue(s.words),
             newPerDay: s.newPerDay,
             start: NINE_AM,
-            behaviour: { correct: () => ++answered % s.wrongEvery !== 0 },
+            behaviour: {
+              correct: (word, n) => n > stumblesFor(word.id),
+              msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
+            },
           });
 
           s.cuts.forEach((cut, i) => {

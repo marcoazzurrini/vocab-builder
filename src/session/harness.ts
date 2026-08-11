@@ -35,8 +35,13 @@ export type Behaviour = {
   correct?: (word: Word, recallNumber: number) => boolean;
   /** Which grade button is pressed on a correct answer. Defaults to Good. */
   effort?: (word: Word) => Effort;
-  /** How long each prompt takes. Defaults to the measured ~18s. */
-  msPerPrompt?: number;
+  /**
+   * How long each prompt takes; a function is asked once per prompt. Defaults
+   * to the measured ~18s. Worth varying: a learner who lingers on one screen
+   * lets cards come due mid-sitting, which is a shape a fixed pace never
+   * produces — and it hid a real bug once.
+   */
+  msPerPrompt?: number | (() => number);
 };
 
 export type Learner = {
@@ -81,7 +86,8 @@ export function createLearner(options: {
   const { words, newPerDay, start } = options;
   const correct = options.behaviour?.correct ?? (() => true);
   const effort = options.behaviour?.effort ?? (() => "good" as const);
-  const msPerPrompt = options.behaviour?.msPerPrompt ?? 18_000;
+  const pace = options.behaviour?.msPerPrompt ?? 18_000;
+  const msPerPrompt = () => (typeof pace === "function" ? pace() : pace);
 
   // The harness identifies a card from what is on screen, so the catalogue has
   // to be unambiguous. A duplicate would make a passing test meaningless.
@@ -180,7 +186,7 @@ export function createLearner(options: {
         session.dismissFeedback();
       }
 
-      nowMs += msPerPrompt;
+      nowMs += msPerPrompt();
     }
 
     if (maxSteps === undefined && !finished) {
