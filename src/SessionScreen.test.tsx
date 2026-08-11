@@ -14,6 +14,7 @@ vi.mock("./lib/repository", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./lib/repository")>();
   return {
     ...actual,
+    loadSettings: () => Promise.resolve(actual.DEFAULT_SETTINGS),
     loadDeck: (lang: string, now: Date) => loadDeck(lang, now),
     upsertCard: () => upsertCard(),
     insertAttempt: () => insertAttempt(),

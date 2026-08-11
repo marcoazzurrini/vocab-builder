@@ -262,6 +262,35 @@ begin;
   end $$;
 rollback;
 
+-- ── settings ────────────────────────────────────────────────────────────────
+begin;
+  set local role authenticated;
+  set local "request.jwt.claims" =
+    '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+  do $$
+  begin
+    -- 26. a user can create their own settings row, and the defaults are sane
+    insert into public.settings default values;
+    if (select new_per_day from public.settings) = 15
+       and (select day_rollover_hour from public.settings) = 4
+       and (select lang from public.settings) = 'fr' then
+      raise notice 'PASS 26 settings row created with defaults';
+    else
+      raise notice 'FAIL 26 settings defaults wrong';
+    end if;
+
+    -- 27. and cannot write someone else's
+    begin
+      insert into public.settings (user_id)
+      values ('99999999-9999-9999-9999-999999999999');
+      raise notice 'FAIL 27 settings for another user accepted';
+    exception when others then
+      raise notice 'PASS 27 settings for another user blocked (%)', sqlstate;
+    end;
+  end $$;
+rollback;
+
 -- ── anon is locked out entirely ─────────────────────────────────────────────
 begin;
   set local role anon;
@@ -269,9 +298,9 @@ begin;
   declare n int;
   begin
     select count(*) into n from public.words;
-    if n = 0 then raise notice 'PASS 26 anon sees no words';
-    else raise notice 'FAIL 26 anon sees % words', n; end if;
+    if n = 0 then raise notice 'PASS 28 anon sees no words';
+    else raise notice 'FAIL 28 anon sees % words', n; end if;
   exception when insufficient_privilege then
-    raise notice 'PASS 26 anon denied on words';
+    raise notice 'PASS 28 anon denied on words';
   end $$;
 rollback;

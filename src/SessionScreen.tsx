@@ -1,19 +1,23 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import { createWriteQueue, insertAttempt, loadDeck, upsertCard } from "./lib/repository";
+import { dayStart } from "./lib/day";
+import {
+  createWriteQueue,
+  DEFAULT_SETTINGS,
+  insertAttempt,
+  loadDeck,
+  loadSettings,
+  upsertCard,
+} from "./lib/repository";
+import type { Settings } from "./lib/repository";
 import { speak, warmUpVoices } from "./lib/speak";
 import { createSession } from "./session";
 import type { Effort, Session } from "./session";
-
-const LANG = "fr";
-const NEW_PER_DAY = 15;
 
 const EFFORT_LABEL: Record<Effort, string> = {
   hard: "Difficile",
   good: "Bene",
   easy: "Facile",
 };
-
-const startOfDay = (d: Date) => new Date(d).setHours(0, 0, 0, 0);
 
 export function SessionScreen({ userId }: { userId: string }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -30,7 +34,9 @@ export function SessionScreen({ userId }: { userId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   /** Read by the reload effect, which must not re-subscribe on every answer. */
   const sessionRef = useRef<Session | null>(null);
-  const loadedOnRef = useRef(startOfDay(new Date()));
+  /** What the last load ran with. The recheck needs the rollover hour too. */
+  const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
+  const loadedOnRef = useRef(dayStart(new Date(), DEFAULT_SETTINGS.dayRolloverHour).getTime());
   /**
    * One queue for the component's whole life, not one per load.
    *
@@ -53,19 +59,25 @@ export function SessionScreen({ userId }: { userId: string }) {
     // just answered again. Waiting for the queue first closes that gap.
     queue
       .settled()
-      .then(() => {
+      .then(() => loadSettings())
+      .then((settings) => {
+        settingsRef.current = settings;
         const now = new Date();
-        loadedOnRef.current = startOfDay(now);
-        return loadDeck(LANG, now);
+        loadedOnRef.current = dayStart(now, settings.dayRolloverHour).getTime();
+        return Promise.all([
+          loadDeck(settings.lang, now, settings.dayRolloverHour),
+          Promise.resolve(settings),
+        ]);
       })
-      .then((deck) => {
+      .then(([deck, settings]) => {
         if (cancelled) return;
         setWriteError(null);
         const created = createSession({
           words: deck.words,
           cards: deck.cards,
-          newPerDay: NEW_PER_DAY,
+          newPerDay: settings.newPerDay,
           introducedToday: deck.introducedToday,
+          dayRolloverHour: settings.dayRolloverHour,
           onCardChange: (card) => queue.push(() => upsertCard(card, userId)),
           onAttempt: (attempt) => queue.push(() => insertAttempt(attempt, userId)),
         });
@@ -110,7 +122,8 @@ export function SessionScreen({ userId }: { userId: string }) {
   useEffect(() => {
     function recheck() {
       if (document.visibilityState !== "visible") return;
-      const newDay = startOfDay(new Date()) !== loadedOnRef.current;
+      const rollover = settingsRef.current.dayRolloverHour;
+      const newDay = dayStart(new Date(), rollover).getTime() !== loadedOnRef.current;
       const between = sessionRef.current?.view.phase === "done";
       if (newDay || between) reload();
     }

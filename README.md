@@ -313,12 +313,22 @@ known fields checked, unknown fields passed through untouched. The old
 denormalised `due` column is gone rather than generated — no query ever read
 it, and a column no query reads is a fact waiting to drift.
 
-### There is nowhere to put a setting — TODO
+### Settings
 
-`newPerDay` and the language being studied are per-user facts currently living in
-`SessionScreen.tsx` as constants, so changing the daily allowance means a deploy.
-They want a settings row. This is also what multi-language needs before it can be
-anything but a recompile.
+One row per user: `lang`, `new_per_day`, and `day_rollover_hour`. These used to
+be constants in `SessionScreen.tsx`, where changing the daily allowance meant a
+deploy. A user with no row gets the same defaults from the client, mirrored
+from the column defaults. There is no settings UI yet — changing a value means
+one UPDATE — but the app reads the row, which is what multi-language needed
+before it could be anything but a recompile.
+
+`day_rollover_hour` is when the study day begins, and it defaults to 4am, not
+midnight. Midnight is when learners are awake: a sitting at 23:55 that
+continues at 00:05 would get a fresh allowance and tomorrow's reviews, doubling
+the day at exactly the moment doubling hurts. Anki draws the same line in the
+same place. Everything that needs to know what "today" means — the due-today
+window, the allowance, the invariants — asks `src/lib/day.ts`, so the answer
+cannot drift between them.
 
 ## How this is tested
 
@@ -400,33 +410,29 @@ are independent enough to reorder.
    where `db:reset` is the heavier version that re-seeds everything and takes
    the auth user with it.
 
-2. **The settings row.** See Schema. The last of the schema work, and what
-   multi-language needs before it can be anything but a recompile.
-
-3. **An integration test layer.** See How this is tested. Nothing runs against a
+2. **An integration test layer.** See How this is tested. Nothing runs against a
    real Postgres today.
 
-4. **Decide the leech policy.** See Known gaps. A decision before it is code.
+3. **Decide the leech policy.** See Known gaps. A decision before it is code.
 
-5. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
+4. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
    hand-picked scaffold entries (§9, §3.2). This quietly fixes more than content:
    deck exhaustion stops being a thing, and the scheduler finally has enough
    cards that the two-and-three-card tail stops being the common case that every
    rule has to be reasoned about against.
 
-6. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
+5. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
    device supplies, so a bad one teaches bad pronunciation forty times over.
    Browser `speechSynthesis` is a stand-in, not a choice.
 
-7. **Real images.** Emoji are standing in, and several words have none because no
+6. **Real images.** Emoji are standing in, and several words have none because no
    emoji is honest for them.
 
-8. **Multi-language, for real.** `lang` is first-class in the schema, but the app
-   is hardcoded to French and there is no way to choose. Needs the settings row
-   first, and needs a decision about what switching means given that languages
-   are studied one at a time.
+7. **Multi-language, for real.** `lang` is first-class in the schema and the
+   settings row now chooses it, but there is no UI to switch and no decision
+   about what switching means given that languages are studied one at a time.
 
-9. **Retrain FSRS on real data.** The point of the append-only log, and the one
+8. **Retrain FSRS on real data.** The point of the append-only log, and the one
    item genuinely gated on something else: history has to be real reps rather
    than a byproduct of testing. The history it trains on can no longer be
    deleted from the client, which is what that moment needed.

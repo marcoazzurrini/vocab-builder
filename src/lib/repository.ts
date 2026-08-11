@@ -114,6 +114,29 @@ export type Deck = {
   introducedToday: number;
 };
 
+export type Settings = {
+  lang: string;
+  newPerDay: number;
+  dayRolloverHour: number;
+};
+
+/** Mirrors the column defaults, for a user who has never written a row. */
+export const DEFAULT_SETTINGS: Settings = { lang: "fr", newPerDay: 15, dayRolloverHour: 4 };
+
+export async function loadSettings(): Promise<Settings> {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("lang, new_per_day, day_rollover_hour")
+    .maybeSingle();
+  if (error) throw new Error(`Could not load settings: ${error.message}`);
+  if (!data) return DEFAULT_SETTINGS;
+  return {
+    lang: data.lang as string,
+    newPerDay: data.new_per_day as number,
+    dayRolloverHour: data.day_rollover_hour as number,
+  };
+}
+
 /**
  * Everything `loadDeck` does except the queries.
  *
