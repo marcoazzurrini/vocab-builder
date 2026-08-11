@@ -11,7 +11,7 @@ expiry date.
 Deployed and usable: sign in with a magic link, answer cards, progress is saved.
 `src/session/` owns the whole pipeline behind one function. What is outstanding
 is in What's next, and the things that are wrong rather than missing are under
-Schema and Known gaps.
+Known gaps.
 
 ## Research foundations
 
@@ -259,76 +259,11 @@ FSRS weights and learning steps to be retrained on real data
 
 ## Schema
 
-Three tables, and the split is load-bearing.
-
-**`words`** is the shared catalogue: the same rows for everyone, read-only to
-users, one row per `(lang, text, gloss)`. **`cards`** is one user's scheduling
-state for one word. **`attempts`** is the append-only log of every answer.
-
-None of them wants merging. Folding `words` into `cards` copies the catalogue per
-user. `attempts` is the only unbackfillable thing here, so it stays whatever else
-changes. And `cards` is a materialised projection of `attempts` — derivable in
-principle, stored because replay cost grows with history forever, while "what is
-due for me right now" is the question that has to be answered on every load.
-
-### Attempts are keyed by their subject
-
-An attempt is about `(user, word, card_type)`, and that is its key. It used to
-point at the card row instead — the source of truth holding a foreign key into
-its own cache — and that one arrow was the root of every schema defect found
-here. Keyed by subject:
-
-- **A card has one name.** `(user_id, word_id, card_type)` is the primary key;
-  there is no uuid to disagree about. Two devices introducing the same word
-  write the same row, and the later write is an ordinary update rather than a
-  rejected duplicate.
-
-- **Nothing is written before the guess.** The card row is born at FSRS's first
-  rating; the guess attempt needs no row to point at. A word abandoned on the
-  guess screen leaves no trace, so "row with no attempts" is not a state to
-  handle but a state that cannot exist.
-
-- **Deleting a card leaves history untouched.** A card is a derived cache, and
-  dropping a corrupt one to rebuild from attempts is a legitimate repair — but
-  the old cascade meant the same door erased the history itself. Now `attempts`
-  is beyond reach from the client entirely: no UPDATE, no DELETE, no cascade,
-  and words with history are delete-restricted. "Wipe my progress" became a
-  service-role operation, which is the right price for an unbackfillable table
-  that will one day be the FSRS retraining corpus.
-
-- **One pretest per word is a partial unique index**, not an application
-  promise. When two devices race an introduction, the loser's duplicate guess
-  is rejected by the index and dropped by the client as benign — the pretest is
-  already on record.
-
-The grading model is in the schema too: guesses are never rated, and a recall's
-rating agrees with its correctness in both directions — a wrong answer is
-`Again`, a correct one never is.
-
-`fsrs_state` stays `jsonb`, and it is the whole of a card beyond its key. Its
-shape belongs to `ts-fsrs`, not to us — it added `learning_steps` and
-deprecated `elapsed_days` recently — and a migration every time upstream moves
-is a worse trade than validating at the boundary, which `reviveFsrsCard` does:
-known fields checked, unknown fields passed through untouched. The old
-denormalised `due` column is gone rather than generated — no query ever read
-it, and a column no query reads is a fact waiting to drift.
-
-### Settings
-
-One row per user: `lang`, `new_per_day`, and `day_rollover_hour`. These used to
-be constants in `SessionScreen.tsx`, where changing the daily allowance meant a
-deploy. A user with no row gets the same defaults from the client, mirrored
-from the column defaults. There is no settings UI yet — changing a value means
-one UPDATE — but the app reads the row, which is what multi-language needed
-before it could be anything but a recompile.
-
-`day_rollover_hour` is when the study day begins, and it defaults to 4am, not
-midnight. Midnight is when learners are awake: a sitting at 23:55 that
-continues at 00:05 would get a fresh allowance and tomorrow's reviews, doubling
-the day at exactly the moment doubling hurts. Anki draws the same line in the
-same place. Everything that needs to know what "today" means — the due-today
-window, the allowance, the invariants — asks `src/lib/day.ts`, so the answer
-cannot drift between them.
+Deliberately not described here. The migrations in `supabase/migrations/` are
+the schema, design rationale included in their comments, and prose that
+paraphrases them is a copy that drifts — this section used to be that copy.
+Read them in order; later migrations revise the decisions of earlier ones and
+say why.
 
 ## How this is tested
 
@@ -390,7 +325,7 @@ for good — a product question, so it is written down rather than invented.
 The introduction gap described here previously — `reps === 0` being unable to
 tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is now
 closed structurally: nothing is written before the guess, so an unrated card
-can only mean one thing. The schema section tells the whole story.
+can only mean one thing. The migration that made it so tells the whole story.
 
 On a fresh session a card that was guessed but never recalled is shown again
 before being asked for. Whether its exposure was actually read before the app
