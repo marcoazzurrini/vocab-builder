@@ -95,6 +95,29 @@ describe("the session screen", () => {
     await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
   });
 
+  it("waits for writes in flight before rebuilding the deck", async () => {
+    // A rebuild that reads the database past its own unfinished writes serves
+    // the card just answered again. The deck must not be re-read until the
+    // queue has drained.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-10T23:50:00"));
+
+    let release!: () => void;
+    upsertCard.mockImplementation(() => new Promise<void>((r) => (release = r)));
+
+    render(<SessionScreen userId="u1" />);
+    await screen.findByText("cane"); // introducing chien queued an upsert that is still open
+
+    vi.setSystemTime(new Date("2026-08-11T07:30:00"));
+    becomeVisible(); // a new day, so a rebuild is wanted — but not yet
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(loadDeck).toHaveBeenCalledTimes(1);
+
+    release();
+    await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
+  });
+
   it("reloads rather than reporting when the word was introduced elsewhere", async () => {
     // The row exists under another id; this session is holding one the database
     // does not have, so every attempt it writes from here would fail.

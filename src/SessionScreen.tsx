@@ -48,24 +48,42 @@ export function SessionScreen({ userId }: { userId: string }) {
    */
   const conflictReloadedRef = useRef(false);
 
+  /**
+   * One queue for the component's whole life, not one per load.
+   *
+   * A queue created inside the load effect dies with it — but its writes do
+   * not, so a rebuild would race the previous session's unfinished writes and
+   * read the database from before them. Shared, the queue can be waited on
+   * across reloads: the rebuild reads its own writes.
+   */
+  const queueRef = useRef<ReturnType<typeof createWriteQueue> | null>(null);
+  queueRef.current ??= createWriteQueue((error) => {
+    // Not something to report — the row exists, this session simply holds the
+    // wrong id for it. Reloading adopts the one that won.
+    if (error instanceof CardAlreadyExistsError && !conflictReloadedRef.current) {
+      conflictReloadedRef.current = true;
+      reload();
+    } else {
+      setWriteError(error.message);
+    }
+  });
+  const queue = queueRef.current;
+
   useEffect(() => {
     warmUpVoices();
     let cancelled = false;
-    const queue = createWriteQueue((error) => {
-      // Not something to report — the row exists, this session simply holds the
-      // wrong id for it. Reloading adopts the one that won.
-      if (error instanceof CardAlreadyExistsError && !conflictReloadedRef.current) {
-        conflictReloadedRef.current = true;
-        reload();
-      } else {
-        setWriteError(error.message);
-      }
-    });
 
-    const now = new Date();
-    loadedOnRef.current = startOfDay(now);
-
-    loadDeck(LANG, now)
+    // Writes run in the background, so a rebuild can race its own history:
+    // answer the last card, see "Bravo", switch apps and back — and the deck
+    // is re-read while the answer is still in flight, which serves the card
+    // just answered again. Waiting for the queue first closes that gap.
+    queue
+      .settled()
+      .then(() => {
+        const now = new Date();
+        loadedOnRef.current = startOfDay(now);
+        return loadDeck(LANG, now);
+      })
       .then((deck) => {
         if (cancelled) return;
         setWriteError(null);
@@ -87,7 +105,20 @@ export function SessionScreen({ userId }: { userId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [userId, reloadCount]);
+  }, [userId, reloadCount, queue]);
+
+  /**
+   * A tab closed with writes in flight loses them, and `attempts` is the one
+   * table that cannot be rebuilt. The browser shows its generic "leave site?"
+   * dialog — not our words, but our timing.
+   */
+  useEffect(() => {
+    function warn(event: BeforeUnloadEvent) {
+      if (queue.pending > 0) event.preventDefault();
+    }
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [queue]);
 
   /**
    * Come back to a session that is still true.
