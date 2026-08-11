@@ -7,7 +7,8 @@
 --
 -- The append-only guarantee on `attempts` is enforced by the ABSENCE of UPDATE and
 -- DELETE policies: RLS denies by default, so omitting them makes the table
--- insert/select only. See the RLS section at the bottom.
+-- insert/select only. It has one door left open, by design -- deleting a card
+-- cascades to its attempts. See the RLS section at the bottom.
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -200,7 +201,15 @@ create policy "own cards are deletable"
 -- attempts: insert and select only.
 --
 -- There is deliberately no UPDATE or DELETE policy, and no UPDATE or DELETE
--- grant below. History cannot be rewritten through the API even by its author.
+-- grant below, so no row here can be edited or removed by name.
+--
+-- That is not the same as history being immutable, and the difference is worth
+-- being exact about. `attempts.card_id` cascades, and a user may delete their
+-- own cards -- so deleting a card takes its attempts with it, through the
+-- foreign key rather than through any policy. The cascade is what makes "drop a
+-- corrupt card and rebuild it from history" possible, and the same door lets
+-- that history be dropped. Erasable in bulk, then, but not editable: what
+-- remains cannot have been altered. See Known gaps in the README.
 create policy "own attempts are readable"
   on public.attempts for select to authenticated
   using ((select auth.uid()) = user_id);

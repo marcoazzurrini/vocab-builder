@@ -269,20 +269,71 @@ forward inside its own learning step.
 
 ## Known gaps
 
-### The session has no leech threshold
+### The session has no leech threshold — TODO
 
 A card answered wrong is rated `Again` and comes back due in a minute, which is
 the scheduler working. It does mean a learner who never gets a word right is
 never told the session is over: the card keeps genuinely coming due, so step 1
-keeps serving it. Anki's answer is to suspend a card after N lapses. That is a
-product decision, not a scheduling one, so it is written down rather than
-invented here.
+keeps serving it, and a bad day on three words is a session with no end.
+
+Anki's answer is a **leech**: after N lapses (default 8) the card is tagged and,
+by default, _suspended_ — pulled out of scheduling indefinitely, until you go and
+unsuspend it by hand. That default assumes a card browser to unsuspend it from,
+which this app does not have and does not want.
+
+So the version to build here is probably softer: **park the card until tomorrow**
+rather than forever. It ends the session, which is the actual problem, and it
+needs no management UI, because the next day returns the card on its own. A
+permanent suspension can come later if some word turns out to be genuinely
+unlearnable, and by then `attempts` will say which.
+
+Either way the decision is which lapse count, and whether parking is for a day or
+for good — a product question, so it is written down rather than invented.
+
+### Two devices can collide on a new card — TODO
+
+Introducing a word means writing its `cards` row: the catalogue is fixed and
+shared, and a card is one user's scheduling state for one word. So "introduced"
+is exactly "a card row now exists for me and this word".
+
+Open the app on a phone and a laptop at once and both may introduce the same
+word. Each mints its own UUID, and `unique(user_id, word_id, card_type)` rejects
+the second — correctly, since one word gets one card. But that session is then
+holding an id the database does not have, so every attempt it writes would fail
+its foreign key.
+
+Today it is contained rather than fixed: the write is a named error, the screen
+reloads once to adopt the row that won, and if the conflict survives that it is
+reported instead of retried. The real fix is to stop minting random ids and
+derive them, so that both devices generate the _same_ id for the same
+(user, word, card_type) and the second write is an ordinary update. That wants
+deciding before `listening` cards make the key wider.
+
+### History is erasable in bulk, though not editable — TODO
+
+`attempts` has no UPDATE or DELETE policy or grant, so no row can be edited or
+removed by name. But `attempts.card_id` cascades and a user may delete their own
+cards, so deleting a card takes its history with it — through the foreign key
+rather than through any policy.
+
+That door is the reason card deletion exists at all: a card is a derived cache,
+and dropping a corrupt one to rebuild it from history is a legitimate repair. The
+same door lets the history be dropped.
+
+For one user on their own data this is closer to a feature than a hole — it is
+what makes "wipe my progress and start again" possible from the client. It stops
+being fine the moment `attempts` is the training corpus for retrained FSRS
+weights, because then a stray delete is unbackfillable. `on delete restrict` is
+the lever, at the cost of making card repair a server-side operation.
 
 ### Cards do not carry their own language
 
-`lang` lives on `words`, so the cards query filters through a join. That is
-correct but it is a join on every load, and a card's language is a fact about the
-card. Worth a column when the second language actually lands.
+`lang` lives on `words`, so the cards query filters through a join
+(`words!inner(lang)`). That is correct — verified against the local database as a
+signed-in user, where the unfiltered query returns every language's cards and the
+filtered one returns only the asked-for language — but it is a join on every
+load, and a card's language is a fact about the card. Worth a column when the
+second language actually lands.
 
 ### Resolved
 
