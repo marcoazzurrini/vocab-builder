@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:reset": "supabase db reset",
+    "db:reset-progress": "docker exec -i supabase_db_vocab-builder psql -U postgres -d postgres -c 'delete from public.attempts' -c 'delete from public.cards'",
     "db:test": "docker exec -i supabase_db_vocab-builder psql -U postgres -d postgres -q < supabase/tests/schema_test.sql"
   },
   "dependencies": {

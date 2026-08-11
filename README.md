@@ -337,37 +337,29 @@ for a word that may never have been seen.
 Roughly in order. The first is small and unblocks the rest day to day; the rest
 are independent enough to reorder.
 
-1. **Reset the local database.** `npm run dev` already runs against
-   `supabase start`, so what is missing is a way to drop progress and keep the
-   deck. History no longer cascades from cards, so the reset is
-   `delete from public.attempts; delete from public.cards;` run as the table
-   owner (`psql` into the local container) — words and the login survive —
-   where `db:reset` is the heavier version that re-seeds everything and takes
-   the auth user with it.
-
-2. **An integration test layer.** See How this is tested. Nothing runs against a
+1. **An integration test layer.** See How this is tested. Nothing runs against a
    real Postgres today.
 
-3. **Decide the leech policy.** See Known gaps. A decision before it is code.
+2. **Decide the leech policy.** See Known gaps. A decision before it is code.
 
-4. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
+3. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
    hand-picked scaffold entries (§9, §3.2). This quietly fixes more than content:
    deck exhaustion stops being a thing, and the scheduler finally has enough
    cards that the two-and-three-card tail stops being the common case that every
    rule has to be reasoned about against.
 
-5. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
+4. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
    device supplies, so a bad one teaches bad pronunciation forty times over.
    Browser `speechSynthesis` is a stand-in, not a choice.
 
-6. **Real images.** Emoji are standing in, and several words have none because no
+5. **Real images.** Emoji are standing in, and several words have none because no
    emoji is honest for them.
 
-7. **Multi-language, for real.** `lang` is first-class in the schema and the
+6. **Multi-language, for real.** `lang` is first-class in the schema and the
    settings row now chooses it, but there is no UI to switch and no decision
    about what switching means given that languages are studied one at a time.
 
-8. **Retrain FSRS on real data.** The point of the append-only log, and the one
+7. **Retrain FSRS on real data.** The point of the append-only log, and the one
    item genuinely gated on something else: history has to be real reps rather
    than a byproduct of testing. The history it trains on can no longer be
    deleted from the client, which is what that moment needed.
