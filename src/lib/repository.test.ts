@@ -173,6 +173,14 @@ describe("building the deck", () => {
     expect(deck.introducedToday).toBe(1);
   });
 
+  it("counts a small-hours guess as yesterday's when the day rolls over at four", () => {
+    // A 00:30 sitting is still yesterday's sitting: its guesses must not
+    // come out of the new day's allowance.
+    const halfPastMidnight = new Date("2026-08-10T00:30:00");
+    const deck = buildDeck(words, [], [guess("w1", halfPastMidnight)], NOW, 4);
+    expect(deck.introducedToday).toBe(0);
+  });
+
   it("revives the dates jsonb threw away", () => {
     const deck = buildDeck(words, [cardRow("w1")], [], NOW);
     expect(deck.cards[0]!.fsrs.due).toBeInstanceOf(Date);

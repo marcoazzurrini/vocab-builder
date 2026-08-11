@@ -2,6 +2,7 @@ import { createEmptyCard, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import * as v from "valibot";
 import type { Attempt, Card, Word } from "../session/types";
+import { dayStart } from "./day";
 import { supabase } from "./supabase";
 
 /** Rows as Postgres returns them: snake_case, dates as strings. */
@@ -107,12 +108,6 @@ export function toCard(row: CardRow): Card {
   };
 }
 
-function startOfToday(now: Date): Date {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  return start;
-}
-
 export type Deck = {
   words: Word[];
   cards: Card[];
@@ -137,8 +132,9 @@ export function buildDeck(
   cardRows: readonly CardRow[],
   guessRows: readonly GuessRow[],
   now: Date,
+  dayRolloverHour = 0,
 ): Deck {
-  const midnight = startOfToday(now).getTime();
+  const midnight = dayStart(now, dayRolloverHour).getTime();
   const carded = new Set(cardRows.map((r) => r.word_id));
   const guesses = new Map(guessRows.map((g) => [g.word_id, g]));
 
@@ -162,7 +158,7 @@ export function buildDeck(
   };
 }
 
-export async function loadDeck(lang: string, now: Date): Promise<Deck> {
+export async function loadDeck(lang: string, now: Date, dayRolloverHour = 0): Promise<Deck> {
   const [words, cards, awaiting, today] = await Promise.all([
     supabase
       .from("words")
@@ -186,14 +182,14 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
       .select("word_id, reviewed_at")
       .eq("card_type", "production")
       .eq("lang", lang),
-    // Guesses since local midnight: what the allowance has already spent.
+    // Guesses since the day rolled over: what the allowance has already spent.
     supabase
       .from("attempts")
       .select("word_id, reviewed_at, words!inner(lang)")
       .eq("phase", "guess")
       .eq("card_type", "production")
       .eq("words.lang", lang)
-      .gte("reviewed_at", startOfToday(now).toISOString()),
+      .gte("reviewed_at", dayStart(now, dayRolloverHour).toISOString()),
   ]);
 
   if (words.error) throw new Error(`Could not load words: ${words.error.message}`);
@@ -206,6 +202,7 @@ export async function loadDeck(lang: string, now: Date): Promise<Deck> {
     (cards.data ?? []) as unknown as CardRow[],
     [...(awaiting.data ?? []), ...(today.data ?? [])] as unknown as GuessRow[],
     now,
+    dayRolloverHour,
   );
 }
 

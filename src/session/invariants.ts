@@ -8,6 +8,7 @@
  */
 
 import { State } from "ts-fsrs";
+import { dayEnd } from "../lib/day";
 import type { Step } from "./harness";
 import type { Attempt } from "./types";
 
@@ -150,19 +151,24 @@ export function gradingContradictions(attempts: readonly Attempt[]): Attempt[] {
  * Checked from the attempts rather than the trace, because `stateBefore` records
  * exactly what the schedule said at the moment the card was put on screen.
  */
-export function reviewsDraggedFromTheFuture(attempts: readonly Attempt[]): Attempt[] {
+export function reviewsDraggedFromTheFuture(
+  attempts: readonly Attempt[],
+  dayRolloverHour = 0,
+): Attempt[] {
   return attempts.filter((a) => {
     if (a.phase !== "recall" || a.stateBefore.state !== State.Review) return false;
-    const endOfThatDay = new Date(a.reviewedAt);
-    endOfThatDay.setHours(23, 59, 59, 999);
-    return a.stateBefore.due > endOfThatDay;
+    return a.stateBefore.due > dayEnd(a.reviewedAt, dayRolloverHour);
   });
 }
 
 /** Every check at once, as a list of human-readable failures. */
-export function violations(trace: readonly Step[], attempts: readonly Attempt[]): string[] {
+export function violations(
+  trace: readonly Step[],
+  attempts: readonly Attempt[],
+  dayRolloverHour = 0,
+): string[] {
   return [
-    ...reviewsDraggedFromTheFuture(attempts).map(
+    ...reviewsDraggedFromTheFuture(attempts, dayRolloverHour).map(
       (a) =>
         `review on ${a.wordId} was due ${a.stateBefore.due.toISOString()} ` +
         `but shown ${a.reviewedAt.toISOString()}`,

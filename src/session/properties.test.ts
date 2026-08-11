@@ -95,10 +95,24 @@ function live(s: Scenario): Learner {
 
 describe("however the history goes", () => {
   it("holds every invariant", () => {
+    // The rollover hour is generated too: what "today" means shifts with it,
+    // and the invariants must agree with the queue about the boundary at any
+    // setting, not just midnight.
     fc.assert(
-      fc.property(scenario({ maxGap: 3 * DAY }), (s) => {
-        const learner = live(s);
-        expect(violations(learner.trace, learner.attempts)).toEqual([]);
+      fc.property(scenario({ maxGap: 3 * DAY }), fc.integer({ min: 0, max: 23 }), (s, rollover) => {
+        const learner = createLearner({
+          words: catalogue(s.words),
+          newPerDay: s.newPerDay,
+          start: NINE_AM,
+          behaviour: behaviourFor(s),
+          dayRolloverHour: rollover,
+        });
+        s.cuts.forEach((cut, i) => {
+          learner.sit(cut);
+          learner.wait(s.gaps[i % s.gaps.length]!);
+        });
+        learner.sit(200);
+        expect(violations(learner.trace, learner.attempts, rollover)).toEqual([]);
       }),
       { numRuns: 300 },
     );

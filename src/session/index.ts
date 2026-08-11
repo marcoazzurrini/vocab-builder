@@ -16,6 +16,8 @@ export type SessionOptions = {
   newPerDay: number;
   /** New words already introduced today, so a resumed session does not restart. */
   introducedToday?: number;
+  /** The hour the study day rolls over. Midnight unless told otherwise. */
+  dayRolloverHour?: number;
   /** Emitted per answered prompt, guesses included. Persisting them is the caller's job. */
   onAttempt?: (attempt: Attempt) => void;
   /**
@@ -101,6 +103,7 @@ export function createSession(options: SessionOptions): Session {
       exposed: exposedThisSession,
       pulledForward: pulledForwardThisSession,
       justShownId,
+      dayRolloverHour: options.dayRolloverHour,
     });
 
     promptShownAt = now;

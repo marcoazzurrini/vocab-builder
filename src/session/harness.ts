@@ -82,8 +82,11 @@ export function createLearner(options: {
   newPerDay: number;
   start: Date;
   behaviour?: Behaviour;
+  /** The hour the study day rolls over. Midnight unless told otherwise. */
+  dayRolloverHour?: number;
 }): Learner {
   const { words, newPerDay, start } = options;
+  const dayRolloverHour = options.dayRolloverHour ?? 0;
   const correct = options.behaviour?.correct ?? (() => true);
   const effort = options.behaviour?.effort ?? (() => "good" as const);
   const pace = options.behaviour?.msPerPrompt ?? 18_000;
@@ -126,13 +129,20 @@ export function createLearner(options: {
   const NEVER_ENDS = 5_000;
 
   function sit(maxSteps?: number): Step[] {
-    const deck = buildDeck(wordRows, [...cardRows.values()], guessRows(), new Date(nowMs));
+    const deck = buildDeck(
+      wordRows,
+      [...cardRows.values()],
+      guessRows(),
+      new Date(nowMs),
+      dayRolloverHour,
+    );
 
     const session = createSession({
       words: deck.words,
       cards: deck.cards,
       newPerDay,
       introducedToday: deck.introducedToday,
+      dayRolloverHour,
       clock: () => new Date(nowMs),
       onCardChange: (card) => {
         cardRows.set(card.wordId, {
@@ -211,8 +221,13 @@ export function createLearner(options: {
       return [...cardRows.keys()];
     },
     get introducedToday() {
-      return buildDeck(wordRows, [...cardRows.values()], guessRows(), new Date(nowMs))
-        .introducedToday;
+      return buildDeck(
+        wordRows,
+        [...cardRows.values()],
+        guessRows(),
+        new Date(nowMs),
+        dayRolloverHour,
+      ).introducedToday;
     },
   };
 }

@@ -1,4 +1,5 @@
 import { State } from "ts-fsrs";
+import { dayEnd } from "../lib/day";
 import type { Card, Word } from "./types";
 
 /**
@@ -95,6 +96,8 @@ export type Queue = {
    * back and forth, which is massing with extra steps.
    */
   justShownId?: string;
+  /** The hour the study day rolls over. Midnight unless told otherwise. */
+  dayRolloverHour?: number;
 };
 
 type Rule = (q: Queue) => Slot | null;
@@ -108,10 +111,8 @@ function isLearning(card: Card): boolean {
   );
 }
 
-function endOfDay(now: Date): Date {
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  return end;
+function endOfDay(q: Queue): Date {
+  return dayEnd(q.now, q.dayRolloverHour ?? 0);
 }
 
 function earliestDue(cards: readonly Card[]): Card | undefined {
@@ -165,7 +166,7 @@ const newWord: Rule = (q) => {
 
 /** 3. A review due today. Day-scale, so the order within the block barely matters. */
 const dueReview: Rule = (q) => {
-  const eod = endOfDay(q.now);
+  const eod = endOfDay(q);
   const card = earliestDue(
     at(q, "scheduled").filter((c) => c.fsrs.state === State.Review && c.fsrs.due <= eod),
   );
@@ -214,7 +215,7 @@ const awaitingRecall: Rule = (q) => {
  * to mature reviews from future days.
  */
 const learnAhead: Rule = (q) => {
-  const eod = endOfDay(q.now);
+  const eod = endOfDay(q);
   const card = earliestDue(
     at(q, "scheduled").filter(
       (c) =>
