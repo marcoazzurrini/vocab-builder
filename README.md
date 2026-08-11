@@ -64,7 +64,8 @@ step count — it is the interval genuinely exceeding a day.
 due yet, the answer is never to sit and watch a timer, so the next card is chosen
 by this rule:
 
-1. A rated learning card is due → ask for it.
+1. A rated learning card is due → ask for it, unless it is the one just
+   answered.
 2. A word was introduced but never guessed → resume it, without spending allowance.
 3. Today's new-word allowance is not used up → introduce a new word.
 4. A review is due today → ask for it.
@@ -75,7 +76,9 @@ by this rule:
 7. Otherwise, pull forward the soonest-due card **that is still in its learning
    steps today**, never the one just answered and never twice in a sitting.
 8. A word just shown, when there is nothing else at all → ask for it.
-9. Nothing left within today → the session is over.
+9. The card just answered has come due again, and there is nothing else at all →
+   ask for it.
+10. Nothing left within today → the session is over.
 
 This list is the code. `src/session/queue.ts` holds one named rule per line and
 an array in this order, because prose and precedence living in different places
@@ -113,10 +116,18 @@ scheduled card goes straight to recall.
 
 Step 8 exists so that step 6's exclusion cannot starve a word: with one card and
 nothing else to do, coming straight back is right, because refusing would show a
-word and never ask for it, again on the next sitting and the one after. It is
-last so that everything else — including pulling a learning card forward — goes
-first. An early review costs a little stability once; a rating #1 taken from the
-short-term buffer misprices the card for its whole life.
+word and never ask for it, again on the next sitting and the one after. It sits
+after everything else — including pulling a learning card forward — so that all
+of it goes first. An early review costs a little stability once; a rating #1
+taken from the short-term buffer misprices the card for its whole life.
+
+Step 9 is step 8's twin on the other side of a rating. Step 1 refuses the card
+just answered even when it is genuinely due — linger on the feedback screen past
+the learning step and the failed card has come due by the time the feedback is
+dismissed, and handing it straight back when anything else could go between is
+massing. When nothing else exists, refusing would end the session with a card
+due, and the session never waits in either direction — so it is asked, last of
+all.
 
 Step 7 is bounded twice over.
 

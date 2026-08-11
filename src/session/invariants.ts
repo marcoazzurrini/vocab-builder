@@ -72,15 +72,21 @@ export function exposuresAfterAFirstRecall(trace: readonly Step[]): PromptStep[]
 /**
  * Never the same card twice running.
  *
- * Three adjacencies are the pipeline working as designed: a guess is followed by
+ * Four adjacencies are the pipeline working as designed: a guess is followed by
  * the exposure that answers it, a wrong recall is followed by the feedback that
  * corrects it, and — only when there is nothing else at all — an exposure is
- * followed by its own recall. Every other repeat is massing.
+ * followed by its own recall, or a failed card that came due during its own
+ * feedback is asked again. Every other repeat is massing.
  */
 export function repeatsInARow(
   trace: readonly Step[],
 ): { previous: PromptStep; next: PromptStep }[] {
-  const allowed = new Set(["guess→exposure", "recall→feedback", "exposure→recall"]);
+  const allowed = new Set([
+    "guess→exposure",
+    "recall→feedback",
+    "exposure→recall",
+    "feedback→recall",
+  ]);
   const bad: { previous: PromptStep; next: PromptStep }[] = [];
 
   for (const sitting of sittings(trace)) {

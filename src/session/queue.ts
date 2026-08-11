@@ -123,9 +123,21 @@ function at(q: Queue, stage: Stage): Card[] {
   return q.cards.filter((c) => stageOf(c) === stage);
 }
 
-/** 1. A rated learning card that is genuinely due. Minute-scale, time-critical. */
+/**
+ * 1. A rated learning card that is genuinely due. Minute-scale, time-critical.
+ *
+ * Never the card just answered, even though it can genuinely be due: linger on
+ * the feedback screen past the learning step and the failed card has come due
+ * by the time the feedback is dismissed. Serving it straight back when anything
+ * else could go between is massing. When nothing else can, the last rule of all
+ * still serves it.
+ */
 const dueLearning: Rule = (q) => {
-  const card = earliestDue(at(q, "scheduled").filter((c) => isLearning(c) && c.fsrs.due <= q.now));
+  const card = earliestDue(
+    at(q, "scheduled").filter(
+      (c) => isLearning(c) && c.fsrs.due <= q.now && c.id !== q.justShownId,
+    ),
+  );
   return card ? { do: "recall", card } : null;
 };
 
@@ -240,6 +252,21 @@ const showAnyway: Rule = (q) => {
 };
 
 /**
+ * 9. The card just answered, come due again, when there is nothing else at all.
+ *
+ * Rule 8's twin on the other side of a rating. Rule 1 refuses the card just
+ * answered so that anything else goes between a failure and its return — but
+ * when nothing else exists, refusing would end the session with a card due,
+ * and the session never waits in either direction. If every other rule came up
+ * empty, the only due card left is the excluded one, so no exclusion is needed
+ * here.
+ */
+const dueEvenIfJustShown: Rule = (q) => {
+  const card = earliestDue(at(q, "scheduled").filter((c) => isLearning(c) && c.fsrs.due <= q.now));
+  return card ? { do: "recall", card } : null;
+};
+
+/**
  * The next-card rule, in order. The session never waits: a due time is not an
  * appointment, and sitting in front of a timer is not a state this app is
  * allowed to be in. When none of these can offer anything, the session is over —
@@ -258,6 +285,7 @@ export const RULE: readonly Rule[] = [
   awaitingRecall,
   learnAhead,
   showAnyway,
+  dueEvenIfJustShown,
 ];
 
 export function pickNext(queue: Queue): Slot {

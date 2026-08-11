@@ -88,6 +88,17 @@ describe("the next-card rule", () => {
       const earlier = scheduled("c2", "w2", State.Learning, new Date(NOW.getTime() - 5 * MINUTE));
       expect(ask({ cards: [later, earlier] })).toEqual({ do: "recall", card: earlier });
     });
+
+    it("skips the card just answered while anything else can go between", () => {
+      // Lingering on the feedback screen past the learning step makes the
+      // failed card genuinely due at dismissal. Straight back is massing.
+      const due = scheduled("c1", "w1", State.Learning, new Date(NOW.getTime() - MINUTE));
+      const shown = awaiting("c2", "w2");
+      expect(ask({ cards: [due, shown], exposed: new Set(["c2"]), justShownId: "c1" })).toEqual({
+        do: "recall",
+        card: shown,
+      });
+    });
   });
 
   describe("2. an introduction left unfinished", () => {
@@ -266,6 +277,18 @@ describe("the next-card rule", () => {
       // The first rule is uncapped: a card that earned its place is not filler.
       const due = scheduled("c1", "w1", State.Learning, new Date(NOW.getTime() - MINUTE));
       expect(ask({ cards: [due], words: [], pulledForward: new Set(["c1"]) })).toEqual({
+        do: "recall",
+        card: due,
+      });
+    });
+  });
+
+  describe("9. the card just answered, come due again", () => {
+    it("is asked again when there is genuinely nothing else", () => {
+      // Refusing here would end the session with a card due — the session
+      // never waits, in either direction.
+      const due = scheduled("c1", "w1", State.Learning, new Date(NOW.getTime() - MINUTE));
+      expect(ask({ cards: [due], words: [], justShownId: "c1" })).toEqual({
         do: "recall",
         card: due,
       });

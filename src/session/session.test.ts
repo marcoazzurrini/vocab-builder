@@ -230,6 +230,20 @@ describe("session", () => {
       expect(s.view.phase).not.toBe("feedback");
     });
 
+    it("puts other work between a failure and its return, even after a slow feedback", () => {
+      // Sixty seconds staring at the feedback screen makes the failed card
+      // genuinely due again at dismissal. It must still not come straight
+      // back while another card could go between.
+      const s = makeSession([CHIEN, FENETRE], 2);
+      stepUntilRecall(s); // both introduced; chien is asked first
+      s.submitRecall("zzz", "good");
+      expect(s.view.phase).toBe("feedback");
+
+      tick(61_000);
+      s.dismissFeedback();
+      expect(s.view).toMatchObject({ phase: "recall", prompt: { gloss: "finestra" } });
+    });
+
     it("refuses a call made in the wrong phase", () => {
       const s = makeSession([CHIEN]);
       expect(() => s.exposureDone()).toThrow(/expected phase/);
