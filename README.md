@@ -156,20 +156,6 @@ because every card is correctly parked two days out. Filling that time by
 dragging tomorrow's cards forward trades a durable gain for a few minutes of
 activity, and it compounds.
 
-**A word failed eight times in a day is parked until tomorrow.** `Again`
-schedules a failed card a minute out, so a word that will not come today keeps
-genuinely coming due, and a bad day on three words was a session with no end.
-Parking is a visibility rule, not a scheduling one: every attempt is recorded
-and rated like any other, the card simply stops being offered for the rest of
-the study day, and the next day returns it on its own — no management UI, and
-nothing to unsuspend. A recall bound of sixteen backs it up for the one loop
-failures cannot catch: a card rated Hard never leaves its learning step
-(ts-fsrs holds it at a fixed six-minute interval, measured), so an always-Hard
-day would otherwise never end despite every answer being right. With both
-bounds, the session ends for every learner — which the termination property
-now asserts unconditionally. Permanent suspension can wait until some word
-proves genuinely unlearnable; `attempts` will say which.
-
 Pulling a card forward is safe: FSRS scores on _actual_ elapsed time, not
 scheduled time, so an early review is scored correctly. It simply earns less
 stability than the longer gap would have — a small, one-off cost, unlike dead air.
@@ -313,16 +299,33 @@ forward inside its own learning step.
 
 ## Known gaps
 
+### The session has no leech threshold — TODO
+
+A card answered wrong is rated `Again` and comes back due in a minute, which is
+the scheduler working. It does mean a learner who never gets a word right is
+never told the session is over: the card keeps genuinely coming due, so step 1
+keeps serving it, and a bad day on three words is a session with no end.
+
+Anki's answer is a **leech**: after N lapses (default 8) the card is tagged and,
+by default, _suspended_ — pulled out of scheduling indefinitely, until you go and
+unsuspend it by hand. That default assumes a card browser to unsuspend it from,
+which this app does not have and does not want.
+
+So the version to build here is probably softer: **park the card until tomorrow**
+rather than forever. It ends the session, which is the actual problem, and it
+needs no management UI, because the next day returns the card on its own. A
+permanent suspension can come later if some word turns out to be genuinely
+unlearnable, and by then `attempts` will say which.
+
+Either way the decision is which lapse count, and whether parking is for a day or
+for good — a product question, so it is written down rather than invented.
+
 ### Resolved
 
 The introduction gap described here previously — `reps === 0` being unable to
 tell _"never guessed"_ from _"guessed and shown, waiting to recall"_ — is now
 closed structurally: nothing is written before the guess, so an unrated card
 can only mean one thing. The migration that made it so tells the whole story.
-
-The leech gap — a learner who never gets a word right was never told the
-session is over — is closed by parking: see the Scheduling section. The
-decision was eight failures in a day, parked until tomorrow, never for good.
 
 On a fresh session a card that was guessed but never recalled is shown again
 before being asked for. Whether its exposure was actually read before the app
@@ -337,24 +340,26 @@ are independent enough to reorder.
 1. **An integration test layer.** See How this is tested. Nothing runs against a
    real Postgres today.
 
-2. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
+2. **Decide the leech policy.** See Known gaps. A decision before it is code.
+
+3. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
    hand-picked scaffold entries (§9, §3.2). This quietly fixes more than content:
    deck exhaustion stops being a thing, and the scheduler finally has enough
    cards that the two-and-three-card tail stops being the common case that every
    rule has to be reasoned about against.
 
-3. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
+4. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
    device supplies, so a bad one teaches bad pronunciation forty times over.
    Browser `speechSynthesis` is a stand-in, not a choice.
 
-4. **Real images.** Emoji are standing in, and several words have none because no
+5. **Real images.** Emoji are standing in, and several words have none because no
    emoji is honest for them.
 
-5. **Multi-language, for real.** `lang` is first-class in the schema and the
+6. **Multi-language, for real.** `lang` is first-class in the schema and the
    settings row now chooses it, but there is no UI to switch and no decision
    about what switching means given that languages are studied one at a time.
 
-6. **Retrain FSRS on real data.** The point of the append-only log, and the one
+7. **Retrain FSRS on real data.** The point of the append-only log, and the one
    item genuinely gated on something else: history has to be real reps rather
    than a byproduct of testing. The history it trains on can no longer be
    deleted from the client, which is what that moment needed.

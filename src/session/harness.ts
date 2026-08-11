@@ -16,7 +16,7 @@
  */
 
 import { buildDeck } from "../lib/repository";
-import type { CardRow, GuessRow, RecallRow, WordRow } from "../lib/repository";
+import type { CardRow, GuessRow, WordRow } from "../lib/repository";
 import { createSession } from "./index";
 import type { Attempt, Effort, Word } from "./types";
 
@@ -125,17 +125,6 @@ export function createLearner(options: {
       .map((a) => ({ word_id: a.wordId, reviewed_at: a.reviewedAt.toISOString() }));
   }
 
-  /** Every recall ever; `buildDeck` keeps only today's, as the query would. */
-  function recallRows(): RecallRow[] {
-    return attempts
-      .filter((a) => a.phase === "recall")
-      .map((a) => ({
-        word_id: a.wordId,
-        reviewed_at: a.reviewedAt.toISOString(),
-        correct: a.correct,
-      }));
-  }
-
   /** Far past any real sitting: 15 new words is about 28 answers. */
   const NEVER_ENDS = 5_000;
 
@@ -144,7 +133,6 @@ export function createLearner(options: {
       wordRows,
       [...cardRows.values()],
       guessRows(),
-      recallRows(),
       new Date(nowMs),
       dayRolloverHour,
     );
@@ -154,8 +142,6 @@ export function createLearner(options: {
       cards: deck.cards,
       newPerDay,
       introducedToday: deck.introducedToday,
-      failedToday: deck.failedToday,
-      recalledToday: deck.recalledToday,
       dayRolloverHour,
       clock: () => new Date(nowMs),
       onCardChange: (card) => {
@@ -239,7 +225,6 @@ export function createLearner(options: {
         wordRows,
         [...cardRows.values()],
         guessRows(),
-        recallRows(),
         new Date(nowMs),
         dayRolloverHour,
       ).introducedToday;

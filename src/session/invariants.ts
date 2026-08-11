@@ -8,8 +8,7 @@
  */
 
 import { State } from "ts-fsrs";
-import { dayEnd, dayStart } from "../lib/day";
-import { PARK_AFTER, PARK_AFTER_RECALLS } from "./index";
+import { dayEnd } from "../lib/day";
 import type { Step } from "./harness";
 import type { Attempt } from "./types";
 
@@ -162,45 +161,6 @@ export function reviewsDraggedFromTheFuture(
   });
 }
 
-/**
- * A word failed PARK_AFTER times in a study day — or recalled
- * PARK_AFTER_RECALLS times, the always-Hard loop — is parked until tomorrow.
- *
- * Without this a learner who cannot get a word right is never told the session
- * is over: Again schedules the card a minute out, it genuinely comes due, and
- * rule 1 serves it forever. Checked from the attempts because they carry
- * timestamps: after either of the day's counters reaches its threshold, no
- * further recall of that word may appear before the next day starts.
- */
-export function recallsAfterParking(attempts: readonly Attempt[], dayRolloverHour = 0): Attempt[] {
-  const byWord = new Map<string, Attempt[]>();
-  for (const a of attempts) {
-    if (a.phase !== "recall") continue;
-    const list = byWord.get(a.wordId) ?? [];
-    list.push(a);
-    byWord.set(a.wordId, list);
-  }
-
-  const bad: Attempt[] = [];
-  for (const recalls of byWord.values()) {
-    let day: number | null = null;
-    let failures = 0;
-    let served = 0;
-    for (const a of recalls) {
-      const thisDay = dayStart(a.reviewedAt, dayRolloverHour).getTime();
-      if (thisDay !== day) {
-        day = thisDay;
-        failures = 0;
-        served = 0;
-      }
-      if (failures >= PARK_AFTER || served >= PARK_AFTER_RECALLS) bad.push(a);
-      served += 1;
-      if (!a.correct) failures += 1;
-    }
-  }
-  return bad;
-}
-
 /** Every check at once, as a list of human-readable failures. */
 export function violations(
   trace: readonly Step[],
@@ -225,9 +185,6 @@ export function violations(
     ...historiesNotStartingWithOneGuess(attempts),
     ...gradingContradictions(attempts).map(
       (a) => `${a.phase} on ${a.wordId}: correct=${a.correct} rating=${a.rating}`,
-    ),
-    ...recallsAfterParking(attempts, dayRolloverHour).map(
-      (a) => `${a.wordId} was recalled at ${a.reviewedAt.toISOString()} despite being parked`,
     ),
   ];
 }

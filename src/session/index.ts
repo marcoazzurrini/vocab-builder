@@ -16,14 +16,6 @@ export type SessionOptions = {
   newPerDay: number;
   /** New words already introduced today, so a resumed session does not restart. */
   introducedToday?: number;
-  /**
-   * Wrong recalls per word since the day rolled over, so a resumed session
-   * does not reset the parking counter. Same shape as `introducedToday`: the
-   * day's history, read back in.
-   */
-  failedToday?: ReadonlyMap<string, number>;
-  /** All recalls per word since the day rolled over, for the Hard-loop bound. */
-  recalledToday?: ReadonlyMap<string, number>;
   /** The hour the study day rolls over. Midnight unless told otherwise. */
   dayRolloverHour?: number;
   /** Emitted per answered prompt, guesses included. Persisting them is the caller's job. */
@@ -51,28 +43,6 @@ type Phase = SessionView["phase"];
 
 type Current = { card: Card; word: Word };
 
-/**
- * After this many wrong recalls in one study day, a word is parked until
- * tomorrow. `Again` schedules a failed card a minute out, so a word that will
- * not come today keeps genuinely coming due — and a bad day on three words was
- * a session with no end. Parking is a visibility rule, not a scheduling one:
- * the attempt is recorded and FSRS rates it, the card simply stops being
- * offered for the rest of the day. Tomorrow returns it on its own, so there is
- * no management UI to build and nothing to unsuspend.
- */
-export const PARK_AFTER = 8;
-
-/**
- * The same door, for a different pathology: a card answered correctly but
- * rated Hard every time never leaves its learning step — ts-fsrs holds it at
- * a fixed six-minute interval forever, measured, so a slow-paced always-Hard
- * learner loops it all day and the failure counter never moves, since nothing
- * failed. Twice the failure threshold is unreachable by any normal day — a
- * word failed seven times and still progressing stays well under it — so the
- * only sessions this ends are the ones that otherwise would not.
- */
-export const PARK_AFTER_RECALLS = PARK_AFTER * 2;
-
 function promptOf(word: Word): Prompt {
   return {
     gloss: word.gloss,
@@ -97,10 +67,6 @@ export function createSession(options: SessionOptions): Session {
 
   const cards: Card[] = [...options.cards];
   let allowanceLeft = Math.max(0, options.newPerDay - (options.introducedToday ?? 0));
-  /** Wrong recalls per word today, seeded from history so reopening cannot reset it. */
-  const failures = new Map(options.failedToday ?? []);
-  /** All recalls per word today, for the same reason. */
-  const recallsToday = new Map(options.recalledToday ?? []);
 
   let phase: Phase = "done";
   let current: Current | null = null;
@@ -129,19 +95,6 @@ export function createSession(options: SessionOptions): Session {
       if (!wordFor(cards[i]!)) cards.splice(i, 1);
     }
 
-    // The card itself is untouched by parking: recorded, rated, and back
-    // tomorrow when the counters read zero again. Only the rule stops seeing
-    // it — see Queue.parked for why the rule, and not a filter here.
-    const parked = new Set(
-      cards
-        .map((c) => c.wordId)
-        .filter(
-          (w) =>
-            (failures.get(w) ?? 0) >= PARK_AFTER ||
-            (recallsToday.get(w) ?? 0) >= PARK_AFTER_RECALLS,
-        ),
-    );
-
     const slot = pickNext({
       cards,
       words: options.words,
@@ -150,7 +103,6 @@ export function createSession(options: SessionOptions): Session {
       exposed: exposedThisSession,
       pulledForward: pulledForwardThisSession,
       justShownId,
-      parked,
       dayRolloverHour: options.dayRolloverHour,
     });
 
@@ -296,14 +248,12 @@ export function createSession(options: SessionOptions): Session {
       });
 
       stats.recalls += 1;
-      recallsToday.set(card.wordId, (recallsToday.get(card.wordId) ?? 0) + 1);
       if (correct) {
         stats.correct += 1;
         // Nothing to read on a correct answer, so no pause.
         advance();
       } else {
         stats.wrong += 1;
-        failures.set(card.wordId, (failures.get(card.wordId) ?? 0) + 1);
         lastTyped = typed;
         phase = "feedback";
       }

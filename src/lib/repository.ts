@@ -32,13 +32,6 @@ export type GuessRow = {
   reviewed_at: string;
 };
 
-/** A recall attempt, one row per answer. Feeds the parking counters. */
-export type RecallRow = {
-  word_id: string;
-  reviewed_at: string;
-  correct: boolean;
-};
-
 export function toWord(row: WordRow): Word {
   return {
     id: row.id,
@@ -119,10 +112,6 @@ export type Deck = {
   words: Word[];
   cards: Card[];
   introducedToday: number;
-  /** Wrong recalls per word since the day rolled over. Feeds the parking counter. */
-  failedToday: Map<string, number>;
-  /** All recalls per word since the day rolled over, for the Hard-loop bound. */
-  recalledToday: Map<string, number>;
 };
 
 export type Settings = {
@@ -165,24 +154,12 @@ export function buildDeck(
   wordRows: readonly WordRow[],
   cardRows: readonly CardRow[],
   guessRows: readonly GuessRow[],
-  recallRows: readonly RecallRow[],
   now: Date,
   dayRolloverHour = 0,
 ): Deck {
   const midnight = dayStart(now, dayRolloverHour).getTime();
   const carded = new Set(cardRows.map((r) => r.word_id));
   const guesses = new Map(guessRows.map((g) => [g.word_id, g]));
-
-  // One entry per recall since the day rolled over. Counted here rather than
-  // in the session, so reopening the app mid-day resumes the parking counters
-  // instead of resetting them — the same reasoning as the allowance.
-  const failedToday = new Map<string, number>();
-  const recalledToday = new Map<string, number>();
-  for (const r of recallRows) {
-    if (new Date(r.reviewed_at).getTime() < midnight) continue;
-    recalledToday.set(r.word_id, (recalledToday.get(r.word_id) ?? 0) + 1);
-    if (!r.correct) failedToday.set(r.word_id, (failedToday.get(r.word_id) ?? 0) + 1);
-  }
 
   return {
     words: wordRows.map(toWord),
@@ -201,8 +178,6 @@ export function buildDeck(
     introducedToday: [...guesses.values()].filter(
       (g) => new Date(g.reviewed_at).getTime() >= midnight,
     ).length,
-    failedToday,
-    recalledToday,
   };
 }
 
@@ -230,12 +205,11 @@ export async function loadDeck(lang: string, now: Date, dayRolloverHour = 0): Pr
       .select("word_id, reviewed_at")
       .eq("card_type", "production")
       .eq("lang", lang),
-    // Everything answered since the day rolled over, in one query: the
-    // guesses say what the allowance has spent, the recalls feed the parking
-    // counters.
+    // Guesses since the day rolled over: what the allowance has already spent.
     supabase
       .from("attempts")
-      .select("word_id, phase, correct, reviewed_at, words!inner(lang)")
+      .select("word_id, reviewed_at, words!inner(lang)")
+      .eq("phase", "guess")
       .eq("card_type", "production")
       .eq("words.lang", lang)
       .gte("reviewed_at", dayStart(now, dayRolloverHour).toISOString()),
@@ -244,19 +218,12 @@ export async function loadDeck(lang: string, now: Date, dayRolloverHour = 0): Pr
   if (words.error) throw new Error(`Could not load words: ${words.error.message}`);
   if (cards.error) throw new Error(`Could not load cards: ${cards.error.message}`);
   if (awaiting.error) throw new Error(`Could not load awaiting words: ${awaiting.error.message}`);
-  if (today.error) throw new Error(`Could not load today's attempts: ${today.error.message}`);
-
-  type TodayRow = { word_id: string; phase: string; correct: boolean; reviewed_at: string };
-  const todayRows = (today.data ?? []) as unknown as TodayRow[];
+  if (today.error) throw new Error(`Could not load today's guesses: ${today.error.message}`);
 
   return buildDeck(
     (words.data ?? []) as WordRow[],
     (cards.data ?? []) as unknown as CardRow[],
-    [
-      ...((awaiting.data ?? []) as unknown as GuessRow[]),
-      ...todayRows.filter((r) => r.phase === "guess"),
-    ],
-    todayRows.filter((r) => r.phase === "recall"),
+    [...(awaiting.data ?? []), ...(today.data ?? [])] as unknown as GuessRow[],
     now,
     dayRolloverHour,
   );
