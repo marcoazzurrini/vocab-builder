@@ -77,6 +77,14 @@ describe("reviving FSRS state from jsonb", () => {
     expect(reviveFsrsCard(JSON.parse(JSON.stringify(withoutSteps))).learning_steps).toBe(0);
   });
 
+  it("passes through fields it does not know, so an upstream addition survives", () => {
+    // ts-fsrs added learning_steps once already. When it adds the next field,
+    // stripping it here would quietly corrupt every card on every load.
+    const withNewField = { ...JSON.parse(JSON.stringify(createEmptyCard(NOW))), decay: 0.2 };
+    const revived = reviveFsrsCard(withNewField) as unknown as Record<string, unknown>;
+    expect(revived.decay).toBe(0.2);
+  });
+
   describe("refusing state it cannot read", () => {
     // Each of these used to pass straight through the cast and become a wrong
     // schedule that never raised anything.

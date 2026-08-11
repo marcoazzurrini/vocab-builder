@@ -59,8 +59,14 @@ const StoredDate = v.pipe(
  *
  * `learning_steps` carries a default because ts-fsrs added it after some rows
  * were written; step 0 is where a card without one belongs.
+ *
+ * Loose on purpose: this shape belongs to ts-fsrs, not to us, and a plain
+ * `v.object` strips the keys it does not know — so the next field upstream
+ * adds would be silently deleted on every load, which is precisely the silent
+ * mis-scheduling this validator exists to prevent. Known fields are checked;
+ * unknown ones pass through untouched.
  */
-const FsrsState = v.object({
+const FsrsState = v.looseObject({
   due: StoredDate,
   stability: v.number(),
   difficulty: v.number(),
