@@ -34,7 +34,13 @@ const CHIEN: Word = {
 };
 
 function deck(words: Word[] = [CHIEN]): Deck {
-  return { words, cards: [], introducedToday: 0 };
+  return {
+    words,
+    cards: [],
+    introducedToday: 0,
+    failedToday: new Map(),
+    recalledToday: new Map(),
+  };
 }
 
 function becomeVisible() {

@@ -1,7 +1,7 @@
 import { Rating, State, createEmptyCard } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createSession } from "./index";
+import { createSession, PARK_AFTER } from "./index";
 import type { Session } from "./index";
 import type { Attempt, Card, Word } from "./types";
 
@@ -357,6 +357,84 @@ describe("session", () => {
         cardFor(CHIEN, { ...rated, reps: 1, state: State.Learning }),
       ]);
       expect(s.view.phase).toBe("recall");
+    });
+  });
+
+  describe("parking a word that will not come today", () => {
+    /** A rated learning card, due now. */
+    function dueNow(word: Word): Card {
+      return {
+        wordId: word.id,
+        fsrs: { ...createEmptyCard(new Date(clockMs)), reps: 1, state: State.Learning },
+      };
+    }
+
+    it("parks after the eighth wrong recall of the day, all of them recorded", () => {
+      const s = makeSession([CHIEN], 1);
+      s.submitGuess("");
+      s.exposureDone();
+
+      let recalls = 0;
+      for (let guard = 0; guard < 60 && s.view.phase !== "done"; guard++) {
+        if (s.view.phase === "recall") {
+          recalls += 1;
+          s.submitRecall("zzz", "good");
+        } else {
+          // Waiting out the learning step is what makes the card genuinely
+          // due again — the exact situation that used to never end.
+          tick(61_000);
+          s.dismissFeedback();
+        }
+      }
+
+      expect(s.view.phase).toBe("done");
+      expect(recalls).toBe(PARK_AFTER);
+      // Parking hides the card from the queue; it does not touch the record.
+      // Every failure, the eighth included, is logged and rated Again.
+      const logged = attempts.filter((a) => a.phase === "recall");
+      expect(logged).toHaveLength(PARK_AFTER);
+      expect(logged.every((a) => a.rating === Rating.Again)).toBe(true);
+    });
+
+    it("counts failures from earlier sittings today, so reopening cannot reset it", () => {
+      const s = createSession({
+        words: [CHIEN],
+        cards: [dueNow(CHIEN)],
+        newPerDay: 0,
+        failedToday: new Map([[CHIEN.id, PARK_AFTER - 1]]),
+        clock: () => new Date(clockMs),
+        onAttempt: (a) => attempts.push(a),
+      });
+
+      expect(s.view.phase).toBe("recall");
+      s.submitRecall("zzz", "good"); // the eighth failure of the day
+      tick(61_000);
+      s.dismissFeedback();
+
+      expect(s.view.phase).toBe("done");
+      expect(attempts.filter((a) => a.phase === "recall")).toHaveLength(1);
+    });
+
+    it("is already over when the only word was parked earlier today", () => {
+      const s = createSession({
+        words: [CHIEN],
+        cards: [dueNow(CHIEN)],
+        newPerDay: 0,
+        failedToday: new Map([[CHIEN.id, PARK_AFTER]]),
+        clock: () => new Date(clockMs),
+      });
+      expect(s.view.phase).toBe("done");
+    });
+
+    it("parks the word, not the session: the others continue", () => {
+      const s = createSession({
+        words: [CHIEN, FENETRE],
+        cards: [dueNow(CHIEN), dueNow(FENETRE)],
+        newPerDay: 0,
+        failedToday: new Map([[CHIEN.id, PARK_AFTER]]),
+        clock: () => new Date(clockMs),
+      });
+      expect(s.view).toMatchObject({ phase: "recall", prompt: { gloss: "finestra" } });
     });
   });
 

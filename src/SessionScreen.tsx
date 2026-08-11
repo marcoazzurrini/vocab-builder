@@ -77,6 +77,8 @@ export function SessionScreen({ userId }: { userId: string }) {
           cards: deck.cards,
           newPerDay: settings.newPerDay,
           introducedToday: deck.introducedToday,
+          failedToday: deck.failedToday,
+          recalledToday: deck.recalledToday,
           dayRolloverHour: settings.dayRolloverHour,
           onCardChange: (card) => queue.push(() => upsertCard(card, userId)),
           onAttempt: (attempt) => queue.push(() => insertAttempt(attempt, userId)),

@@ -140,21 +140,21 @@ describe("building the deck", () => {
     // A guess with no card is a word introduced but never rated — the app
     // closed between the exposure and the first recall. The card is rebuilt
     // from the attempt that defines the stage.
-    const deck = buildDeck(words, [], [guess("w1", NOW)], NOW);
+    const deck = buildDeck(words, [], [guess("w1", NOW)], [], NOW);
     expect(deck.cards).toHaveLength(1);
     expect(deck.cards[0]!.wordId).toBe("w1");
     expect(deck.cards[0]!.fsrs.reps).toBe(0);
   });
 
   it("does not double a word that has both a guess and a card row", () => {
-    const deck = buildDeck(words, [cardRow("w1")], [guess("w1", NOW)], NOW);
+    const deck = buildDeck(words, [cardRow("w1")], [guess("w1", NOW)], [], NOW);
     expect(deck.cards).toHaveLength(1);
   });
 
   it("tolerates the same guess arriving from both queries", () => {
     // The awaiting query and the today query can overlap; one guess per word
     // makes deduplication exact.
-    const deck = buildDeck(words, [], [guess("w1", NOW), guess("w1", NOW)], NOW);
+    const deck = buildDeck(words, [], [guess("w1", NOW), guess("w1", NOW)], [], NOW);
     expect(deck.cards).toHaveLength(1);
     expect(deck.introducedToday).toBe(1);
   });
@@ -163,13 +163,13 @@ describe("building the deck", () => {
     // Counted from the guesses rather than tracked separately, so reopening
     // the app mid-day resumes the allowance instead of restarting it.
     const yesterday = new Date(NOW.getTime() - 24 * 60 * 60_000);
-    const deck = buildDeck(words, [], [guess("w1", yesterday), guess("w2", NOW)], NOW);
+    const deck = buildDeck(words, [], [guess("w1", yesterday), guess("w2", NOW)], [], NOW);
     expect(deck.introducedToday).toBe(1);
   });
 
   it("counts one guessed a minute after midnight", () => {
     const justAfterMidnight = new Date("2026-08-10T00:01:00");
-    const deck = buildDeck(words, [], [guess("w1", justAfterMidnight)], NOW);
+    const deck = buildDeck(words, [], [guess("w1", justAfterMidnight)], [], NOW);
     expect(deck.introducedToday).toBe(1);
   });
 
@@ -177,13 +177,47 @@ describe("building the deck", () => {
     // A 00:30 sitting is still yesterday's sitting: its guesses must not
     // come out of the new day's allowance.
     const halfPastMidnight = new Date("2026-08-10T00:30:00");
-    const deck = buildDeck(words, [], [guess("w1", halfPastMidnight)], NOW, 4);
+    const deck = buildDeck(words, [], [guess("w1", halfPastMidnight)], [], NOW, 4);
     expect(deck.introducedToday).toBe(0);
   });
 
   it("revives the dates jsonb threw away", () => {
-    const deck = buildDeck(words, [cardRow("w1")], [], NOW);
+    const deck = buildDeck(words, [cardRow("w1")], [], [], NOW);
     expect(deck.cards[0]!.fsrs.due).toBeInstanceOf(Date);
+  });
+
+  it("counts the day's recalls per word, wrong ones separately", () => {
+    // One row per answer. Feeds the parking counters, so a session resumed
+    // mid-day continues the counts instead of restarting them.
+    const recall = (wordId: string, correct: boolean) => ({
+      word_id: wordId,
+      reviewed_at: NOW.toISOString(),
+      correct,
+    });
+    const deck = buildDeck(
+      words,
+      [cardRow("w1")],
+      [],
+      [recall("w1", false), recall("w1", false), recall("w1", true), recall("w2", true)],
+      NOW,
+    );
+    expect(deck.failedToday.get("w1")).toBe(2);
+    expect(deck.recalledToday.get("w1")).toBe(3);
+    expect(deck.failedToday.get("w2")).toBeUndefined();
+    expect(deck.recalledToday.get("w2")).toBe(1);
+  });
+
+  it("does not count yesterday's recalls — parking is until tomorrow, not for good", () => {
+    const yesterday = new Date(NOW.getTime() - 24 * 60 * 60_000);
+    const deck = buildDeck(
+      words,
+      [cardRow("w1")],
+      [],
+      [{ word_id: "w1", reviewed_at: yesterday.toISOString(), correct: false }],
+      NOW,
+    );
+    expect(deck.failedToday.size).toBe(0);
+    expect(deck.recalledToday.size).toBe(0);
   });
 });
 

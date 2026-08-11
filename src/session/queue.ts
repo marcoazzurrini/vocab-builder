@@ -96,6 +96,15 @@ export type Queue = {
    * back and forth, which is massing with extra steps.
    */
   justShownId?: string;
+  /**
+   * Words parked for the rest of the day: too many wrong recalls since it
+   * rolled over. Unpickable by every rule at once — including the two
+   * last-resort ones, since rule 1 re-serving a card that keeps genuinely
+   * coming due is exactly the endless session parking exists to end. But a
+   * parked word is still carded: it must not look "new" to rule 2, which
+   * would reintroduce it and log the second guess the schema forbids.
+   */
+  parked: ReadonlySet<string>;
   /** The hour the study day rolls over. Midnight unless told otherwise. */
   dayRolloverHour?: number;
 };
@@ -122,8 +131,9 @@ function earliestDue(cards: readonly Card[]): Card | undefined {
   );
 }
 
+/** The cards a rule may pick from: the given stage, minus the parked. */
 function at(q: Queue, stage: Stage): Card[] {
-  return q.cards.filter((c) => stageOf(c) === stage);
+  return q.cards.filter((c) => stageOf(c) === stage && !q.parked.has(c.wordId));
 }
 
 /**
@@ -157,6 +167,7 @@ const dueLearning: Rule = (q) => {
  */
 const newWord: Rule = (q) => {
   if (q.allowanceLeft <= 0) return null;
+  // From every card, parked ones included: a parked word is not a new word.
   const carded = new Set(q.cards.map((c) => c.wordId));
   const [word] = q.words
     .filter((w) => !carded.has(w.id))

@@ -44,6 +44,7 @@ function ask(q: Partial<Queue> & Pick<Queue, "cards">): Slot {
     allowanceLeft: 0,
     exposed: new Set(),
     pulledForward: new Set(),
+    parked: new Set(),
     ...q,
   });
 }
@@ -258,5 +259,32 @@ describe("the next-card rule", () => {
 
   it("is done when nothing is left", () => {
     expect(ask({ cards: [], words: [], allowanceLeft: 5 })).toEqual({ do: "done" });
+  });
+
+  describe("a parked word", () => {
+    it("is invisible to every rule, even genuinely due", () => {
+      const due = scheduled("w1", State.Learning, new Date(NOW.getTime() - MINUTE));
+      expect(ask({ cards: [due], words: [], parked: new Set(["w1"]) })).toEqual({ do: "done" });
+    });
+
+    it("is not reintroduced as a new word", () => {
+      // The bug the parking invariant caught on its first run: hiding parked
+      // cards from the whole queue made rule 2 read the word as never
+      // introduced, reintroducing it and logging the second guess the schema
+      // forbids. Parked means unpickable, not uncarded.
+      const due = scheduled("w1", State.Learning, new Date(NOW.getTime() - MINUTE));
+      expect(
+        ask({ cards: [due], words: [WORDS[0]!], allowanceLeft: 5, parked: new Set(["w1"]) }),
+      ).toEqual({ do: "done" });
+    });
+
+    it("does not park the rest of the deck with it", () => {
+      const parked = scheduled("w1", State.Learning, new Date(NOW.getTime() - MINUTE));
+      const fine = scheduled("w2", State.Learning, new Date(NOW.getTime() - MINUTE));
+      expect(ask({ cards: [parked, fine], parked: new Set(["w1"]) })).toEqual({
+        do: "recall",
+        card: fine,
+      });
+    });
   });
 });

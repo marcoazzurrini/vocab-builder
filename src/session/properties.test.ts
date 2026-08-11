@@ -71,11 +71,9 @@ function behaviourFor(s: Scenario): Behaviour {
 /**
  * Play a whole history out.
  *
- * The final sitting is capped rather than run to exhaustion, because a learner
- * who is wrong every single time genuinely never finishes: each wrong answer is
- * rated Again and comes back due in a minute, which is correct — a card you keep
- * failing keeps coming back, exactly as it should. Termination is asserted
- * separately, against a learner who sometimes gets one right.
+ * The final sitting is capped for speed, not necessity: since parking landed,
+ * even a learner who is wrong every single time finishes, and termination has
+ * its own property below.
  */
 function live(s: Scenario): Learner {
   const learner = createLearner({
@@ -118,52 +116,31 @@ describe("however the history goes", () => {
     );
   });
 
-  it("ends for any learner who eventually gets each word right", () => {
-    // A learner who keeps failing a word forever genuinely never finishes: the
-    // card is rated Again and comes back due in a minute, which is the
-    // scheduler working — that is the leech gap in the README, and a decision
-    // rather than a bug. The promise this pins is the complement: stumble on
-    // each word a bounded number of times and the session always ends. The
-    // earlier form of this property ("one wrong answer in every N") was
-    // quietly weaker — cycled across enough slow-paced cards it can pin every
-    // wrong answer onto the same word, which is the forever-failing learner
-    // again. `sit()` throws rather than hangs if the end never comes, so
-    // reaching the assertion at all is most of the property.
+  it("always reaches the end of the session, whoever the learner is", () => {
+    // This used to hold only for learners who eventually got each word right —
+    // a learner who never did genuinely never finished, and the README carried
+    // it as the leech gap. Parking closed it: eight wrong recalls in a day and
+    // the word is invisible until tomorrow, so every card's day is bounded and
+    // the session ends for everyone. The final sitting is uncapped, and
+    // `sit()` throws rather than hangs if the end never comes — so reaching
+    // the assertion at all is most of the property.
     fc.assert(
-      fc.property(
-        fc.record({
-          words: fc.integer({ min: 1, max: 25 }),
-          newPerDay: fc.integer({ min: 0, max: 12 }),
-          cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
-          gaps: fc.array(fc.integer({ min: 0, max: 7 * DAY }), { minLength: 1, maxLength: 8 }),
-          stumbles: fc.array(fc.integer({ min: 0, max: 3 }), { minLength: 1, maxLength: 25 }),
-          thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), {
-            minLength: 1,
-            maxLength: 10,
-          }),
-        }),
-        (s) => {
-          let thought = 0;
-          const stumblesFor = (id: string) => s.stumbles[Number(id.slice(1)) % s.stumbles.length]!;
-          const learner = createLearner({
-            words: catalogue(s.words),
-            newPerDay: s.newPerDay,
-            start: NINE_AM,
-            behaviour: {
-              correct: (word, n) => n > stumblesFor(word.id),
-              msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
-            },
-          });
+      fc.property(scenario({ maxGap: 7 * DAY }), (s) => {
+        const learner = createLearner({
+          words: catalogue(s.words),
+          newPerDay: s.newPerDay,
+          start: NINE_AM,
+          behaviour: behaviourFor(s),
+        });
 
-          s.cuts.forEach((cut, i) => {
-            learner.sit(cut);
-            learner.wait(s.gaps[i % s.gaps.length]!);
-          });
-          learner.sit();
+        s.cuts.forEach((cut, i) => {
+          learner.sit(cut);
+          learner.wait(s.gaps[i % s.gaps.length]!);
+        });
+        learner.sit();
 
-          expect(learner.trace.at(-1)).toEqual({ at: "closed" });
-        },
-      ),
+        expect(learner.trace.at(-1)).toEqual({ at: "closed" });
+      }),
       { numRuns: 200 },
     );
   });

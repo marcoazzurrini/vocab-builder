@@ -85,15 +85,14 @@ describe("a sitting that resumes an earlier one", () => {
 });
 
 describe("a word that is never got right", () => {
-  it("keeps coming back, so the session does not end on its own", () => {
-    // Not a bug, and worth pinning so nobody 'fixes' it: Again schedules the
-    // card a minute out, and a minute later it is genuinely due, so it is served
-    // by the first rule rather than as filler. A card you keep failing keeps
-    // coming back, which is the scheduler working.
-    //
-    // It does mean a learner who never gets three words right is never told the
-    // session is over. Anki's answer is a leech threshold — suspend a card after
-    // N lapses — which is a product decision rather than a scheduling one.
+  const DAY = 24 * 60 * 60_000;
+
+  it("is parked after eight failures, so the sitting ends on its own", () => {
+    // Before the leech policy this sitting genuinely never ended: Again
+    // schedules the card a minute out, a minute later it is genuinely due, and
+    // the first rule serves it — the scheduler working, forever. Eight wrong
+    // recalls in a day is where the day gives up on a word: every failure is
+    // recorded and rated, the word just stops being offered until tomorrow.
     const l = createLearner({
       words: catalogue(3),
       newPerDay: 3,
@@ -101,9 +100,25 @@ describe("a word that is never got right", () => {
       behaviour: { correct: () => false },
     });
 
-    const steps = l.sit(120);
-    expect(steps.filter((s) => s.at === "recall").length).toBeGreaterThan(30);
-    expect(steps.at(-1)).toEqual({ at: "closed" }); // cut short, never finished
+    const steps = l.sit(); // uncapped: throws if the session cannot end
+    expect(steps.filter((s) => s.at === "recall")).toHaveLength(3 * 8);
+    expect(steps.at(-1)).toEqual({ at: "closed" });
+  });
+
+  it("returns the parked words tomorrow", () => {
+    const l = createLearner({
+      words: catalogue(3),
+      newPerDay: 3,
+      start: START,
+      behaviour: { correct: () => false },
+    });
+    l.sit();
+    l.wait(DAY);
+    const tomorrow = l.sit();
+
+    // A fresh day, a fresh counter: each word is served — and failed — again.
+    expect(tomorrow.filter((s) => s.at === "recall")).toHaveLength(3 * 8);
+    expect(violations(l.trace, l.attempts)).toEqual([]);
   });
 
   it("still never repeats a card back to back while doing it", () => {
@@ -113,9 +128,29 @@ describe("a word that is never got right", () => {
       start: START,
       behaviour: { correct: () => false },
     });
-    l.sit(120);
+    l.sit();
 
     expect(repeatsInARow(l.trace)).toEqual([]);
+  });
+});
+
+describe("a word that is only ever Hard", () => {
+  it("is parked by the recall bound, so even that sitting ends", () => {
+    // ts-fsrs holds a card rated Hard at its learning step forever — a fixed
+    // six-minute interval, measured — so a slow learner pressing Difficile on
+    // every correct answer loops it all day, and the failure counter never
+    // moves because nothing failed. The recall bound is the backstop: twice
+    // the failure threshold, unreachable by any day that is going anywhere.
+    const l = createLearner({
+      words: catalogue(2),
+      newPerDay: 2,
+      start: START,
+      behaviour: { effort: () => "hard", msPerPrompt: 7 * 60_000 },
+    });
+
+    const steps = l.sit(); // uncapped: throws if the session cannot end
+    expect(steps.filter((s) => s.at === "recall")).toHaveLength(2 * 16);
+    expect(violations(l.trace, l.attempts)).toEqual([]);
   });
 });
 
