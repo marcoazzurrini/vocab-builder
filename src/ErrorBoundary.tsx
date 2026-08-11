@@ -34,14 +34,16 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!error) return this.props.children;
 
     return (
-      <div className="card">
+      <div className="stage">
         <p className="eyebrow wrong">qualcosa è andato storto</p>
-        <p className="gloss">
+        <p className="message">
           Le risposte già date sono salvate. Ricarica per riprendere da dove eri.
         </p>
-        <button type="button" onClick={() => window.location.reload()}>
-          Ricarica
-        </button>
+        <div className="actions">
+          <button type="button" onClick={() => window.location.reload()}>
+            Ricarica
+          </button>
+        </div>
         <p className="note">{error.message}</p>
       </div>
     );

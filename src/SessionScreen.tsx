@@ -167,11 +167,18 @@ export function SessionScreen({ userId }: { userId: string }) {
     rerender();
   }
 
-  if (loadError) return <p role="alert">Errore nel caricamento: {loadError}</p>;
-  if (!view) return <p>Carico…</p>;
+  if (loadError)
+    return (
+      <p role="alert" className="note wrong">
+        Errore nel caricamento: {loadError}
+      </p>
+    );
+  if (!view) return <p className="note">Carico…</p>;
 
   return (
-    <div className="card">
+    // Keyed so the entrance animation replays when the phase or card changes —
+    // a remount is exactly the "new screen" the motion is meant to mark.
+    <div className="stage" key={`${view.phase}:${promptGloss ?? ""}`}>
       {view.phase === "guess" && (
         <form
           onSubmit={(e) => {
@@ -192,21 +199,30 @@ export function SessionScreen({ userId }: { userId: string }) {
             spellCheck={false}
           />
           {/* Empty is a valid answer — a shrug is a legitimate pretest (§3). */}
-          <button type="submit">Continua</button>
+          <div className="actions">
+            <button type="submit">Continua</button>
+          </div>
         </form>
       )}
 
       {view.phase === "exposure" && (
         <>
           <p className="eyebrow">ascolta e ripeti ad alta voce</p>
+          {view.prompt.image && <p className="image">{view.prompt.image}</p>}
           <p className="answer">{view.answer}</p>
           <p className="gloss">{view.prompt.gloss}</p>
-          <button type="button" className="ghost" onClick={() => speak(view.answer, setAudioError)}>
-            Riascolta
-          </button>
-          <button type="button" onClick={() => act(() => session!.exposureDone())}>
-            L'ho detta
-          </button>
+          <div className="actions">
+            <button
+              type="button"
+              className="audio"
+              onClick={() => speak(view.answer, setAudioError)}
+            >
+              Riascolta
+            </button>
+            <button type="button" onClick={() => act(() => session!.exposureDone())}>
+              L'ho detta
+            </button>
+          </div>
         </>
       )}
 
@@ -230,7 +246,7 @@ export function SessionScreen({ userId }: { userId: string }) {
             autoCorrect="off"
             spellCheck={false}
           />
-          <div className="efforts">
+          <div className="actions">
             {/* The list comes from the session. The UI does not know that Easy
                 is withheld on a first recall, only that it was not offered. */}
             {view.efforts.map((effort) => (
@@ -248,6 +264,9 @@ export function SessionScreen({ userId }: { userId: string }) {
               </button>
             ))}
           </div>
+          <p className="kbd-hint">
+            <kbd>Invio</kbd> = Bene
+          </p>
         </form>
       )}
 
@@ -256,18 +275,23 @@ export function SessionScreen({ userId }: { userId: string }) {
           <p className="eyebrow wrong">non ancora</p>
           <p className="answer">{view.expected}</p>
           {/* No diff highlighting — finding the difference is the point (§2). */}
-          <p className="typed">hai scritto: {view.typed || "—"}</p>
-          <button type="button" onClick={() => act(() => session!.dismissFeedback())}>
-            Continua
-          </button>
+          <p className="typed">
+            hai scritto: <b>{view.typed || "—"}</b>
+          </p>
+          <div className="actions">
+            <button type="button" onClick={() => act(() => session!.dismissFeedback())}>
+              Continua
+            </button>
+          </div>
         </>
       )}
 
       {view.phase === "caughtUp" && (
         <>
           <p className="eyebrow">sei in pari</p>
-          <p className="answer">Tutto fatto, per ora</p>
-          <p className="gloss">
+          {/* Italian, so the sans voice — .answer is reserved for French. */}
+          <p className="status">Tutto fatto, per ora</p>
+          <p className="stats">
             {view.stats.introduced} parole nuove · {view.stats.correct}/{view.stats.recalls}{" "}
             richiami corretti
           </p>
@@ -281,8 +305,8 @@ export function SessionScreen({ userId }: { userId: string }) {
       {view.phase === "done" && (
         <>
           <p className="eyebrow">sessione finita</p>
-          <p className="answer">Bravo</p>
-          <p className="gloss">
+          <p className="status">Bravo</p>
+          <p className="stats">
             {view.stats.introduced} parole nuove · {view.stats.correct}/{view.stats.recalls}{" "}
             richiami corretti
           </p>
