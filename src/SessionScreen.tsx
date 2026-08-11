@@ -124,7 +124,8 @@ export function SessionScreen({ userId }: { userId: string }) {
       if (document.visibilityState !== "visible") return;
       const rollover = settingsRef.current.dayRolloverHour;
       const newDay = dayStart(new Date(), rollover).getTime() !== loadedOnRef.current;
-      const between = sessionRef.current?.view.phase === "done";
+      const phaseNow = sessionRef.current?.view.phase;
+      const between = phaseNow === "done" || phaseNow === "caughtUp";
       if (newDay || between) reload();
     }
 
@@ -138,6 +139,18 @@ export function SessionScreen({ userId }: { userId: string }) {
   // The gloss changes whenever the card does, which is what should re-run these.
   const exposureAnswer = view?.phase === "exposure" ? view.answer : null;
   const promptGloss = view && "prompt" in view ? view.prompt.gloss : null;
+  const nextDueMs = view?.phase === "caughtUp" ? view.nextDueAt.getTime() : null;
+
+  /**
+   * Caught up is a pause, not an end: rebuild when the next card comes due.
+   * The extra second keeps the rebuilt queue from landing a hair before the
+   * due time and showing the same screen again.
+   */
+  useEffect(() => {
+    if (nextDueMs === null) return;
+    const timer = setTimeout(reload, Math.max(1000, nextDueMs - Date.now() + 1000));
+    return () => clearTimeout(timer);
+  }, [nextDueMs]);
 
   // One clean exposure: see it, hear it, say it (§2, §6).
   useEffect(() => {
@@ -247,6 +260,21 @@ export function SessionScreen({ userId }: { userId: string }) {
           <button type="button" onClick={() => act(() => session!.dismissFeedback())}>
             Continua
           </button>
+        </>
+      )}
+
+      {view.phase === "caughtUp" && (
+        <>
+          <p className="eyebrow">sei in pari</p>
+          <p className="answer">Tutto fatto, per ora</p>
+          <p className="gloss">
+            {view.stats.introduced} parole nuove · {view.stats.correct}/{view.stats.recalls}{" "}
+            richiami corretti
+          </p>
+          <p className="note">
+            Prossima carta tra ~{Math.max(1, Math.ceil((nextDueMs! - Date.now()) / 60_000))} min —
+            questa pagina riparte da sola.
+          </p>
         </>
       )}
 

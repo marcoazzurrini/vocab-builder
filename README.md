@@ -60,9 +60,15 @@ handles both same-session reps and across-day reviews. Gaps come from FSRS's
 difficulty/stability estimate, never a hardcoded ladder, and graduation is not a
 step count — it is the interval genuinely exceeding a day.
 
-**The session never waits.** A due time is not an appointment. When nothing is
-due yet, the answer is never to sit and watch a timer, so the next card is chosen
-by this rule:
+**The session never makes you wait — and never lies about being done.** A due
+time is not an appointment, so every gap that can honestly be filled is filled:
+the next card is chosen by this rule. But when nothing is servable right now
+and a card is still coming today, the session says so — caught up, next card at
+such a time — and the screen rebuilds itself when that time arrives. This is
+Anki's congratulations screen, adopted deliberately: the earlier design ended
+the day by force instead, and everything it needed to make that safe (a leech
+policy, a last-resort serving bound) existed only to prop up an ending that was
+sometimes a lie. "Done" now means exactly one thing: nothing more within today.
 
 1. A rated learning card is due → ask for it, unless it is the one just
    answered.
@@ -77,7 +83,9 @@ by this rule:
 7. A word just shown, when there is nothing else at all → ask for it.
 8. The card just answered has come due again, and there is nothing else at all →
    ask for it.
-9. Nothing left within today → the session is over.
+9. Nothing due right now, but a card still coming today → caught up: say when,
+   and pause.
+10. Nothing left within today → the session is over.
 
 This list is the code. `src/session/queue.ts` holds one named rule per line and
 an array in this order, because prose and precedence living in different places
@@ -128,9 +136,9 @@ Step 8 is step 7's twin on the other side of a rating. Step 1 refuses the card
 just answered even when it is genuinely due — linger on the feedback screen past
 the learning step and the failed card has come due by the time the feedback is
 dismissed, and handing it straight back when anything else could go between is
-massing. When nothing else exists, refusing would end the session with a card
-due, and the session never waits in either direction — so it is asked, last of
-all.
+massing. When nothing else exists, refusing would mean announcing "caught up,
+next card now", which is a pause with nothing to pause for — so it is asked,
+last of all.
 
 Step 6 is bounded twice over.
 
@@ -142,17 +150,18 @@ doing it again, and the collection drifts toward massing. Anki draws its line in
 the same place: learn-ahead applies only to learning cards, never to mature
 reviews from future days.
 
-**To once per card per sitting**, which is what lets a session end at all. A card
-dragged forward is answered, which schedules it a minute out, which is still
-today, so it is dragged forward again. "Never the same card twice running" stops
-the one-card cycle and nothing else, because two cards simply alternate — an hour
-later the session is still going, which is the padding this design exists to
-refuse. A card that genuinely comes due is served by step 1, which is uncapped
-and has earned it.
+**To once per card per sitting**, which is what lets a sitting pause at all. A
+card dragged forward is answered, which schedules it a minute out, which is
+still today, so it is dragged forward again. "Never the same card twice running"
+stops the one-card cycle and nothing else, because two cards simply alternate —
+an hour later the sitting is still going, which is the padding this design
+exists to refuse. A card that genuinely comes due is served by step 1, which is
+uncapped and has earned it; a card whose free ride is spent waits for its real
+due time behind the caught-up screen.
 
-So a session that has run out is over, not padded. On day one, 15 new words with
-no backlog is about nine minutes of work and then genuinely nothing to do,
-because every card is correctly parked two days out. Filling that time by
+So a sitting that has run out pauses honestly, not padded. On day one, 15 new
+words with no backlog is about nine minutes of work and then genuinely nothing
+to do, because every card is correctly parked two days out. Filling that time by
 dragging tomorrow's cards forward trades a durable gain for a few minutes of
 activity, and it compounds.
 
@@ -180,7 +189,8 @@ diverged from the real rule; `d317d5b` still holds it:
   session ends, because the gap it wanted cannot be filled today and tomorrow
   will fill it properly.
 
-- **Once the session never waits, the configured learning step barely matters.**
+- **Once the session fills its gaps, the configured learning step barely
+  matters.**
   `1m,3m` and `1m,10m` yield near-identical sessions, because real spacing is set
   by how many cards are in rotation, not by the clock — the step is a ceiling that
   rarely binds. So FSRS's defaults stand, and spacing widens on its own as the
@@ -293,32 +303,22 @@ not by thinking harder. The invariants in `session/invariants.ts` are the claims
 this document makes: a first recall is always preceded by its exposure in the
 same sitting, no card appears twice running, every card's history opens with
 exactly one guess, `Again` if and only if the answer was wrong, a review is never
-dragged back from a future day, and the session ends. That last one found a real
-defect the day it was written — two cards alternating forever, each dragged
-forward inside its own learning step.
+dragged back from a future day, and a sitting always reaches an honest pause.
+That last one found a real defect the day it was written — two cards alternating
+forever, each dragged forward inside its own learning step.
 
 ## Known gaps
 
-### The session has no leech threshold — TODO
+### No leech rule, on purpose — for now
 
-A card answered wrong is rated `Again` and comes back due in a minute, which is
-the scheduler working. It does mean a learner who never gets a word right is
-never told the session is over: the card keeps genuinely coming due, so step 1
-keeps serving it, and a bad day on three words is a session with no end.
-
-Anki's answer is a **leech**: after N lapses (default 8) the card is tagged and,
-by default, _suspended_ — pulled out of scheduling indefinitely, until you go and
-unsuspend it by hand. That default assumes a card browser to unsuspend it from,
-which this app does not have and does not want.
-
-So the version to build here is probably softer: **park the card until tomorrow**
-rather than forever. It ends the session, which is the actual problem, and it
-needs no management UI, because the next day returns the card on its own. A
-permanent suspension can come later if some word turns out to be genuinely
-unlearnable, and by then `attempts` will say which.
-
-Either way the decision is which lapse count, and whether parking is for a day or
-for good — a product question, so it is written down rather than invented.
+A word failed over and over keeps genuinely coming due a minute later, and a
+learner failing it at a steady pace sees no pause — the same experience Anki
+gives, and the same exit: stop answering, and the caught-up screen is never
+more than a card away. A parking rule was built and then removed along with
+the forced day-ending it existed to prop up (`de6fe27` and its revert hold
+both sides of the argument). What remains of the idea is optional polish —
+giving up on a genuinely stuck word _sooner_ than the learner would — and that
+wants real data about how often it happens. `attempts` will say.
 
 ### Resolved
 
@@ -340,26 +340,24 @@ are independent enough to reorder.
 1. **An integration test layer.** See How this is tested. Nothing runs against a
    real Postgres today.
 
-2. **Decide the leech policy.** See Known gaps. A decision before it is code.
-
-3. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
+2. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
    hand-picked scaffold entries (§9, §3.2). This quietly fixes more than content:
    deck exhaustion stops being a thing, and the scheduler finally has enough
    cards that the two-and-three-card tail stops being the common case that every
    rule has to be reasoned about against.
 
-4. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
+3. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
    device supplies, so a bad one teaches bad pronunciation forty times over.
    Browser `speechSynthesis` is a stand-in, not a choice.
 
-5. **Real images.** Emoji are standing in, and several words have none because no
+4. **Real images.** Emoji are standing in, and several words have none because no
    emoji is honest for them.
 
-6. **Multi-language, for real.** `lang` is first-class in the schema and the
+5. **Multi-language, for real.** `lang` is first-class in the schema and the
    settings row now chooses it, but there is no UI to switch and no decision
    about what switching means given that languages are studied one at a time.
 
-7. **Retrain FSRS on real data.** The point of the append-only log, and the one
+6. **Retrain FSRS on real data.** The point of the append-only log, and the one
    item genuinely gated on something else: history has to be real reps rather
    than a byproduct of testing. The history it trains on can no longer be
    deleted from the client, which is what that moment needed.

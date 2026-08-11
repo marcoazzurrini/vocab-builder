@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createEmptyCard, State } from "ts-fsrs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Deck } from "./lib/repository";
 import type { Word } from "./session/types";
@@ -118,6 +119,37 @@ describe("the session screen", () => {
     expect(loadDeck).toHaveBeenCalledTimes(1);
 
     release();
+    await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
+  });
+
+  it("pauses caught up, then rebuilds itself when the next card comes due", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-10T09:00:00"));
+
+    const learning = {
+      ...createEmptyCard(new Date("2026-08-10T08:00:00")),
+      reps: 1,
+      state: State.Learning,
+      due: new Date("2026-08-10T09:04:00"),
+    };
+    loadDeck.mockResolvedValue({
+      words: [CHIEN],
+      cards: [{ wordId: "w1", fsrs: learning }],
+      introducedToday: 15, // allowance spent, so nothing new can fill the gap
+    });
+
+    render(<SessionScreen userId="u1" />);
+    await screen.findByText("scrivi la parola francese");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "chien" } });
+    fireEvent.click(screen.getByText("Bene"));
+
+    // Nothing else to do, and the card's next step is minutes away: the
+    // honest screen, not a fake end of session.
+    expect(await screen.findByText("Tutto fatto, per ora")).toBeDefined();
+    expect(screen.queryByText("Bravo")).toBeNull();
+
+    // When the due time passes, the screen rebuilds on its own.
+    vi.advanceTimersByTime(60 * 60_000);
     await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
   });
 

@@ -72,6 +72,8 @@ export function createSession(options: SessionOptions): Session {
   let current: Current | null = null;
   let promptShownAt = clock();
   let lastTyped = "";
+  /** When the next card comes due, while the phase is "caughtUp". */
+  let nextDueAt: Date | null = null;
   let justShownId: string | undefined;
   /** Both passed to the rule rather than kept here — see `Queue.exposed`. */
   const exposedThisSession = new Set<string>();
@@ -112,6 +114,12 @@ export function createSession(options: SessionOptions): Session {
       case "done":
         current = null;
         phase = "done";
+        return;
+
+      case "wait":
+        current = null;
+        nextDueAt = slot.until;
+        phase = "caughtUp";
         return;
 
       case "introduce": {
@@ -186,6 +194,8 @@ export function createSession(options: SessionOptions): Session {
           };
         case "feedback":
           return { phase, expected: current!.word.text, typed: lastTyped };
+        case "caughtUp":
+          return { phase, nextDueAt: nextDueAt!, stats: { ...stats } };
         case "done":
           return { phase, stats: { ...stats } };
       }

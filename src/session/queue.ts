@@ -53,6 +53,8 @@ export type Slot =
   | { do: "expose"; card: Card }
   /** `pulledForward` marks filler: a card shown before it was actually due. */
   | { do: "recall"; card: Card; pulledForward?: true }
+  /** Nothing due right now, but a card is still coming today: caught up. */
+  | { do: "wait"; until: Date }
   | { do: "done" };
 
 export type Queue = {
@@ -261,10 +263,10 @@ const dueEvenIfJustShown: Rule = (q) => {
 };
 
 /**
- * The next-card rule, in order. The session never waits: a due time is not an
- * appointment, and sitting in front of a timer is not a state this app is
- * allowed to be in. When none of these can offer anything, the session is over —
- * the gap it wanted cannot be filled today, and tomorrow will fill it properly.
+ * The next-card rule, in order. The session never makes the user wait — every
+ * gap it can honestly fill, it fills — but when nothing is due right now it
+ * says so instead of manufacturing an ending: caught up, next card at such a
+ * time. "Done" is reserved for the truth it claims: nothing more within today.
  *
  * Precedence is this array. It used to be the order of the branches inside one
  * function, interleaved with the derivations they depended on, which is why the
@@ -286,5 +288,18 @@ export function pickNext(queue: Queue): Slot {
     const slot = rule(queue);
     if (slot) return slot;
   }
-  return { do: "done" };
+
+  // Nothing is servable right now. If a learning card is still coming today,
+  // the honest answer is when — reviews and awaiting words can never be the
+  // reason to wait, because the rules above serve them any time today.
+  const upcoming = earliestDue(
+    queue.cards.filter(
+      (c) =>
+        stageOf(c) === "scheduled" &&
+        isLearning(c) &&
+        c.fsrs.due > queue.now &&
+        c.fsrs.due <= endOfDay(queue),
+    ),
+  );
+  return upcoming ? { do: "wait", until: upcoming.fsrs.due } : { do: "done" };
 }

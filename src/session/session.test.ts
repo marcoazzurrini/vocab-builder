@@ -69,11 +69,11 @@ function stepUntilRecall(session: Session) {
   }
 }
 
-/** Answer everything until the session says it is over. */
+/** Answer everything until the session pauses or finishes. */
 function drain(session: Session, answerFor: (gloss: string) => string) {
   for (let guard = 0; guard < 200; guard++) {
     const view = session.view;
-    if (view.phase === "done") return;
+    if (view.phase === "done" || view.phase === "caughtUp") return;
     if (view.phase === "guess") session.submitGuess("");
     else if (view.phase === "exposure") session.exposureDone();
     else if (view.phase === "recall") session.submitRecall(answerFor(view.prompt.gloss), "good");
@@ -253,8 +253,8 @@ describe("session", () => {
     it("never introduces more than the daily allowance", () => {
       const s = makeSession([CHIEN, FENETRE], 1);
       introduce(s, "chien", "good");
-      expect(s.view.phase).toBe("done");
-      expect(s.view).toMatchObject({ stats: { introduced: 1 } });
+      // Caught up, not done: chien's next learning step is still coming today.
+      expect(s.view).toMatchObject({ phase: "caughtUp", stats: { introduced: 1 } });
     });
 
     it("counts words already introduced earlier today", () => {
@@ -273,11 +273,15 @@ describe("session", () => {
       expect(s.view).toMatchObject({ phase: "done" });
     });
 
-    it("ends rather than repeating the card just answered", () => {
-      // The gap it wants cannot be filled by one card; tomorrow will fill it.
+    it("waits rather than repeating the card just answered", () => {
+      // The gap one card cannot fill is an honest pause, not an ending: the
+      // session says when the card comes due, and the screen rebuilds then.
       const s = makeSession([CHIEN], 1);
       introduce(s, "chien", "good");
-      expect(s.view.phase).toBe("done");
+      expect(s.view).toMatchObject({
+        phase: "caughtUp",
+        nextDueAt: changed.at(-1)!.fsrs.due,
+      });
     });
 
     it("reports what happened", () => {
@@ -295,8 +299,9 @@ describe("session", () => {
       const s = makeSession([FENETRE], 1);
       introduce(s, "fenetre", "good"); // missing accent
       s.dismissFeedback();
+      // Caught up, not done: the failed card comes back in a minute.
       expect(s.view).toMatchObject({
-        phase: "done",
+        phase: "caughtUp",
         stats: { introduced: 1, recalls: 1, correct: 0, wrong: 1 },
       });
     });
@@ -334,7 +339,8 @@ describe("session", () => {
       s.exposureDone();
       s.submitRecall("chien", "good");
       // fenêtre must not follow: the single slot was spent on chien already.
-      expect(s.view.phase).toBe("done");
+      // Caught up rather than done, because chien itself is still coming today.
+      expect(s.view.phase).toBe("caughtUp");
     });
 
     it("logs no second guess for a resumed word", () => {

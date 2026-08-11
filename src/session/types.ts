@@ -77,4 +77,10 @@ export type SessionView =
   | { phase: "recall"; prompt: Prompt; efforts: Effort[] }
   /** Only ever reached by a wrong answer, so there is no `correct` flag. */
   | { phase: "feedback"; expected: string; typed: string }
+  /**
+   * Nothing due right now, but a card is still coming today. The honest pause
+   * Anki calls its congratulations screen: the user is told when, and the UI
+   * rebuilds the session at that moment. `done` remains final for the day.
+   */
+  | { phase: "caughtUp"; nextDueAt: Date; stats: SessionStats }
   | { phase: "done"; stats: SessionStats };

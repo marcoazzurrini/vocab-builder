@@ -161,7 +161,10 @@ export function createLearner(options: {
 
     for (let i = 0; i < limit; i++) {
       const view = session.view;
-      if (view.phase === "done") {
+      // Both end screens end a sitting: "caught up" is where a real learner
+      // puts the phone down, and the next sit() rebuilds — the same journey
+      // the app takes when its timer fires.
+      if (view.phase === "done" || view.phase === "caughtUp") {
         finished = true;
         break;
       }

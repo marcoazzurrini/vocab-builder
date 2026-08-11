@@ -205,11 +205,14 @@ describe("the next-card rule", () => {
       });
     });
 
-    it("never hands back the card just answered", () => {
-      // With one candidate left this would be massing with extra steps. Ending
-      // is better: tomorrow will fill the gap properly.
+    it("waits rather than handing back the card just answered", () => {
+      // With one candidate left this would be massing with extra steps. Being
+      // honestly caught up is better: the card will be served on time.
       const soon = scheduled("w1", State.Learning, new Date(NOW.getTime() + 8 * MINUTE));
-      expect(ask({ cards: [soon], words: [], justShownId: "w1" })).toEqual({ do: "done" });
+      expect(ask({ cards: [soon], words: [], justShownId: "w1" })).toEqual({
+        do: "wait",
+        until: soon.fsrs.due,
+      });
     });
 
     it("takes a different card when one is available", () => {
@@ -223,13 +226,15 @@ describe("the next-card rule", () => {
     });
 
     it("gives each card one free ride and no more", () => {
-      // Otherwise the session cannot end: the answer schedules the card a minute
-      // out, which is still today, so it is dragged forward again — and with two
-      // cards they alternate forever, never repeating and never finishing.
+      // Otherwise the sitting never pauses: the answer schedules the card a
+      // minute out, which is still today, so it is dragged forward again — and
+      // with two cards they alternate forever. Spent rides mean caught up,
+      // until the earliest of them genuinely comes due.
       const a = scheduled("w1", State.Learning, new Date(NOW.getTime() + 8 * MINUTE));
       const b = scheduled("w2", State.Learning, new Date(NOW.getTime() + 9 * MINUTE));
       expect(ask({ cards: [a, b], words: [], pulledForward: new Set(["w1", "w2"]) })).toEqual({
-        do: "done",
+        do: "wait",
+        until: a.fsrs.due,
       });
     });
 
