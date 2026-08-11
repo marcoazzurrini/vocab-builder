@@ -9,8 +9,9 @@ expiry date.
 ## Status
 
 Deployed and usable: sign in with a magic link, answer cards, progress is saved.
-`src/session/` owns the whole pipeline behind one function. Still to do:
-pre-generated audio, and the gaps below.
+`src/session/` owns the whole pipeline behind one function. What is outstanding
+is in What's next, and the things that are wrong rather than missing are under
+Schema and Known gaps.
 
 ## Research foundations
 
@@ -242,6 +243,85 @@ Every rep is logged to an append-only `attempts` table. That history is what all
 FSRS weights and learning steps to be retrained on real data
 (`@open-spaced-repetition/binding`) rather than running on generic defaults forever.
 
+## Schema
+
+Three tables, and the split is load-bearing.
+
+**`words`** is the shared catalogue: the same rows for everyone, read-only to
+users, one row per `(lang, text, gloss)`. **`cards`** is one user's scheduling
+state for one word. **`attempts`** is the append-only log of every answer.
+
+None of them wants merging. Folding `words` into `cards` copies the catalogue per
+user. `attempts` is the only unbackfillable thing here, so it stays whatever else
+changes. And `cards` is a materialised projection of `attempts` — derivable in
+principle, stored because replay cost grows with history forever and you cannot
+put an index on a computation, while "what is due for me right now" is the query
+that has to be fast.
+
+So the table count is not the problem. The problems are all in one narrow place.
+
+### One fact in two places — TODO
+
+Every schema defect found so far is the same shape, four times. Each is a value
+that exists in two places with nothing keeping the two equal, and the halves
+drift. Roughly half the bugs this app has shipped came from this list.
+
+1. **A card's identity.** The primary key is a random UUID, but the table also
+   declares `unique(user_id, word_id, card_type)` — and that is the real
+   identity. Two devices introducing the same word mint different UUIDs for the
+   same logical card, and the second write is rejected. Fix: derive the id from
+   the natural key, or promote the natural key to the primary key, so both
+   devices compute the same id and the second write is an ordinary update.
+
+2. **A card's stage.** Whether a word is unseen, guessed, or scheduled is half in
+   `fsrs_state.reps` and half in `attempts`, so the app re-derives it by joining
+   the two. Both of the bugs in `daa4fa4` and `e43721e` were two derivations
+   disagreeing. Fix: complete the projection — either a `stage` column kept
+   current by a trigger on `attempts`, or create the card row at the first
+   _rating_ rather than at introduction, which makes the ambiguous state
+   impossible rather than merely labelled.
+
+3. **A card's language.** It lives only on the word, so the cards query reaches
+   it through a join. This is safe to denormalise because it cannot go stale — a
+   card's `word_id` never changes. Fix: a `lang` column on `cards`.
+
+4. **A card's due date.** Stored twice: in `fsrs_state.due` and in the
+   denormalised `due` column that the index needs, kept equal by application
+   code. Fix: make `due` a generated column, so divergence stops being possible.
+
+   ```sql
+   due timestamptz generated always as ((fsrs_state->>'due')::timestamptz) stored
+   ```
+
+`fsrs_state` stays `jsonb`. Its shape belongs to `ts-fsrs`, not to us — it added
+`learning_steps` and deprecated `elapsed_days` recently — and a migration every
+time upstream moves is a worse trade than validating at the boundary, which
+`reviveFsrsCard` now does.
+
+### There is nowhere to put a setting — TODO
+
+`newPerDay` and the language being studied are per-user facts currently living in
+`SessionScreen.tsx` as constants, so changing the daily allowance means a deploy.
+They want a settings row. This is also what multi-language needs before it can be
+anything but a recompile.
+
+### History is erasable in bulk, though not editable — TODO
+
+`attempts` has no UPDATE or DELETE policy or grant, so no row can be edited or
+removed by name. But `attempts.card_id` cascades and a user may delete their own
+cards, so deleting a card takes its history with it — through the foreign key
+rather than through any policy.
+
+That door is the reason card deletion exists: a card is a derived cache, and
+dropping a corrupt one to rebuild it from history is a legitimate repair. The
+same door lets the history be dropped.
+
+For one user on their own data this is closer to a feature than a hole — it is
+what makes "wipe my progress and start again" possible from the client. It stops
+being fine the moment `attempts` is the training corpus for retrained FSRS
+weights, because then a stray delete is unbackfillable. `on delete restrict` is
+the lever, at the cost of making card repair a server-side operation.
+
 ## How this is tested
 
 Three layers, because the bugs came in three kinds.
@@ -256,6 +336,13 @@ The harness never writes a card: it runs a sitting, keeps what the session
 emitted, pushes it through the same JSON round trip `jsonb` does, and rebuilds
 the next sitting with the same `buildDeck` the app uses. Closing the app at every
 step of a sitting is then one loop rather than an act of imagination.
+
+**No integration layer yet — TODO.** Nothing here runs against a real Postgres:
+every test is a pure function or jsdom with the repository mocked. That leaves
+`loadDeck` unguarded, and its language filter lives in a PostgREST select string
+where a typo compiles and returns the wrong rows. Doing it properly means
+deciding how data is seeded and cleaned, how a test user is made, and whether it
+runs on push and on deploy — neither of which has a database today.
 
 **Properties** (`session/properties.test.ts`) over generated histories, because a
 reachable state nobody imagined is found by generating the ways of reaching it,
@@ -290,51 +377,6 @@ unlearnable, and by then `attempts` will say which.
 Either way the decision is which lapse count, and whether parking is for a day or
 for good — a product question, so it is written down rather than invented.
 
-### Two devices can collide on a new card — TODO
-
-Introducing a word means writing its `cards` row: the catalogue is fixed and
-shared, and a card is one user's scheduling state for one word. So "introduced"
-is exactly "a card row now exists for me and this word".
-
-Open the app on a phone and a laptop at once and both may introduce the same
-word. Each mints its own UUID, and `unique(user_id, word_id, card_type)` rejects
-the second — correctly, since one word gets one card. But that session is then
-holding an id the database does not have, so every attempt it writes would fail
-its foreign key.
-
-Today it is contained rather than fixed: the write is a named error, the screen
-reloads once to adopt the row that won, and if the conflict survives that it is
-reported instead of retried. The real fix is to stop minting random ids and
-derive them, so that both devices generate the _same_ id for the same
-(user, word, card_type) and the second write is an ordinary update. That wants
-deciding before `listening` cards make the key wider.
-
-### History is erasable in bulk, though not editable — TODO
-
-`attempts` has no UPDATE or DELETE policy or grant, so no row can be edited or
-removed by name. But `attempts.card_id` cascades and a user may delete their own
-cards, so deleting a card takes its history with it — through the foreign key
-rather than through any policy.
-
-That door is the reason card deletion exists at all: a card is a derived cache,
-and dropping a corrupt one to rebuild it from history is a legitimate repair. The
-same door lets the history be dropped.
-
-For one user on their own data this is closer to a feature than a hole — it is
-what makes "wipe my progress and start again" possible from the client. It stops
-being fine the moment `attempts` is the training corpus for retrained FSRS
-weights, because then a stray delete is unbackfillable. `on delete restrict` is
-the lever, at the cost of making card repair a server-side operation.
-
-### Cards do not carry their own language
-
-`lang` lives on `words`, so the cards query filters through a join
-(`words!inner(lang)`). That is correct — verified against the local database as a
-signed-in user, where the unfiltered query returns every language's cards and the
-filtered one returns only the asked-for language — but it is a join on every
-load, and a card's language is a fact about the card. Worth a column when the
-second language actually lands.
-
 ### Resolved
 
 The introduction gap described here previously — `reps === 0` being unable to
@@ -346,6 +388,48 @@ On a fresh session a card that was guessed but never recalled is shown again
 before being asked for. Whether its exposure was actually read before the app
 closed is unknowable, and re-showing costs seconds where skipping it would ask
 for a word that may never have been seen.
+
+## What's next
+
+Roughly in order. The first is small and unblocks the rest day to day; the rest
+are independent enough to reorder.
+
+1. **Reset the local database.** `npm run dev` already runs against
+   `supabase start`, so what is missing is a way to drop progress and keep the
+   deck. `delete from public.cards` does it — attempts cascade, words and the
+   login survive — where `db:reset` is the heavier version that re-seeds
+   everything and takes the auth user with it.
+
+2. **An integration test layer.** See How this is tested. Nothing runs against a
+   real Postgres today.
+
+3. **The schema changes above.** Four small ones and a settings table. None is
+   urgent alone; together they close roughly half the bug classes seen so far.
+
+4. **Decide the leech policy.** See Known gaps. A decision before it is code.
+
+5. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
+   hand-picked scaffold entries (§9, §3.2). This quietly fixes more than content:
+   deck exhaustion stops being a thing, and the scheduler finally has enough
+   cards that the two-and-three-card tail stops being the common case that every
+   rule has to be reasoned about against.
+
+6. **Pre-generated audio.** §6 has you repeating aloud after whatever voice the
+   device supplies, so a bad one teaches bad pronunciation forty times over.
+   Browser `speechSynthesis` is a stand-in, not a choice.
+
+7. **Real images.** Emoji are standing in, and several words have none because no
+   emoji is honest for them.
+
+8. **Multi-language, for real.** `lang` is first-class in the schema, but the app
+   is hardcoded to French and there is no way to choose. Needs the settings row
+   first, and needs a decision about what switching means given that languages
+   are studied one at a time.
+
+9. **Retrain FSRS on real data.** The point of the append-only log, and the one
+   item genuinely gated on something else: history has to be real reps rather
+   than a byproduct of testing. That same moment is when the cascade above stops
+   being a convenience and starts being a risk.
 
 ## Not in v1
 
