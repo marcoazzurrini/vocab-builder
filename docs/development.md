@@ -1,0 +1,147 @@
+# Development and migration
+
+## Scope
+
+The app uses TanStack Start on Cloudflare Workers, D1, Drizzle, and Better Auth.
+The learning engine and the visual design are preserved. Monorepo extraction
+and a package-manager change are separate tasks; this migration keeps npm and
+its lockfile so infrastructure changes can be tested independently.
+
+The new database starts with fresh users, sessions, settings, and progress.
+Existing Supabase test progress is intentionally not imported. No script deletes
+or modifies the Supabase project. Existing users must sign in again.
+
+## Local development
+
+Use Node.js 24 or newer.
+
+```sh
+npm ci
+npm run setup:local -- you@example.com
+npm run db:migrate
+npm run db:seed
+npm run dev
+```
+
+`setup:local` creates a private, ignored `.dev.vars` with a random secret. It
+refuses to overwrite an existing file. Edit `ALLOWED_EMAILS` there if needed.
+Vite uses port 5173; keep `BETTER_AUTH_URL` aligned with the actual origin.
+Local magic links appear in the development terminal instead of sending email.
+Never share these links or expose the development server to the public Internet.
+Logging links is rejected when the authentication URL is not localhost.
+
+The checked-in `data/words.json` preserves all 50 original seed entries and the
+later question-mark corrections. Its IDs are deterministic because the old SQL
+seed generated IDs inside Postgres. Importing a live export into an empty D1
+instead preserves the live IDs and creation dates.
+
+## Preserve the live catalogue
+
+Do this **before retiring Supabase**. The checked-in seed cannot prove that no
+additional words or edits exist in the hosted database.
+
+1. Stop editing the source catalogue for the duration of the export.
+2. Provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` through your shell's
+   environment or secret manager. Never commit the key or put it in a `VITE_`
+   variable. This is a one-time administrative credential, not an app dependency.
+3. Run `npm run db:export-words`. This only reads the `words` table. It verifies
+   pagination against the source row count and writes `exports/words.json`.
+   It refuses to overwrite a previous export.
+4. Inspect the export and keep a backup outside this checkout.
+5. Apply D1 migrations, then import the export **instead of the fallback seed**:
+
+   ```sh
+   npm run db:seed -- exports/words.json
+   ```
+
+6. Verify the destination count and compare every exported field, including
+   accents, punctuation, hints, images, language, and frequency order.
+
+The importer is idempotent by `(lang, text, gloss)`. It updates content fields,
+never deletes words, and preserves an existing D1 ID when a natural-key match
+already exists. Importing into an empty database is therefore the way to retain
+all original IDs. Do not apply the fallback seed over a live export: that could
+overwrite your custom edits. Export files are ignored by Git.
+
+## Database workflow
+
+```sh
+npm run db:generate -- --name=describe_the_change
+npm run db:migrate
+npm run db:test
+```
+
+Review generated SQL before applying it. For triggers or other SQL not expressible
+in Drizzle, use `npx drizzle-kit generate --custom --name=describe_the_change`
+and edit that migration. Do not use `drizzle-kit push` against production.
+
+D1's `batch()` is transactional; a failed statement rolls back the whole batch.
+It is not a PostgreSQL-style interactive `db.transaction(async tx => ...)`.
+Better Auth's Drizzle adapter explicitly has interactive transactions disabled.
+Application recall saves use Drizzle's D1 batch API, independently of the auth
+adapter. Authentication's multi-operation flows do not receive that same
+application-level atomicity guarantee.
+
+There is no RLS in D1. `src/server/functions.ts` validates input and derives the
+owner from the Better Auth session. `src/server/db/repository.ts` scopes all
+private queries. The browser never receives database credentials or arbitrary
+SQL access. SQL triggers enforce append-only attempts and revision checks.
+Deleting an account with history requires a deliberate administrative retention
+policy; it is not currently exposed through the UI.
+
+The outbox persists each answer under its own user-scoped localStorage key,
+then removes only that answer after acknowledgement. A failed save stops the
+queue. Retry reuses the original ID and payload. A conflict with another device
+requires explicitly discarding the pending answers before reloading; the UI
+asks for confirmation. Do not clear browser storage while answers are pending.
+This is reliable save recovery, not a fully offline application.
+
+## Checks
+
+```sh
+npm run ci
+```
+
+This builds both bundles, generates Cloudflare types, runs strict TypeScript,
+checks formatting and linting, and runs unit, UI, D1, and auth tests. D1 tests use
+ephemeral local databases, never the development database or a remote binding.
+No Supabase instance, Docker daemon, email key, or Cloudflare login is needed.
+
+`src/routeTree.gen.ts` and `worker-configuration.d.ts` are generated and ignored.
+Run `npm run build` after a fresh checkout before a standalone typecheck. Database
+integration tests load the SQL files from `migrations/`, including custom triggers.
+
+Drizzle Kit's stable release still depends on deprecated `@esbuild-kit` tooling.
+The package override raises that tooling's nested esbuild to a patched version;
+remove it once upstream replaces that dependency. No force-upgraded ORM prerelease
+is required for this migration.
+
+## Production cutover
+
+The checked-in D1 ID and authentication hostname are placeholders. Nothing has
+been deployed or switched away from Supabase by this code change.
+
+1. Create a D1 database with `npx wrangler d1 create vocab-builder`. Set its
+   returned ID in `wrangler.jsonc`.
+2. Set `BETTER_AUTH_URL` in Wrangler variables to the exact HTTPS application
+   origin. Keep `AUTH_EMAIL_MODE` set to `resend`.
+3. Configure a verified sending domain with Resend. Set these Worker secrets
+   using the interactive `npx wrangler secret put NAME` command:
+   - `BETTER_AUTH_SECRET`: at least 32 cryptographically random characters.
+   - `ALLOWED_EMAILS`: comma-separated addresses allowed to use this private app.
+   - `RESEND_API_KEY`: a sending credential.
+   - `EMAIL_FROM`: a sender using the verified domain.
+4. Apply the schema with `npm run db:migrate:remote`.
+5. Import the verified export with `npm run db:seed -- exports/words.json --remote`.
+   Do not run the fallback seed if you imported the live catalogue.
+6. Compare D1 with the export, run `npm run ci`, and deploy with `npm run deploy`.
+7. Verify sign-in, one-time link reuse rejection, sign-out, a guess, a recall,
+   reload, and the saved history on the deployed origin.
+8. Keep Supabase and the export available until the new deployment is verified.
+   Retiring Supabase is a separate, explicit action.
+
+Better Auth runs inside the application Worker; there is no separate auth server
+to host. D1 stores its users, sessions, verification tokens, and rate-limit state.
+The authentication limiter trusts Cloudflare's `cf-connecting-ip` header.
+Magic links expire after ten minutes and are stored hashed. Email delivery is
+the only new external service; credentials remain server-side.

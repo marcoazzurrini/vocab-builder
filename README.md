@@ -8,10 +8,13 @@ expiry date.
 
 ## Status
 
-Deployed and usable: sign in with a magic link, answer cards, progress is saved.
-`src/session/` owns the whole pipeline behind one function. What is outstanding
-is in What's next, and the things that are wrong rather than missing are under
-Known gaps.
+The app now targets TanStack Start on Cloudflare Workers, D1, Drizzle, and
+Better Auth magic links. The learning engine in `src/session/` is unchanged.
+The Cloudflare deployment and the live word export still require configuration;
+Supabase has not been deleted or modified. Old test progress is not migrated.
+
+See [development and migration](docs/development.md) for local setup, word
+preservation, secrets, and the production cutover checklist.
 
 ## Research foundations
 
@@ -250,15 +253,12 @@ sequence the intonation contour is part of the chunk (§7).
 
 ## Stack
 
-| Layer      | Choice                                                       |
-| ---------- | ------------------------------------------------------------ |
-| Frontend   | Vite + React SPA, no router (phase state is the router)      |
-| Hosting    | Cloudflare Pages                                             |
-| Backend    | none — `supabase-js` direct from the browser, RLS is the API |
-| DB         | Supabase Postgres                                            |
-| Auth       | Supabase Auth, magic link                                    |
-| Scheduling | `ts-fsrs`, client-side                                       |
-| TTS        | browser `speechSynthesis`                                    |
+- **Frontend:** React, TanStack Start/Router, Vite.
+- **Hosting/backend:** Cloudflare Workers and authenticated Start server functions.
+- **Database:** Cloudflare D1 (SQLite), Drizzle ORM, checked-in SQL migrations.
+- **Authentication:** Better Auth, private email allowlist, magic links, Resend delivery.
+- **Scheduling:** `ts-fsrs` in the client for interaction and on the server for persisted state.
+- **TTS:** browser `speechSynthesis`.
 
 `lang` is a first-class column from day one. Languages are learned sequentially, one
 at a time — parallel study causes interference.
@@ -269,15 +269,20 @@ FSRS weights and learning steps to be retrained on real data
 
 ## Schema
 
-Deliberately not described here. The migrations in `supabase/migrations/` are
-the schema, design rationale included in their comments, and prose that
-paraphrases them is a copy that drifts — this section used to be that copy.
-Read them in order; later migrations revise the decisions of earlier ones and
-say why.
+`src/server/db/schema.ts` defines the Drizzle schema. `migrations/` contains
+reviewed SQL, including append-only and revision-check triggers that Drizzle
+cannot express in its schema builder. Wrangler applies these migrations.
+`supabase/` is historical reference only; it is not used by the new app.
+
+One recall inserts its attempt and updates its card in a single D1 batch.
+Stable answer IDs make retries idempotent. Revision guards reject stale-device
+writes rather than overwrite newer progress. A user-scoped browser outbox keeps
+unacknowledged answers, pauses on failure, and supports retry. Clearing browser
+storage before synchronization can still lose unsaved answers.
 
 ## How this is tested
 
-Three layers, because the bugs came in three kinds.
+Learning tests, UI tests, persistence tests, and authentication integration tests.
 
 **Examples** for the rules we decided on — one per claim, each carrying the
 reason it exists.
@@ -290,12 +295,12 @@ emitted, pushes it through the same JSON round trip `jsonb` does, and rebuilds
 the next sitting with the same `buildDeck` the app uses. Closing the app at every
 step of a sitting is then one loop rather than an act of imagination.
 
-**No integration layer yet — TODO.** Nothing here runs against a real Postgres:
-every test is a pure function or jsdom with the repository mocked. That leaves
-`loadDeck` unguarded, and its language filter lives in a PostgREST select string
-where a typo compiles and returns the wrong rows. Doing it properly means
-deciding how data is seeded and cleaned, how a test user is made, and whether it
-runs on push and on deploy — neither of which has a database today.
+**D1 integration tests** run the checked-in migrations in isolated local
+`workerd` databases through Wrangler. They cover rollback when the second write
+fails, duplicate retries, racing recalls, ownership and language filters,
+constraints, and the preserved catalogue. Better Auth tests exercise actual
+magic-link verification, sessions, sign-out, and origin checks against D1.
+No hosted database or real email delivery is required.
 
 **Properties** (`session/properties.test.ts`) over generated histories, because a
 reachable state nobody imagined is found by generating the ways of reaching it,
@@ -337,8 +342,9 @@ for a word that may never have been seen.
 Roughly in order. The first is small and unblocks the rest day to day; the rest
 are independent enough to reorder.
 
-1. **An integration test layer.** See How this is tested. Nothing runs against a
-   real Postgres today.
+1. **Complete the production cutover.** Export and verify the live word
+   catalogue, provision D1, configure email and authentication secrets, then
+   deploy and smoke-test before retiring Supabase.
 
 2. **The real word list.** ~500–1000 subtitle-derived lemmas replacing the 50
    hand-picked scaffold entries (§9, §3.2). This quietly fixes more than content:
@@ -364,7 +370,7 @@ are independent enough to reorder.
 
 ## Not in v1
 
-Speech recognition and pronunciation assessment. Chunks. Real subtitle-derived
+Speech recognition and pronunciation assessment. Real subtitle-derived
 frequency lists and images (emoji stand in). Listening / micro-dictation cards.
 
 ## Conventions
