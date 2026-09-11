@@ -1,38 +1,23 @@
-import type { Session } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { SessionScreen } from "./SessionScreen";
-import { redirectTo, supabase } from "./lib/supabase";
+import { authClient } from "./lib/auth-client";
 import { Sidebar } from "./ui/Sidebar";
 import { Wordmark } from "./ui/Wordmark";
 
 // Auth gate and shell. Everything past signing in belongs to SessionScreen.
 
-type AuthState =
-  | { status: "loading" }
-  | { status: "signedOut" }
-  | { status: "linkSent"; email: string }
-  | { status: "signedIn"; session: Session };
-
 export default function App() {
-  const [auth, setAuth] = useState<AuthState>({ status: "loading" });
+  const { data: current, isPending, error: sessionError } = authClient.useSession();
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setAuth(
-        data.session ? { status: "signedIn", session: data.session } : { status: "signedOut" },
-      );
-    });
-
-    // Also fires when a magic link returns and the session is read out of the
-    // URL, which is what moves the screen on without a reload — and again on
-    // sign-out, which is what moves it back.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuth(session ? { status: "signedIn", session } : { status: "signedOut" });
-    });
-    return () => sub.subscription.unsubscribe();
+    if (new URLSearchParams(window.location.search).has("error")) {
+      setError("Link non valido o scaduto. Richiedi un nuovo link.");
+    }
   }, []);
 
   useEffect(() => {
@@ -50,22 +35,34 @@ export default function App() {
     const email = new FormData(event.currentTarget).get("email");
     if (typeof email !== "string" || !email) return;
 
-    const { error: signInError } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo() },
-    });
-    if (signInError) setError(signInError.message);
-    else setAuth({ status: "linkSent", email });
+    setSending(true);
+    try {
+      const { error: signInError } = await authClient.signIn.magicLink({ email, callbackURL: "/" });
+      if (signInError) setError(signInError.message ?? "Invio non riuscito. Riprova.");
+      else setSentTo(email);
+    } catch {
+      setError("Connessione non disponibile. Riprova.");
+    } finally {
+      setSending(false);
+    }
   }
 
-  if (auth.status === "signedIn") {
+  if (current) {
     return (
       <div className="shell">
         <Sidebar
-          email={auth.session.user.email ?? null}
+          email={current.user.email}
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
-          onSignOut={() => void supabase.auth.signOut()}
+          onSignOut={() => {
+            void authClient
+              .signOut()
+              .then(({ error: signOutError }) => {
+                if (signOutError) setError("Disconnessione non riuscita. Riprova.");
+                else setSentTo(null);
+              })
+              .catch(() => setError("Disconnessione non riuscita. Riprova."));
+          }}
         />
         {menuOpen && (
           <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />
@@ -97,7 +94,12 @@ export default function App() {
           </header>
           <main>
             <ErrorBoundary>
-              <SessionScreen userId={auth.session.user.id} />
+              {error && (
+                <p role="alert" className="note wrong">
+                  {error}
+                </p>
+              )}
+              <SessionScreen key={current.user.id} userId={current.user.id} />
             </ErrorBoundary>
           </main>
         </div>
@@ -111,9 +113,9 @@ export default function App() {
         <Wordmark />
       </h1>
 
-      {auth.status === "loading" && <p className="sent">…</p>}
+      {isPending && <p className="sent">Carico…</p>}
 
-      {auth.status === "signedOut" && (
+      {!isPending && !sentTo && (
         <form onSubmit={sendLink}>
           <label htmlFor="email">Accedi con un link via email</label>
           <input
@@ -125,20 +127,28 @@ export default function App() {
             placeholder="tu@esempio.it"
           />
           <div className="actions">
-            <button type="submit">Invia link</button>
+            <button type="submit" disabled={sending}>
+              {sending ? "Invio…" : "Invia link"}
+            </button>
           </div>
         </form>
       )}
 
-      {auth.status === "linkSent" && (
-        <p className="sent">
-          Link inviato a <strong>{auth.email}</strong>. Aprilo su questo dispositivo.
-        </p>
+      {sentTo && (
+        <>
+          <p className="sent">
+            Se l'indirizzo è abilitato, riceverai un link a <strong>{sentTo}</strong>. Aprilo su
+            questo dispositivo.
+          </p>
+          <button type="button" onClick={() => setSentTo(null)}>
+            Richiedi un altro link
+          </button>
+        </>
       )}
 
-      {error && (
+      {(error || sessionError) && (
         <p role="alert" className="note wrong">
-          Errore: {error}
+          {error ?? "Impossibile verificare l'accesso. Riprova."}
         </p>
       )}
     </div>

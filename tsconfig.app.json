@@ -28,5 +28,5 @@
     // ordering and the earliest-due picks all read as total when they are not.
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src"]
+  "include": ["src", "worker-configuration.d.ts"]
 }

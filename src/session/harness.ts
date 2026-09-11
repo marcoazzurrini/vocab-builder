@@ -15,8 +15,8 @@
  * not have thought to write down.
  */
 
-import { buildDeck } from "../lib/repository";
-import type { CardRow, GuessRow, WordRow } from "../lib/repository";
+import { buildDeck } from "../lib/deck";
+import type { CardRow, GuessRow, WordRow } from "../lib/deck";
 import { createSession } from "./index";
 import type { Attempt, Effort, Word } from "./types";
 

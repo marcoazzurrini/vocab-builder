@@ -2,25 +2,22 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createEmptyCard, State } from "ts-fsrs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Deck } from "./lib/repository";
+import type { Deck } from "./lib/deck";
+import { DEFAULT_SETTINGS } from "./lib/deck";
+import type { AnswerCommand } from "./lib/commands";
 import type { Word } from "./session/types";
 
 const loadDeck = vi.fn<(lang: string, now: Date) => Promise<Deck>>();
-const upsertCard = vi.fn<() => Promise<void>>();
-const insertAttempt = vi.fn<() => Promise<void>>();
+const persistAnswer = vi.fn<(command: AnswerCommand, expectedUserId: string) => Promise<void>>();
 
 vi.mock("./lib/speak", () => ({ speak: vi.fn(), warmUpVoices: vi.fn() }));
 
-vi.mock("./lib/repository", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./lib/repository")>();
-  return {
-    ...actual,
-    loadSettings: () => Promise.resolve(actual.DEFAULT_SETTINGS),
-    loadDeck: (lang: string, now: Date) => loadDeck(lang, now),
-    upsertCard: () => upsertCard(),
-    insertAttempt: () => insertAttempt(),
-  };
-});
+vi.mock("./lib/repository", () => ({
+  loadSettings: () => Promise.resolve(DEFAULT_SETTINGS),
+  loadDeck: (lang: string, now: Date) => loadDeck(lang, now),
+  persistAnswer: (command: AnswerCommand, expectedUserId: string) =>
+    persistAnswer(command, expectedUserId),
+}));
 
 const { SessionScreen } = await import("./SessionScreen");
 
@@ -45,8 +42,8 @@ function becomeVisible() {
 describe("the session screen", () => {
   beforeEach(() => {
     loadDeck.mockReset().mockResolvedValue(deck());
-    upsertCard.mockReset().mockResolvedValue(undefined);
-    insertAttempt.mockReset().mockResolvedValue(undefined);
+    persistAnswer.mockReset().mockResolvedValue(undefined);
+    window.localStorage.clear();
   });
   afterEach(() => {
     // Not automatic: Testing Library only registers its own cleanup when
@@ -106,7 +103,7 @@ describe("the session screen", () => {
     vi.setSystemTime(new Date("2026-08-10T23:50:00"));
 
     let release!: () => void;
-    insertAttempt.mockImplementation(() => new Promise<void>((r) => (release = r)));
+    persistAnswer.mockImplementation(() => new Promise<void>((r) => (release = r)));
 
     render(<SessionScreen userId="u1" />);
     await screen.findByText("cane");
@@ -153,8 +150,23 @@ describe("the session screen", () => {
     await waitFor(() => expect(loadDeck).toHaveBeenCalledTimes(2));
   });
 
+  it("retries the same stored answer under its original account", async () => {
+    persistAnswer.mockRejectedValueOnce(new Error("network down"));
+    render(<SessionScreen userId="u1" />);
+    await screen.findByText("cane");
+    fireEvent.click(screen.getByText("Continua"));
+    await screen.findByText(/network down/);
+    expect(window.localStorage.length).toBe(1);
+    const first = persistAnswer.mock.calls[0]!;
+    expect(first[1]).toBe("u1");
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await waitFor(() => expect(persistAnswer).toHaveBeenCalledTimes(2));
+    expect(persistAnswer.mock.calls[1]).toEqual(first);
+    await waitFor(() => expect(window.localStorage.length).toBe(0));
+  });
+
   it("reports a write failure it cannot act on", async () => {
-    insertAttempt.mockRejectedValue(new Error("network down"));
+    persistAnswer.mockRejectedValue(new Error("network down"));
 
     render(<SessionScreen userId="u1" />);
     await screen.findByText("cane");

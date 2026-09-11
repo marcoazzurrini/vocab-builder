@@ -1,7 +1,7 @@
 import { createEmptyCard } from "ts-fsrs";
-import { describe, expect, it, vi } from "vitest";
-import { buildDeck, createWriteQueue, reviveFsrsCard, toCard, toWord } from "./repository";
-import type { CardRow, GuessRow, WordRow } from "./repository";
+import { describe, expect, it } from "vitest";
+import { buildDeck, reviveFsrsCard, toCard, toWord } from "./deck";
+import type { CardRow, GuessRow, WordRow } from "./deck";
 
 const NOW = new Date("2026-08-10T09:00:00");
 
@@ -184,59 +184,5 @@ describe("building the deck", () => {
   it("revives the dates jsonb threw away", () => {
     const deck = buildDeck(words, [cardRow("w1")], [], NOW);
     expect(deck.cards[0]!.fsrs.due).toBeInstanceOf(Date);
-  });
-});
-
-describe("write queue", () => {
-  it("runs tasks in the order they were pushed", async () => {
-    // A card insert must land before the attempt whose foreign key points at it.
-    const order: number[] = [];
-    const queue = createWriteQueue(() => {});
-    queue.push(async () => {
-      await new Promise((r) => setTimeout(r, 20));
-      order.push(1);
-    });
-    queue.push(async () => {
-      order.push(2);
-    });
-    await queue.settled();
-    expect(order).toEqual([1, 2]);
-  });
-
-  it("reports a failure instead of swallowing it", async () => {
-    const onError = vi.fn();
-    const queue = createWriteQueue(onError);
-    const boom = new Error("network down");
-    queue.push(async () => {
-      throw boom;
-    });
-    await queue.settled();
-    expect(onError).toHaveBeenCalledWith(boom);
-  });
-
-  it("hands over the error itself, not a copy of its message", async () => {
-    class MarkerError extends Error {}
-    const onError = vi.fn();
-    const queue = createWriteQueue(onError);
-    queue.push(async () => {
-      throw new MarkerError("boom");
-    });
-    await queue.settled();
-    expect(onError.mock.calls[0]![0]).toBeInstanceOf(MarkerError);
-  });
-
-  it("keeps going after a failure", async () => {
-    const onError = vi.fn();
-    const done: string[] = [];
-    const queue = createWriteQueue(onError);
-    queue.push(async () => {
-      throw new Error("boom");
-    });
-    queue.push(async () => {
-      done.push("after");
-    });
-    await queue.settled();
-    expect(done).toEqual(["after"]);
-    expect(onError).toHaveBeenCalledOnce();
   });
 });

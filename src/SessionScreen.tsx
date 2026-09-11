@@ -1,14 +1,10 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { dayStart } from "./lib/day";
-import {
-  createWriteQueue,
-  DEFAULT_SETTINGS,
-  insertAttempt,
-  loadDeck,
-  loadSettings,
-  upsertCard,
-} from "./lib/repository";
-import type { Settings } from "./lib/repository";
+import { loadDeck, loadSettings, persistAnswer } from "./lib/repository";
+import { DEFAULT_SETTINGS } from "./lib/deck";
+import type { Settings } from "./lib/deck";
+import { commandFor, SyncConflict } from "./lib/commands";
+import { createOutbox } from "./lib/outbox";
 import { speak, warmUpVoices } from "./lib/speak";
 import { createSession } from "./session";
 import type { Effort, Session } from "./session";
@@ -23,6 +19,7 @@ export function SessionScreen({ userId }: { userId: string }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const [syncConflict, setSyncConflict] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   /** Bumped to rebuild the session from storage. See the reload effect below. */
@@ -45,8 +42,16 @@ export function SessionScreen({ userId }: { userId: string }) {
    * read the database from before them. Shared, the queue can be waited on
    * across reloads: the rebuild reads its own writes.
    */
-  const queueRef = useRef<ReturnType<typeof createWriteQueue> | null>(null);
-  queueRef.current ??= createWriteQueue((error) => setWriteError(error.message));
+  const queueRef = useRef<ReturnType<typeof createOutbox> | null>(null);
+  queueRef.current ??= createOutbox({
+    userId,
+    storage: window.localStorage,
+    send: (command) => persistAnswer(command, userId),
+    onError: (error) => {
+      setWriteError(error.message);
+      setSyncConflict(error instanceof SyncConflict);
+    },
+  });
   const queue = queueRef.current;
 
   useEffect(() => {
@@ -78,8 +83,8 @@ export function SessionScreen({ userId }: { userId: string }) {
           newPerDay: settings.newPerDay,
           introducedToday: deck.introducedToday,
           dayRolloverHour: settings.dayRolloverHour,
-          onCardChange: (card) => queue.push(() => upsertCard(card, userId)),
-          onAttempt: (attempt) => queue.push(() => insertAttempt(attempt, userId)),
+          // The server records the attempt and derives its schedule in one transaction.
+          onAttempt: (attempt) => queue.push(commandFor(attempt)),
         });
         sessionRef.current = created;
         setSession(created);
@@ -94,9 +99,8 @@ export function SessionScreen({ userId }: { userId: string }) {
   }, [userId, reloadCount, queue]);
 
   /**
-   * A tab closed with writes in flight loses them, and `attempts` is the one
-   * table that cannot be rebuilt. The browser shows its generic "leave site?"
-   * dialog — not our words, but our timing.
+   * Answers are retained locally until acknowledged. Still warn before leaving:
+   * clearing browser storage before sync would lose the only copy.
    */
   useEffect(() => {
     function warn(event: BeforeUnloadEvent) {
@@ -167,11 +171,59 @@ export function SessionScreen({ userId }: { userId: string }) {
     rerender();
   }
 
-  if (loadError)
+  if (loadError || writeError)
     return (
-      <p role="alert" className="note wrong">
-        Errore nel caricamento: {loadError}
-      </p>
+      <div>
+        <p role="alert" className="note wrong">
+          {writeError ? "Salvataggio non riuscito" : "Caricamento non riuscito"}:{" "}
+          {writeError ?? loadError}
+        </p>
+        <p className="note">
+          Riprova prima di continuare. Non cancellare i dati del browser: potrebbero contenere
+          risposte da salvare.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            void queue
+              .retry()
+              .then(() => {
+                setLoadError(null);
+                setWriteError(null);
+                reload();
+              })
+              .catch((error: unknown) =>
+                setWriteError(error instanceof Error ? error.message : String(error)),
+              );
+          }}
+        >
+          Riprova
+        </button>
+        {syncConflict && (
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                !window.confirm(
+                  "Scartare tutte le risposte non sincronizzate su questo dispositivo? Questa azione non può essere annullata. I progressi già salvati rimangono invariati.",
+                )
+              )
+                return;
+              try {
+                queue.discard();
+                setLoadError(null);
+                setWriteError(null);
+                setSyncConflict(false);
+                reload();
+              } catch (error) {
+                setWriteError(error instanceof Error ? error.message : String(error));
+              }
+            }}
+          >
+            Scarta risposte in attesa e ricarica
+          </button>
+        )}
+      </div>
     );
   if (!view) return <p className="note">Carico…</p>;
 
@@ -314,11 +366,6 @@ export function SessionScreen({ userId }: { userId: string }) {
       )}
 
       {audioError && <p className="note">{audioError}</p>}
-      {writeError && (
-        <p role="alert" className="note wrong">
-          Salvataggio non riuscito: {writeError}
-        </p>
-      )}
     </div>
   );
 }

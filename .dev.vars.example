@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local development only. Never commit real secrets.
+BETTER_AUTH_URL=http://localhost:5173
+BETTER_AUTH_SECRET=replace-with-at-least-32-random-characters
+ALLOWED_EMAILS=you@example.com
+# Local links appear in the terminal. This mode is rejected outside localhost.
+AUTH_EMAIL_MODE=log
+# Production requires a verified sender and an email provider key.
+# RESEND_API_KEY=
+# EMAIL_FROM=Vocabulary <login@your-domain.example>

@@ -5,35 +5,47 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "ci": "npm run check && vite build",
+    "build": "vite build && npm run typecheck",
+    "ci": "npm run build && npm run check",
     "preview": "vite preview",
     "prepare": "lefthook install",
     "lint": "oxlint",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "typecheck": "tsc -b",
+    "typecheck": "wrangler types && tsc -b",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:reset": "supabase db reset",
-    "db:reset-progress": "docker exec -i supabase_db_vocab-builder psql -U postgres -d postgres -c 'delete from public.attempts' -c 'delete from public.cards'",
-    "db:test": "docker exec -i supabase_db_vocab-builder psql -U postgres -d postgres -q < supabase/tests/schema_test.sql"
+    "db:test": "vitest run src/server/db/repository.test.ts src/server/auth.test.ts",
+    "cf:types": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:seed": "node scripts/seed-words.mjs",
+    "db:export-words": "node scripts/export-supabase-words.mjs",
+    "deploy": "npm run ci && wrangler deploy",
+    "setup:local": "node scripts/setup-local.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.2",
+    "@better-auth/drizzle-adapter": "^1.7.4",
+    "@tanstack/react-router": "^1.170.35",
+    "@tanstack/react-start": "^1.168.52",
+    "better-auth": "^1.7.4",
+    "drizzle-orm": "^0.45.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "ts-fsrs": "^5.4.1",
     "valibot": "^1.4.2"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.54.8",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "drizzle-kit": "^0.31.10",
     "fast-check": "^4.9.0",
     "jsdom": "^29.1.1",
     "lefthook": "^2.1.10",
@@ -44,10 +56,16 @@
     "vitest": "^4.1.10",
     "wrangler": "^4.120.0"
   },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.12"
+    }
+  },
   "allowScripts": {
     "esbuild@0.28.1": true,
     "lefthook@2.1.10": true,
     "workerd@1.20260911.1": true,
-    "fsevents@2.3.3": true
+    "fsevents@2.3.3": true,
+    "esbuild@0.25.12": true
   }
 }
