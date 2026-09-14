@@ -31,6 +31,28 @@ Local sign-in links appear in the terminal. Do not expose the development server
 or share those links. See [development and deployment](docs/development.md) for
 secrets, existing catalogue imports, and production safeguards.
 
+## Install as an app
+
+On the HTTPS deployment, use your browser's install action. On iPhone or iPad,
+open the site in Safari and choose Share → Add to Home Screen (enable Open as Web
+App if offered). Installation adds a standalone app window; an internet connection
+is still required for sign-in and practice. There is no service worker or offline
+cache, and installation does not change answer persistence or authentication.
+
+The manifest lives in `apps/web/public/manifest.webmanifest`. Installation icons
+use the app's colors and are generated from `apps/web/public/favicon.svg`. To
+regenerate the checked-in PNGs after changing that SVG, run from the repository root:
+
+```sh
+bunx --yes --package sharp-cli sharp -i apps/web/public/favicon.svg -o apps/web/public/icons/pwa-192.png resize 192 192
+bunx --yes --package sharp-cli sharp -i apps/web/public/favicon.svg -o apps/web/public/icons/pwa-512.png resize 512 512
+bunx --yes --package sharp-cli sharp -i apps/web/public/favicon.svg -o apps/web/public/icons/apple-touch-icon.png resize 180 180
+```
+
+Keep the symbol inside the centered 80%-diameter circle so the 512px icon remains
+safe under maskable icon crops. Icon generation is a maintenance step, not a build
+or runtime dependency.
+
 ## Repository
 
 ```text

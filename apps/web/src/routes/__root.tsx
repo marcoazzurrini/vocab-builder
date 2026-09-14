@@ -11,7 +11,11 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#16171b", media: "(prefers-color-scheme: dark)" },
       { title: "vocab-builder" },
     ],
-    links: [{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
+    links: [
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/apple-touch-icon.png" },
+    ],
   }),
   component: Root,
 });
