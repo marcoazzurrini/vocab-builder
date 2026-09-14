@@ -150,6 +150,40 @@ retire Supabase.
 8. Keep Supabase and the export available until the new deployment is verified.
    Retiring Supabase is a separate, explicit action.
 
+## Git-based deployments
+
+The existing `vocab-builder` Worker is connected to
+`marcoazzurrini/vocab-builder` through Cloudflare Workers Builds. The production
+configuration is:
+
+- Production branch: `main`.
+- Root directory: `/`.
+- Build command: `npm run ci`.
+- Deploy command: `npx wrangler deploy`.
+- Build watch paths: `*`, with no exclusions.
+- Non-production branch builds: disabled.
+
+Cloudflare installs dependencies from the npm lockfile, then runs the build
+command. Deployment runs only if all checks in that command succeed. GitHub
+Actions independently runs the same checks on pushes and pull requests; Cloudflare
+uses its own check results rather than waiting for the GitHub Actions result.
+The build environment must provide Node.js 24 or newer.
+
+Push reviewed changes with `git push origin main`. Check the resulting build in
+Cloudflare and confirm that its commit matches the pushed commit. After deployment,
+check the application at `https://vocab-builder.marcoazzurrini.com`.
+
+Runtime secrets remain in the Worker's encrypted settings. They are not committed
+to Git or copied into build variables. The existing D1 binding and custom domain
+remain configured in `wrangler.jsonc`. Builds neither seed the database nor apply
+remote migrations; review and apply required migrations separately before deploying
+code that depends on them.
+
+Preview builds are disabled because the current bindings and authentication origin
+point at production. Before enabling previews, configure an isolated staging
+Worker, database, and authentication origin. The saved version command is
+`npx wrangler versions upload`, not a command that promotes a version to production.
+
 ### Preparing an undeployed server version
 
 The previous Worker served only static assets. Upload the built server application
