@@ -12,7 +12,8 @@ scripts. Vite, Vitest, and Wrangler still run with their Node shebangs; do not f
 Cloudflare's `workerd`, not Bun or Node. No active Deno toolchain remains.
 
 - `apps/web` (`@vocab/web`) owns routes, HTTP adapters, Worker bindings, React UI,
-  assets, and browser answer recovery. UI stays app-local; there is no UI package.
+  assets, browser answer recovery, and local settings setup. UI stays app-local;
+  there is no UI package.
 - `packages/spaced-repetition` owns session flow, grading, scheduling, answer
   validation, and deck reconstruction. Its public entrypoints hide FSRS machinery.
 - `packages/database` owns D1 access, user-scoped repositories, Drizzle schema,
@@ -28,9 +29,11 @@ Cloudflare's `workerd`, not Bun or Node. No active Deno toolchain remains.
   See [architecture](architecture.md) for the public contracts and dependency graph.
 
 Bun filters run workspace scripts in their workspace directory. Root `db:seed`
-and `setup:local` invoke package tooling directly: their file arguments are relative
-to the repository root. Prefer absolute paths for backups. Root commands provide
-common operations without requiring `cd`.
+and `setup:local` invoke scripts in their owning workspaces directly: their file
+arguments are relative to the repository root. Catalogue import and its seed data
+live in `packages/database/scripts/`; local settings setup lives in `apps/web/scripts/`.
+Prefer absolute paths for backups. Root commands provide common operations without
+requiring `cd`.
 
 Workspace typechecks use TypeScript 7. The root's TypeScript 6 dependency exists
 only for dependency-cruiser's parser compatibility; see [architecture](architecture.md).
@@ -56,8 +59,10 @@ bun run dev
 ```
 
 `setup:local` creates a private, ignored `apps/web/.dev.vars` with a random secret
-and refuses to overwrite an existing file. Edit `ALLOWED_EMAILS` there as needed.
-Vite uses port 5173; keep `BETTER_AUTH_URL` aligned with the actual origin.
+and refuses to overwrite an existing file. Run it once for a fresh checkout;
+`bun run dev` reads existing settings and does not run setup automatically.
+Edit `ALLOWED_EMAILS` there as needed. Vite uses port 5173; keep `BETTER_AUTH_URL`
+aligned with the actual origin.
 Local magic links appear in the development terminal instead of sending email.
 Never share these links or expose the development server to the public Internet.
 Logging links is rejected when the authentication URL is not localhost.
@@ -66,7 +71,7 @@ Local D1 state lives under `apps/web/.wrangler/`. When moving an existing checko
 preserve its `.dev.vars`, `.wrangler/`, and `exports/` under `apps/web/`; do not
 recreate or reseed an existing database merely because the project moved.
 
-The checked-in `packages/database/seed/words.json` preserves all 50 original seed entries
+The checked-in `packages/database/scripts/words.json` preserves all 50 original seed entries
 and the later question-mark corrections. Its IDs are deterministic because the
 old SQL seed generated IDs inside Postgres. Importing a live export into an empty
 D1 instead preserves live IDs and creation dates.

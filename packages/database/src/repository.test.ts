@@ -204,7 +204,7 @@ describe("D1 persistence", () => {
 
   it("preserves the complete checked-in catalogue including corrected punctuation", async () => {
     const source = JSON.parse(
-      await readFile(new URL("../seed/words.json", import.meta.url), "utf8"),
+      await readFile(new URL("../scripts/words.json", import.meta.url), "utf8"),
     ) as (typeof words.$inferInsert)[];
     expect(source).toHaveLength(50);
     expect(source.filter((word) => word.kind === "chunk")).toHaveLength(15);

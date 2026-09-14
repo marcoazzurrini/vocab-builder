@@ -37,7 +37,6 @@ apps/web/                    TanStack routes, Worker wiring, UI, browser recover
 packages/spaced-repetition/  Learning sessions, grading, and scheduling
 packages/database/           Scoped persistence, schema, migrations, seed and import
 packages/authentication/     Sign-in policy, sessions, email delivery, client facade
-tooling/                     Workspace boundary checks
 docs/                        Architecture, learning rationale, development
 .github/                     CI
 ```
@@ -49,7 +48,8 @@ Worker environment and presents their results. See [architecture](docs/architect
 for interfaces, dependencies, and enforced boundaries. UI remains app-local.
 
 Generated files, local D1 state, secrets, and existing private exports stay ignored
-and app-local. The development catalogue lives in `packages/database/seed/words.json`.
+and app-local. The development catalogue and its importer live together in
+`packages/database/scripts/`. The local settings helper lives in `apps/web/scripts/`.
 Historical catalogue SQL survives as independent database test fixtures. Retired
 Supabase configuration and export tooling remain in Git history. This cleanup does
 not retire the hosted Supabase project or remove private backups.

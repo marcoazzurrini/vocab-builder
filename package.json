@@ -25,10 +25,10 @@
     "db:generate": "bun run --filter @vocab/database generate",
     "db:migrate": "bun run --filter @vocab/web db:migrate",
     "db:migrate:remote": "bun run --filter @vocab/web db:migrate:remote",
-    "db:seed": "bun packages/database/tooling/import-catalogue.ts --config apps/web/wrangler.jsonc",
+    "db:seed": "bun packages/database/scripts/import-catalogue.ts --config apps/web/wrangler.jsonc",
     "deploy": "bun run ci && bun run deploy:only",
     "deploy:only": "bun run --filter @vocab/web deploy",
-    "setup:local": "bun packages/authentication/tooling/setup-local.mjs apps/web/.dev.vars"
+    "setup:local": "bun apps/web/scripts/setup-local.mjs apps/web/.dev.vars"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

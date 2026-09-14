@@ -21,6 +21,11 @@ packages/authentication    Access policy and server/client authentication facade
 These web directories live under `apps/web/src/`. UI components and styling remain
 app-local. There is deliberately no UI package in this refactor.
 
+Administrative scripts stay with their owner: `apps/web/scripts/` prepares the web
+app's local settings, and `packages/database/scripts/` contains the catalogue importer,
+its tests, and its seed JSON. These scripts run only when explicitly invoked; they
+are not part of application startup. Root commands provide convenient entrypoints.
+
 Production workspace dependencies flow in one direction:
 
 - Web consumes authentication, database, and spaced repetition.

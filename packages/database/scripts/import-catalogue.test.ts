@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { testDatabase } from "../src/testing";
-import { compileCatalogue } from "./catalogue";
+import { compileCatalogue } from "./import-catalogue";
 
 let fixture: Awaited<ReturnType<typeof testDatabase>>;
 beforeAll(async () => {
@@ -22,6 +24,23 @@ const word = {
 };
 
 describe("catalogue import", () => {
+  it("runs the CLI only when executed directly by Bun", () => {
+    const script = fileURLToPath(new URL("./import-catalogue.ts", import.meta.url));
+    const imported = spawnSync("bun", ["-e", `await import(${JSON.stringify(script)})`], {
+      encoding: "utf8",
+      timeout: 5_000,
+    });
+    expect(imported.status).toBe(0);
+    expect(imported.stdout).toBe("");
+    expect(imported.stderr).toBe("");
+
+    const executed = spawnSync("bun", [script], { encoding: "utf8", timeout: 5_000 });
+    expect(executed.status).toBe(1);
+    expect(executed.stderr).toContain(
+      "Provide --config with the target Worker's Wrangler configuration.",
+    );
+  });
+
   it("escapes text and preserves existing IDs, progress, and creation timestamps", async () => {
     await fixture.binding.prepare(compileCatalogue([word]).sql).run();
     const before = await fixture.binding.prepare("SELECT id, text, created_at FROM words").first();

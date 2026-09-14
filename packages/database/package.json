@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate": "drizzle-kit generate",
-    "seed": "bun tooling/import-catalogue.ts"
+    "seed": "bun scripts/import-catalogue.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.4",

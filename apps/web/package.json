@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "setup:local": "bun scripts/setup-local.mjs .dev.vars",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "bun run cf:types && tsc -p tsconfig.json && tsc -p tsconfig.node.json",
