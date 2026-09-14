@@ -16,6 +16,7 @@ pre-commit:
         - "*.ts"
         - "*.tsx"
         - "*.js"
+        - "*.cjs"
         - "*.jsx"
         - "*.json"
         - "*.css"
@@ -29,6 +30,7 @@ pre-commit:
         - "*.ts"
         - "*.tsx"
         - "*.js"
+        - "*.cjs"
         - "*.jsx"
 
     # No files template: typechecking is whole-project by nature, since a change
@@ -42,6 +44,10 @@ pre-commit:
 
 pre-push:
   jobs:
+    # Check the whole dependency graph, not just staged files.
+    - name: boundaries
+      run: bun run boundaries
+
     # On push rather than commit: it is the slower check, and it is the last
     # point where a failure is still cheap to fix locally.
     - name: test

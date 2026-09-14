@@ -132,12 +132,28 @@ storage or server writes must be visible, not silently dropped.
 
 ## Enforcement and evidence
 
-`bun run boundaries` parses workspace imports with Oxc. It rejects undeclared
-dependencies, unexported workspace paths, relative cross-workspace imports, reverse
-dependencies, implementation-library imports from web, and production imports of
-test helpers. Browser features can import TanStack server functions, not Worker
-service wiring or server-only package entrypoints. This check is part of lint and
-CI; it complements TypeScript and the TanStack client/server build, not replaces them.
+`bun run boundaries` runs dependency-cruiser using the root
+`.dependency-cruiser.cjs`. That file declares architecture rules; the library owns
+parsing, dependency resolution, graph analysis, and reporting. There is no custom
+checker or separate tooling test suite.
+
+The rules reject undeclared external dependencies, unresolved or unexported package
+paths, relative cross-workspace imports, reverse dependencies, implementation-library
+imports from web, and production imports of test helpers. Browser features can
+import TanStack server functions, not Worker service wiring or server-only package
+entrypoints. Public client entrypoints also cannot reach server implementation
+indirectly through shared helpers. Workspace dependency direction is enforced by
+explicit rules; each workspace must still declare its dependencies in `package.json`.
+
+This check runs during lint, CI, and the Lefthook pre-push hook. It complements
+TypeScript and the TanStack client/server build rather than replacing them.
+
+Dependency-cruiser 18 needs TypeScript's JavaScript compiler API, which TypeScript 7
+no longer supplies. The root therefore pins TypeScript 6 solely as the scanner's
+parser. Every app and package retains its explicit TypeScript 7 dependency for
+compilation and typechecking. The root has no TypeScript compilation task; it only
+dispatches workspace typechecks. Align the root version again when dependency-cruiser
+supports TypeScript 7.
 
 Tests cover the public learning interface and scheduling parity, isolated D1
 transactions and conflicts, catalogue identity preservation, authentication through

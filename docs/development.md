@@ -23,13 +23,17 @@ Cloudflare's `workerd`, not Bun or Node. No active Deno toolchain remains.
   Vite bundles those exports without library build steps. No relative imports
   between workspaces or imports of another package's internal source are allowed.
 - Root configuration covers formatting, linting, Git hooks, and strict TypeScript
-  defaults. `bun run boundaries` checks imports and runs as part of lint and CI.
+  defaults. `.dependency-cruiser.cjs` defines repository-wide import rules.
+  `bun run boundaries` runs them during lint, CI, and the pre-push hook.
   See [architecture](architecture.md) for the public contracts and dependency graph.
 
 Bun filters run workspace scripts in their workspace directory. Root `db:seed`
 and `setup:local` invoke package tooling directly: their file arguments are relative
 to the repository root. Prefer absolute paths for backups. Root commands provide
 common operations without requiring `cd`.
+
+Workspace typechecks use TypeScript 7. The root's TypeScript 6 dependency exists
+only for dependency-cruiser's parser compatibility; see [architecture](architecture.md).
 
 The root `prepare` script installs Lefthook. `trustedDependencies` explicitly
 allows the `esbuild`, `lefthook`, and `workerd` installation scripts. Review trust
