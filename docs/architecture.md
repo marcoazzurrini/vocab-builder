@@ -1,0 +1,146 @@
+# Module design
+
+The repository is organized around hidden knowledge, not file categories. A package
+is useful when its callers can stop coordinating its implementation details. Small
+export lists are a consequence, not the sole measure of a deep module.
+
+## Ownership and dependencies
+
+```text
+apps/web
+  routes/ and server/       HTTP adapters and Worker composition
+  features/practice/        Session presentation and durable browser synchronization
+  features/sign-in/         App-specific sign-in presentation
+  shell/                    Layout and navigation
+
+packages/spaced-repetition  Learning rules, with no framework or database dependency
+packages/database          Persistence, migrations, catalogue tooling
+packages/authentication    Access policy and server/client authentication facades
+```
+
+These web directories live under `apps/web/src/`. UI components and styling remain
+app-local. There is deliberately no UI package in this refactor.
+
+Production workspace dependencies flow in one direction:
+
+- Web consumes authentication, database, and spaced repetition.
+- Authentication uses database's authentication storage adapter.
+- Database uses spaced repetition to validate and schedule answers.
+- Spaced repetition does not import another workspace.
+- No package imports web.
+
+All packages export TypeScript source. Vite bundles only the entrypoints required
+by each target. Internal relative imports are fine inside a workspace; relative
+imports between workspaces and imports of unexported source are not.
+
+## Spaced repetition
+
+The `@vocab/spaced-repetition` browser-safe entrypoint exposes:
+
+- `createSession({ snapshot, settings, onAnswer, clock })`: reconstruct progress,
+  apply the local study-day allowance, run the session, and emit durable commands.
+- `Session`: its current view and guess, exposure, recall, and feedback operations.
+- Settings, answer validation, view types, and a study-day boundary helper.
+
+Callers do not build decks, instantiate FSRS, derive ratings, calculate revisions,
+or convert schedules into dates. Review snapshots contain domain words, opaque
+schedule strings, and introduction timestamps, not SQLite column names. Only the
+learning engine interprets a schedule.
+
+`@vocab/spaced-repetition/server` exposes `evaluateAnswer` and `RevisionConflict`.
+It validates an answer against the authoritative spelling and current schedule,
+then produces the next schedule and audit details. Browser session transitions
+and server evaluation use the same private grading and scheduling primitives.
+Neither owns storage or network behavior.
+
+Command shape, command IDs, and scheduling semantics are preserved. Existing
+pending browser answers must remain readable and replayable across deployment.
+
+## Database
+
+`createDatabase(binding).forUser(authenticatedUserId)` returns:
+
+```ts
+interface UserRepository {
+  settings(): Promise<Settings>;
+  snapshot(language: string): Promise<ReviewSnapshot>;
+  recordAnswer(answer: AnswerCommand): Promise<void>;
+}
+```
+
+The repository owns user filters, Drizzle queries, storage serialization, atomic
+answer writes, replay idempotency, and revision conflicts. It delegates learning
+rules to spaced repetition. It does not know HTTP headers or Worker binding names.
+
+Authentication must happen before choosing the repository's owner. A repository
+is a scoped capability, not an authentication mechanism. Individual operations
+cannot choose a different owner. Expected-user checks on writes prevent an old
+tab from replaying one account's answers after another account signs in.
+
+There is one physical schema and one immutable migration history, including
+Better Auth tables and application triggers. Authentication owns the requirements
+for its tables; database owns their physical representation and migrations.
+`@vocab/database/authentication` supplies the configured storage adapter without
+exposing Drizzle handles or schema objects to the authentication implementation.
+It is intentionally a framework-specific integration seam, not a universal
+persistence abstraction.
+
+`@vocab/database/testing` provisions an isolated migrated D1 database for package
+integration tests. It is not a production API; the boundary checker prevents its
+use from production files. Normal application code cannot import schema or raw
+connection helpers.
+
+Schema generation, seeds, and catalogue import belong here. The deployable app
+retains Wrangler configuration and local/remote migration commands because only
+the app knows which DB binding to target. Its `migrations_dir` points to this
+package. No migration filenames, metadata, triggers, or production binding IDs
+change during the refactor.
+
+## Authentication
+
+`@vocab/authentication/server` exposes `createAuthentication(options)` with two
+operations:
+
+- `handle(request)` serves authentication HTTP routes.
+- `requireUser(headers, expectedUserId?)` returns an application identity or rejects.
+
+The module hides Better Auth configuration, allowlists, origin checks, rate
+limits, magic-link hashing and expiry, email delivery, and account checks. The app
+supplies configuration explicitly; the package never imports `cloudflare:workers`.
+Cookies, table names, session lifetime, and token behavior remain unchanged.
+
+`@vocab/authentication/client` exposes `useSession`, `requestLink`, and `signOut`.
+It returns application identities and errors, not a Better Auth client. Its graph
+must not reach database or server configuration. Sign-in copy and layout belong
+to the consuming application.
+
+## Browser session synchronization
+
+`usePracticeSession(userId)` owns loading, outbox draining, retry/discard handling,
+study-day rollover, visibility refreshes, and next-due timers. `SessionScreen`
+renders its view and dispatches semantic actions. It does not interpret database
+responses or coordinate persistence.
+
+Mount the screen keyed by user ID. One queue survives reloads for that mounted
+account. Rebuilds disable the old prompt and drain pending writes before reading
+a fresh snapshot. Cancelled loads cannot replace a newer mounted session.
+
+The outbox preserves existing user-scoped localStorage keys and answer payloads.
+An answer is removed only after acknowledgement; retries reuse its ID. Conflicts
+require explicit confirmation before discarding pending work. Failed local
+storage or server writes must be visible, not silently dropped.
+
+## Enforcement and evidence
+
+`bun run boundaries` parses workspace imports with Oxc. It rejects undeclared
+dependencies, unexported workspace paths, relative cross-workspace imports, reverse
+dependencies, implementation-library imports from web, and production imports of
+test helpers. Browser features can import TanStack server functions, not Worker
+service wiring or server-only package entrypoints. This check is part of lint and
+CI; it complements TypeScript and the TanStack client/server build, not replaces them.
+
+Tests cover the public learning interface and scheduling parity, isolated D1
+transactions and conflicts, catalogue identity preservation, authentication through
+its public HTTP/session facade, browser recovery, and session reloads. Add tests at
+the owning module before expanding an interface. Avoid exporting internal helpers
+merely to make a caller's orchestration easier.

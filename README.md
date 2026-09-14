@@ -33,37 +33,43 @@ secrets, existing catalogue imports, and production safeguards.
 ## Repository
 
 ```text
-apps/web/          TanStack app, Worker, authentication, DB, migrations, assets
-packages/study/    Runtime-independent learning engine, commands, and tests
-docs/              Learning rationale and development/deployment instructions
-.github/           CI
+apps/web/                    TanStack routes, Worker wiring, UI, browser recovery
+packages/spaced-repetition/  Learning sessions, grading, and scheduling
+packages/database/           Scoped persistence, schema, migrations, seed and import
+packages/authentication/     Sign-in policy, sessions, email delivery, client facade
+tooling/                     Workspace boundary checks
+docs/                        Architecture, learning rationale, development
+.github/                     CI
 ```
 
-`@vocab/web` imports `@vocab/study` through explicit package exports. The study
-package has no React, Drizzle, or Cloudflare dependencies. Shared linting,
-formatting, TypeScript defaults, and Git hooks live at the root; app-specific
-configuration lives in `apps/web/`.
+Packages expose small, explicit interfaces, not their source trees. Database owns
+serialization and transactions; spaced repetition owns learning rules;
+authentication owns session and sign-in policy. Web binds those modules to the
+Worker environment and presents their results. See [architecture](docs/architecture.md)
+for interfaces, dependencies, and enforced boundaries. UI remains app-local.
 
-Generated files, local D1 state, secrets, and exports stay ignored and app-local.
-The checked-in catalogue lives in `apps/web/data/words.json`. Historical catalogue
-SQL survives only as independent test fixtures; other Supabase setup files remain
-in Git history. The hosted Supabase project has not been retired by this cleanup.
+Generated files, local D1 state, secrets, and existing private exports stay ignored
+and app-local. The development catalogue lives in `packages/database/seed/words.json`.
+Historical catalogue SQL survives as independent database test fixtures. Retired
+Supabase configuration and export tooling remain in Git history. This cleanup does
+not retire the hosted Supabase project or remove private backups.
 
 ## Checks
 
 ```sh
 bun run ci            # Build, format check, lint, typecheck, and all Vitest tests
-bun run test          # Both workspaces; do not substitute `bun test`
+bun run test          # All workspaces; do not substitute `bun test`
 bun run db:test       # Isolated D1 and authentication integration tests
 bun run format
 ```
 
-Workspaces export TypeScript source, so the app bundles the study package without
-a separate library build. A fresh checkout needs `bun run build` before standalone
+Workspaces export TypeScript source, so the app bundles their production entrypoints
+without separate library builds. A fresh checkout needs `bun run build` before standalone
 `bun run typecheck` to generate the TanStack route tree.
 
 ## Documentation
 
+- [Module interfaces and dependency rules](docs/architecture.md)
 - [Learning design and product direction](docs/learning-design.md)
 - [Local development, database workflow, and production deployment](docs/development.md)
 

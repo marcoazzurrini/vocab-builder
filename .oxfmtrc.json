@@ -6,8 +6,8 @@
     "**/.tanstack/**",
     "**/.generated/**",
     "**/routeTree.gen.ts",
-    "apps/web/migrations/**",
-    "apps/web/tests/fixtures/legacy-catalogue/**",
+    "packages/database/migrations/**",
+    "packages/database/tests/fixtures/legacy-catalogue/**",
     "**/exports/**"
   ]
 }

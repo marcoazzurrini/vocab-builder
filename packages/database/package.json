@@ -1,0 +1,32 @@
+{
+  "name": "@vocab/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./authentication": "./src/authentication.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate": "drizzle-kit generate",
+    "seed": "bun tooling/import-catalogue.ts"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.4",
+    "@cloudflare/workers-types": "^5.20260911.1",
+    "@vocab/spaced-repetition": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "valibot": "^1.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.120.0"
+  }
+}

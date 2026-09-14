@@ -12,29 +12,32 @@
     "ci": "bun run build && bun run check",
     "preview": "bun run --filter @vocab/web preview",
     "prepare": "lefthook install",
-    "lint": "oxlint",
+    "lint": "oxlint && bun run boundaries",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "tsc -p tooling/tsconfig.json && bun run --filter '*' typecheck",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
-    "test": "bun run --filter '*' test",
+    "test": "vitest run --config tooling/vitest.config.ts && bun run --filter '*' test",
     "test:watch": "bun run --filter '*' test:watch",
-    "db:test": "bun run --filter @vocab/web db:test",
+    "boundaries": "bun tooling/check-boundaries.ts",
+    "db:test": "bun run --filter @vocab/database --filter @vocab/authentication test",
     "cf:types": "bun run --filter @vocab/web cf:types",
-    "db:generate": "bun run --filter @vocab/web db:generate",
+    "db:generate": "bun run --filter @vocab/database generate",
     "db:migrate": "bun run --filter @vocab/web db:migrate",
     "db:migrate:remote": "bun run --filter @vocab/web db:migrate:remote",
-    "db:seed": "bun run --filter @vocab/web db:seed",
-    "db:export-words": "bun run --filter @vocab/web db:export-words",
+    "db:seed": "bun packages/database/tooling/import-catalogue.ts --config apps/web/wrangler.jsonc",
     "deploy": "bun run ci && bun run deploy:only",
     "deploy:only": "bun run --filter @vocab/web deploy",
-    "setup:local": "bun run --filter @vocab/web setup:local"
+    "setup:local": "bun packages/authentication/tooling/setup-local.mjs apps/web/.dev.vars"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
     "lefthook": "^2.1.10",
+    "oxc-parser": "^0.150.0",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.75.0",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {

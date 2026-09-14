@@ -1,0 +1,29 @@
+{
+  "name": "@vocab/authentication",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "setup:local": "bun tooling/setup-local.mjs"
+  },
+  "dependencies": {
+    "@vocab/database": "workspace:*",
+    "better-auth": "^1.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  }
+}

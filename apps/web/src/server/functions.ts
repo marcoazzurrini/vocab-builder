@@ -1,30 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import * as v from "valibot";
-import { AnswerCommand } from "@vocab/study/commands";
+import { AnswerCommand } from "@vocab/spaced-repetition";
 
-// Imports inside handlers stay on the server. No database binding or secret enters the client bundle.
-async function context(expectedUserId?: string) {
-  const { env } = await import("cloudflare:workers");
-  const { createAuth, authenticatedUser } = await import("./auth");
-  const { database } = await import("./db/repository");
-  const user = await authenticatedUser(createAuth(env), getRequestHeaders(), expectedUserId);
-  return { db: database(env.DB), userId: user.id };
+// Dynamic imports keep server-only packages and Worker bindings out of the browser graph.
+async function repository(expectedUserId?: string) {
+  const { services } = await import("./services");
+  const { authentication, database } = services();
+  const user = await authentication.requireUser(getRequestHeaders(), expectedUserId);
+  return database.forUser(user.id);
 }
 
 export const getSettings = createServerFn({ method: "GET" }).handler(async () => {
-  const { db, userId } = await context();
-  const { readSettings } = await import("./db/repository");
-  return readSettings(db, userId);
+  return (await repository()).settings();
 });
 
-export const getDeck = createServerFn({ method: "GET" })
+export const getSnapshot = createServerFn({ method: "GET" })
   .validator(v.strictObject({ lang: v.pipe(v.string(), v.minLength(2), v.maxLength(16)) }))
-  .handler(async ({ data }) => {
-    const { db, userId } = await context();
-    const { readDeck } = await import("./db/repository");
-    return readDeck(db, userId, data.lang);
-  });
+  .handler(async ({ data }) => (await repository()).snapshot(data.lang));
 
 export const recordAnswer = createServerFn({ method: "POST" })
   .validator(
@@ -34,11 +27,11 @@ export const recordAnswer = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    // An old tab/outbox must not submit one account's answers after another account signs in.
-    const { db, userId } = await context(data.expectedUserId);
-    const { saveAnswer, SaveConflict } = await import("./db/repository");
+    // An old tab/outbox cannot submit one account's answers after another account signs in.
+    const progress = await repository(data.expectedUserId);
+    const { SaveConflict } = await import("@vocab/database");
     try {
-      await saveAnswer(db, userId, data.answer);
+      await progress.recordAnswer(data.answer);
       return { conflict: false };
     } catch (error) {
       if (error instanceof SaveConflict) return { conflict: true };

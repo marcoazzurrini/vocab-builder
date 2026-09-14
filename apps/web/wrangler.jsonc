@@ -11,7 +11,7 @@
       "binding": "DB",
       "database_name": "vocab-builder",
       "database_id": "a5aef066-fd28-45ac-9a06-16217f9b6dd1",
-      "migrations_dir": "migrations",
+      "migrations_dir": "../../packages/database/migrations",
     },
   ],
   "vars": {

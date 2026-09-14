@@ -84,7 +84,7 @@ sometimes a lie. "Done" now means exactly one thing: nothing more within today.
    and pause.
 10. Nothing left within today → the session is over.
 
-This list is the code. `packages/study/src/session/queue.ts` holds one named rule per line and
+This list is the code. `packages/spaced-repetition/src/session/queue.ts` holds one named rule per line and
 an array in this order, because prose and precedence living in different places
 is how they came to disagree.
 
@@ -263,11 +263,11 @@ FSRS weights and learning steps to be retrained on real data
 
 ## Schema
 
-`apps/web/src/server/db/schema.ts` defines the Drizzle schema.
-`apps/web/migrations/` contains reviewed SQL, including append-only and
+`packages/database/src/schema.ts` defines the Drizzle schema.
+`packages/database/migrations/` contains reviewed SQL, including append-only and
 revision-check triggers that Drizzle cannot express in its schema builder.
 Wrangler applies these migrations. Original catalogue SQL is preserved in
-`apps/web/tests/fixtures/legacy-catalogue/` for regression tests, not deployment.
+`packages/database/tests/fixtures/legacy-catalogue/` for regression tests, not deployment.
 
 One recall inserts its attempt and updates its card in a single D1 batch.
 Stable answer IDs make retries idempotent. Revision guards reject stale-device
@@ -282,7 +282,7 @@ Learning tests, UI tests, persistence tests, and authentication integration test
 **Examples** for the rules we decided on — one per claim, each carrying the
 reason it exists.
 
-**A round-trip harness** (`packages/study/src/session/harness.ts`) for the rest. Every earlier test
+**A round-trip harness** (`packages/spaced-repetition/src/session/harness.ts`) for the rest. Every earlier test
 built its starting cards by hand, and a hand-built fixture can only hold the
 states someone already thought of — which is exactly the set with no bugs in it.
 The harness never writes a card: it runs a sitting, keeps what the session
@@ -297,9 +297,9 @@ constraints, and the preserved catalogue. Better Auth tests exercise actual
 magic-link verification, sessions, sign-out, and origin checks against D1.
 No hosted database or real email delivery is required.
 
-**Properties** (`packages/study/src/session/properties.test.ts`) over generated histories, because a
+**Properties** (`packages/spaced-repetition/src/session/properties.test.ts`) over generated histories, because a
 reachable state nobody imagined is found by generating the ways of reaching it,
-not by thinking harder. The invariants in `packages/study/src/session/invariants.ts` are the claims
+not by thinking harder. The invariants in `packages/spaced-repetition/src/session/invariants.ts` are the claims
 this document makes: a first recall is always preceded by its exposure in the
 same sitting, no card appears twice running, every card's history opens with
 exactly one guess, `Again` if and only if the answer was wrong, a review is never

@@ -11,22 +11,25 @@ scripts. Vite, Vitest, and Wrangler still run with their Node shebangs; do not f
 `--bun` onto those tools without testing their compatibility. Production runs on
 Cloudflare's `workerd`, not Bun or Node. No active Deno toolchain remains.
 
-- `apps/web` (`@vocab/web`) owns TanStack routes, React UI, browser persistence,
-  server functions, Better Auth, Drizzle schema, SQL migrations, assets, and scripts.
-- `packages/study` (`@vocab/study`) owns the learning engine, answer commands,
-  study-day logic, deck reconstruction, and their tests. It depends on `ts-fsrs`
-  and Valibot, not React, Cloudflare, or Drizzle.
-- The app declares `@vocab/study: workspace:*` and imports its explicit exports.
-  The package exports TypeScript source; Vite bundles it without a library build.
-  Do not import another workspace through relative filesystem paths or expose
-  test harnesses as production package exports.
-- Root configuration covers formatting, linting, Git hooks, and common strict
-  TypeScript defaults. Each workspace owns its scripts and TypeScript environment.
-  The app has a separate Node configuration for build tools and script tests.
+- `apps/web` (`@vocab/web`) owns routes, HTTP adapters, Worker bindings, React UI,
+  assets, and browser answer recovery. UI stays app-local; there is no UI package.
+- `packages/spaced-repetition` owns session flow, grading, scheduling, answer
+  validation, and deck reconstruction. Its public entrypoints hide FSRS machinery.
+- `packages/database` owns D1 access, user-scoped repositories, Drizzle schema,
+  migrations, catalogue seed/import, and the authentication storage adapter.
+- `packages/authentication` owns Better Auth configuration, access policy, email
+  delivery, session checks, and separate server/client facades.
+- Each workspace declares its dependencies and explicit TypeScript source exports.
+  Vite bundles those exports without library build steps. No relative imports
+  between workspaces or imports of another package's internal source are allowed.
+- Root configuration covers formatting, linting, Git hooks, and strict TypeScript
+  defaults. `bun run boundaries` checks imports and runs as part of lint and CI.
+  See [architecture](architecture.md) for the public contracts and dependency graph.
 
-Bun filters run workspace scripts in their workspace directory. File arguments to
-app scripts are therefore relative to `apps/web`, unless supplied as absolute
-paths. Root scripts provide the usual commands without requiring `cd`.
+Bun filters run workspace scripts in their workspace directory. Root `db:seed`
+and `setup:local` invoke package tooling directly: their file arguments are relative
+to the repository root. Prefer absolute paths for backups. Root commands provide
+common operations without requiring `cd`.
 
 The root `prepare` script installs Lefthook. `trustedDependencies` explicitly
 allows the `esbuild`, `lefthook`, and `workerd` installation scripts. Review trust
@@ -59,7 +62,7 @@ Local D1 state lives under `apps/web/.wrangler/`. When moving an existing checko
 preserve its `.dev.vars`, `.wrangler/`, and `exports/` under `apps/web/`; do not
 recreate or reseed an existing database merely because the project moved.
 
-The checked-in `apps/web/data/words.json` preserves all 50 original seed entries
+The checked-in `packages/database/seed/words.json` preserves all 50 original seed entries
 and the later question-mark corrections. Its IDs are deterministic because the
 old SQL seed generated IDs inside Postgres. Importing a live export into an empty
 D1 instead preserves live IDs and creation dates.
@@ -71,21 +74,21 @@ including IDs and creation timestamps. Do not reseed production during deploymen
 Private backups and verification hashes remain in the ignored
 `apps/web/exports/` directory; keep another backup outside this checkout.
 
-The following read-only export remains available for future verification before
-retiring Supabase:
+The one-time Supabase exporter and its dedicated tests have been retired from the
+active tree. Recover them from commit `0016db6` if another source export is needed.
+No Supabase credential is needed for normal development or catalogue imports.
 
-1. Stop editing the source catalogue for the duration of the export.
-2. Provide `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` through the shell or a
-   secret manager. Never commit the key or put it in a `VITE_` variable. This is
-   an administrative credential, not an app dependency.
-3. Run `bun run db:export-words`. It only reads `words`, verifies pagination against
-   the source row count, and writes `apps/web/exports/words.json`. It refuses to
-   overwrite an existing export.
-4. Inspect the export and keep an external backup.
-5. For a new local database, apply migrations and import the export **instead of
-   the fallback seed** with `bun run db:seed exports/words.json`.
-6. Compare every exported field, including IDs, creation dates, accents,
-   punctuation, hints, images, language, and frequency order.
+For a new local database, apply migrations and import a verified catalogue instead
+of the fallback seed:
+
+```sh
+bun run db:seed /absolute/path/to/words.json
+```
+
+The reusable importer validates the entire catalogue before executing SQL. Compare
+IDs, creation dates, accents, punctuation, hints, images, language, and frequency
+order when verifying an import. Keep a usable backup outside this checkout before
+removing any ignored `apps/web/exports/` files. This refactor leaves those files alone.
 
 The importer is idempotent by `(lang, text, gloss)`. It updates content fields,
 never deletes words, and preserves an existing D1 ID on a natural-key match.
@@ -95,7 +98,7 @@ Remote imports require an explicit `--remote` argument and separate review.
 
 Historical Supabase configuration and unrelated migrations were removed from the
 working tree, not from Git history. The two original catalogue SQL files remain
-in `apps/web/tests/fixtures/legacy-catalogue/` as independent regression fixtures.
+in `packages/database/tests/fixtures/legacy-catalogue/` as independent regression fixtures.
 Removing local files does not delete or modify the hosted Supabase project.
 Old Supabase test users, sessions, settings, and progress were not imported.
 
@@ -115,8 +118,10 @@ bun run db:generate --custom --name=describe_the_change
 ```
 
 Edit the generated migration. Do not use `drizzle-kit push` against production.
-`apps/web/drizzle.config.ts` generates SQL into `apps/web/migrations/`; Wrangler
-applies that same directory. Preserve migration filenames, metadata, and custom
+`packages/database/drizzle.config.ts` generates SQL into `packages/database/migrations/`.
+The app's Wrangler configuration points to that directory; app-local commands
+apply it to the app's existing DB binding. This deployment wiring is not database
+implementation. There is one migration history, including authentication tables. Preserve migration filenames, metadata, and custom
 triggers when reorganizing code.
 
 D1's `batch()` is transactional; a failed statement rolls back the batch. It is
@@ -125,9 +130,11 @@ Drizzle adapter has interactive transactions disabled. Application recall saves
 use Drizzle's D1 batch API independently of the auth adapter. Authentication's
 multi-operation flows do not receive that same application-level atomicity.
 
-D1 has no RLS. `apps/web/src/server/functions.ts` validates input and derives the
-owner from the Better Auth session. `apps/web/src/server/db/repository.ts` scopes
-private queries. Server-only imports must remain inside server handlers; browser
+D1 has no RLS. `apps/web/src/server/functions.ts` validates transport input and
+uses the authentication facade to derive the owner from the current session.
+`@vocab/database` creates a user-scoped repository; no caller-supplied owner is
+accepted by individual data operations. The expected user ID on answer writes is
+an identity check, never a source of authorization. Server-only imports must remain inside server handlers; browser
 bundles must never receive bindings, secrets, or arbitrary SQL access. SQL triggers
 enforce append-only attempts and revision checks. Account deletion with history
 requires a deliberate retention policy and is not exposed through the UI.
@@ -149,7 +156,7 @@ bun run format
 ```
 
 `ci` builds the application, checks formatting and linting, generates Cloudflare
-types, runs strict TypeScript in both workspaces, and runs all Vitest tests.
+types, runs strict TypeScript in all workspaces, and runs all Vitest tests.
 `bun run test` invokes Vitest; `bun test` invokes a different runner and is not the
 project's test command. D1 and auth tests use ephemeral local `workerd` databases,
 never development state or a remote binding. No Supabase instance, Docker daemon,
@@ -178,7 +185,7 @@ The existing Cloudflare Builds integration was updated and verified on
 - `SKIP_DEPENDENCY_INSTALL=1` uses the explicit frozen install below.
 - Build command: `bun install --frozen-lockfile && bun run ci`.
 - Deploy command: `bun run deploy:only`.
-- Build watch paths: `*`, with no exclusions, so study-package changes also deploy.
+- Build watch paths: `*`, with no exclusions, so changes to every package also deploy.
 - Non-production branch builds: disabled.
 
 The build command installs dependencies from the root `bun.lock` and rejects
