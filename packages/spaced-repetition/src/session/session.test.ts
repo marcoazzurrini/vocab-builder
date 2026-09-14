@@ -1,6 +1,6 @@
 import { Rating, State, createEmptyCard } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { createSession } from "./index";
 import type { Session } from "./index";
 import type { Attempt, Card, Word } from "./types";

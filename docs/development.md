@@ -165,11 +165,23 @@ bun run format
 ```
 
 `ci` builds the application, checks formatting and linting, generates Cloudflare
-types, runs strict TypeScript in all workspaces, and runs all Vitest tests.
-`bun run test` invokes Vitest; `bun test` invokes a different runner and is not the
-project's test command. D1 and auth tests use ephemeral local `workerd` databases,
-never development state or a remote binding. No Supabase instance, Docker daemon,
-email key, or Cloudflare login is needed for the checks.
+types, runs strict TypeScript in all workspaces, and runs every workspace's tests.
+`bun run test` dispatches to Bun's built-in runner in `authentication`, `database`,
+and `spaced-repetition`, and to Vitest in `apps/web`. `bun run test:watch` starts
+the corresponding watch command in each workspace in parallel, so dependent
+packages do not wait for another package's watcher to exit. Do not substitute bare
+`bun test` at the repository root: it would also discover the web app's Vitest tests.
+
+Package tests import from `bun:test` and need no separate test configuration file.
+The database and authentication test commands allow 30 seconds per test or hook
+for local D1 startup. Run `bun run --filter @vocab/authentication test` to target a
+single package, or `bun run db:test` for both database and authentication tests.
+
+D1 and authentication tests share the public `@vocab/database/testing` helper. It
+creates an ephemeral local `workerd` database, applies the real migrations, and
+provides cleanup. It does not depend on the test runner and never uses development
+state or a remote binding. No Supabase instance, Docker daemon, email key, or
+Cloudflare login is needed for the checks.
 
 The app's Vite build generates `apps/web/src/routeTree.gen.ts`. Run `bun run build`
 after a fresh checkout before standalone `bun run typecheck`. Cloudflare runtime

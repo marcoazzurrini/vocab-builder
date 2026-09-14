@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, spyOn } from "bun:test";
 import { createAuthentication } from "./server";
 import { testDatabase } from "@vocab/database/testing";
 
@@ -41,7 +41,7 @@ describe("Better Auth on D1", () => {
   });
 
   it("signs in through a single-use magic link and supports sign-out", async () => {
-    const logs = vi.spyOn(console, "info").mockImplementation(() => {});
+    const logs = spyOn(console, "info").mockImplementation(() => {});
     try {
       expect((await requestLink("learner@example.com")).status).toBe(200);
       const line = logs.mock.calls.find(([value]) =>
@@ -76,7 +76,7 @@ describe("Better Auth on D1", () => {
   });
 
   it("does not deliver links to addresses outside the allowlist", async () => {
-    const logs = vi.spyOn(console, "info").mockImplementation(() => {});
+    const logs = spyOn(console, "info").mockImplementation(() => {});
     try {
       expect((await requestLink("stranger@example.com")).status).toBe(200);
       expect(logs).not.toHaveBeenCalled();

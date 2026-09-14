@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { createSession, DEFAULT_SETTINGS } from "./index";
 import type { AnswerCommand, ReviewSnapshot } from "./index";
 import { evaluateAnswer, RevisionConflict } from "./server";
@@ -52,7 +52,7 @@ describe("the public spaced-repetition interface", () => {
   it.each(["fenêtre", "fenetre", "wrong"])(
     "derives exactly the same schedule in session and server for %s",
     (typed) => {
-      let schedule: string | undefined;
+      let schedule: string | null = null;
       const answers: AnswerCommand[] = [];
       const session = internalSession({
         words: [word],
@@ -68,6 +68,7 @@ describe("the public spaced-repetition interface", () => {
       session.exposureDone();
       session.submitRecall(typed, "good");
       const result = evaluateAnswer(answers[1]!, word.text, undefined, now);
+      expect(schedule).toBeString();
       expect(result.nextSchedule).toBe(schedule);
       expect(result.revision).toBe(1);
     },

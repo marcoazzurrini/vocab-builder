@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { and, eq } from "drizzle-orm";
 import { readFile } from "node:fs/promises";
 import { createDatabase } from "./index";
@@ -187,10 +187,16 @@ describe("D1 persistence", () => {
     const l = await learner();
     await saveAnswer(fixture.db, l.id, l.guess);
     await expect(
-      fixture.db.update(attempts).set({ typed: "tampered" }).where(eq(attempts.user_id, l.id)),
+      fixture.db
+        .update(attempts)
+        .set({ typed: "tampered" })
+        .where(eq(attempts.user_id, l.id))
+        .run(),
     ).rejects.toThrow();
-    await expect(fixture.db.delete(attempts).where(eq(attempts.user_id, l.id))).rejects.toThrow();
-    await expect(fixture.db.delete(words).where(eq(words.id, l.wordId))).rejects.toThrow();
+    await expect(
+      fixture.db.delete(attempts).where(eq(attempts.user_id, l.id)).run(),
+    ).rejects.toThrow();
+    await expect(fixture.db.delete(words).where(eq(words.id, l.wordId)).run()).rejects.toThrow();
     expect(await history(l.id)).toHaveLength(1);
   });
 
@@ -241,7 +247,12 @@ describe("D1 persistence", () => {
       .prepare(
         "SELECT lang, text, gloss, hint, image, kind, freq_rank FROM legacy_words ORDER BY freq_rank",
       )
-      .all();
+      .all<
+        Pick<
+          typeof words.$inferSelect,
+          "lang" | "text" | "gloss" | "hint" | "image" | "kind" | "freq_rank"
+        >
+      >();
     expect(
       source.map(({ lang, text, gloss, hint, image, kind, freq_rank }) => ({
         lang,

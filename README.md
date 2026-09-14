@@ -8,10 +8,11 @@ productive recall, small exposures, and one FSRS scheduler throughout learning.
 - React and TanStack Start on Cloudflare Workers.
 - Cloudflare D1, Drizzle ORM, and Better Auth magic links with Resend.
 - Bun workspaces and one lockfile. No separate API deployment or task orchestrator.
-- Vitest for learning, UI, authentication, and isolated D1 integration tests.
+- Bun's built-in test runner for packages; Vitest for the web app.
 
-Bun manages dependencies, workspace commands, and administrative scripts. Vite,
-Vitest, and Wrangler retain their supported Node runtime. Production uses
+Bun manages dependencies, workspace commands, administrative scripts, and package
+tests. Vite, web-app Vitest, and the Wrangler CLI retain their Node runtime. Database
+and authentication tests use Wrangler's local D1 proxy from Bun. Production uses
 Cloudflare's `workerd`. Deno is not part of the active toolchain.
 
 ## Quick start
@@ -57,11 +58,15 @@ not retire the hosted Supabase project or remove private backups.
 ## Checks
 
 ```sh
-bun run ci            # Build, format check, lint, typecheck, and all Vitest tests
-bun run test          # All workspaces; do not substitute `bun test`
+bun run ci            # Build, format check, lint, typecheck, and all tests
+bun run test          # All workspaces: Bun for packages, Vitest for web
 bun run db:test       # Isolated D1 and authentication integration tests
 bun run format
 ```
+
+Use `bun run test:watch` to watch all workspaces. Inside a package, `bun run test`
+and `bun run test:watch` use Bun directly. Bare `bun test` at the repository root
+is not the full-suite command: the web app still requires Vitest.
 
 Workspaces export TypeScript source, so the app bundles their production entrypoints
 without separate library builds. A fresh checkout needs `bun run build` before standalone

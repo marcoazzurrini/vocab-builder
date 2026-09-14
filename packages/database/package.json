@@ -10,8 +10,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "bun test --timeout 30000",
+    "test:watch": "bun test --watch --timeout 30000",
     "generate": "drizzle-kit generate",
     "seed": "bun scripts/import-catalogue.ts"
   },
@@ -23,10 +23,10 @@
     "valibot": "^1.4.2"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.2",
     "@types/node": "^24.13.3",
     "drizzle-kit": "^0.31.10",
     "typescript": "7.0.2",
-    "vitest": "^4.1.10",
     "wrangler": "^4.120.0"
   }
 }

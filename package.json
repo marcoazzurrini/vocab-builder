@@ -18,7 +18,7 @@
     "typecheck": "bun run --filter '*' typecheck",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
     "test": "bun run --filter '*' test",
-    "test:watch": "bun run --filter '*' test:watch",
+    "test:watch": "bun run --parallel --filter '*' test:watch",
     "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
     "db:test": "bun run --filter @vocab/database --filter @vocab/authentication test",
     "cf:types": "bun run --filter @vocab/web cf:types",

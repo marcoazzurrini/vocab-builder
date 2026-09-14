@@ -9,16 +9,16 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "bun test",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "ts-fsrs": "^5.4.1",
     "valibot": "^1.4.2"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.2",
     "fast-check": "^4.9.0",
-    "typescript": "7.0.2",
-    "vitest": "^4.1.10"
+    "typescript": "7.0.2"
   }
 }

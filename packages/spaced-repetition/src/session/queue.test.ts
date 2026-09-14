@@ -1,5 +1,5 @@
 import { createEmptyCard, State } from "ts-fsrs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { pickNext, stageOf } from "./queue";
 import type { Queue, Slot } from "./queue";
 import type { Card, Word } from "./types";
@@ -20,7 +20,7 @@ function word(id: string, freqRank: number): Word {
   };
 }
 
-const WORDS = [word("w1", 1), word("w2", 2), word("w3", 3)];
+const WORDS: [Word, Word, Word] = [word("w1", 1), word("w2", 2), word("w3", 3)];
 
 // The builders below can only make cards the pipeline can actually produce.
 // There is no "rated but never guessed", and since attempts were re-keyed by

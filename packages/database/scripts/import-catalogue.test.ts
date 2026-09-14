@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { testDatabase } from "../src/testing";
 import { compileCatalogue } from "./import-catalogue";
 
@@ -60,10 +60,14 @@ describe("catalogue import", () => {
     await fixture.binding.prepare(update.sql).run();
     const after = await fixture.binding.prepare("SELECT id, text, created_at FROM words").first();
     expect(after).toEqual(before);
-    expect(await fixture.binding.prepare("SELECT word_id FROM attempts").first()).toEqual({
+    expect(
+      await fixture.binding.prepare("SELECT word_id FROM attempts").first<{ word_id: string }>(),
+    ).toEqual({
       word_id: "original-id",
     });
-    expect(await fixture.binding.prepare("SELECT hint FROM words").first()).toEqual({
+    expect(
+      await fixture.binding.prepare("SELECT hint FROM words").first<{ hint: string | null }>(),
+    ).toEqual({
       hint: "today's word",
     });
   });
