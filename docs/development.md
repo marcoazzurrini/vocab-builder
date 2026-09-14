@@ -118,27 +118,66 @@ is required for this migration.
 
 ## Production cutover
 
-The checked-in D1 ID and authentication hostname are placeholders. Nothing has
-been deployed or switched away from Supabase by this code change.
+`wrangler.jsonc` targets the existing `vocab-builder` D1 database and
+`https://vocab-builder.marcoazzurrini.com`. Its custom-domain route is attached
+when Wrangler deploys the Worker. Provisioning alone does not deploy the app or
+retire Supabase.
 
-1. Create a D1 database with `npx wrangler d1 create vocab-builder`. Set its
-   returned ID in `wrangler.jsonc`.
-2. Set `BETTER_AUTH_URL` in Wrangler variables to the exact HTTPS application
-   origin. Keep `AUTH_EMAIL_MODE` set to `resend`.
-3. Configure a verified sending domain with Resend. Set these Worker secrets
-   using the interactive `npx wrangler secret put NAME` command:
+1. Confirm Wrangler is authenticated to the account specified in `wrangler.jsonc`.
+   The D1 database already exists; create another database only when intentionally
+   replacing infrastructure, then update its configured ID.
+2. Keep `BETTER_AUTH_URL` equal to the exact HTTPS application origin and
+   `AUTH_EMAIL_MODE` set to `resend`.
+3. Verify `vocab-builder.marcoazzurrini.com` in Resend. Its DKIM and sending SPF/MX
+   records are scoped to this subdomain; leave unrelated domain email records alone.
+   Use `Vocabulary <login@vocab-builder.marcoazzurrini.com>` as the sender and
+   a sending-only API key restricted to this domain. Configure these Worker secrets
+   using the versioned procedure below when preparing an undeployed version:
    - `BETTER_AUTH_SECRET`: at least 32 cryptographically random characters.
    - `ALLOWED_EMAILS`: comma-separated addresses allowed to use this private app.
    - `RESEND_API_KEY`: a sending credential.
    - `EMAIL_FROM`: a sender using the verified domain.
-4. Apply the schema with `npm run db:migrate:remote`.
-5. Import the verified export with `npm run db:seed -- exports/words.json --remote`.
-   Do not run the fallback seed if you imported the live catalogue.
-6. Compare D1 with the export, run `npm run ci`, and deploy with `npm run deploy`.
+4. Apply any pending schema migrations with `npm run db:migrate:remote` before
+   deploying code that requires them. Review production migrations separately.
+5. The initial live catalogue import is complete: all 50 rows matched the export,
+   including IDs and creation timestamps. Backups and verification hashes are in
+   the ignored `exports/` directory. Do not reseed production during deployment.
+6. Run `npm run ci`. For a prepared version with staged secrets, deploy that exact
+   version using the procedure below. For subsequent regular releases, use
+   `npm run deploy`, which checks, builds, and deploys the current code.
 7. Verify sign-in, one-time link reuse rejection, sign-out, a guess, a recall,
    reload, and the saved history on the deployed origin.
 8. Keep Supabase and the export available until the new deployment is verified.
    Retiring Supabase is a separate, explicit action.
+
+### Preparing an undeployed server version
+
+The previous Worker served only static assets. Upload the built server application
+before attaching its runtime secrets. During this migration, secret-only updates
+against the old asset-only versions reported success but exposed no secret
+bindings afterward; verify the resulting server version rather than relying only
+on the CLI success message.
+
+```sh
+npm run ci
+npx wrangler versions upload
+npx wrangler versions secret put RESEND_API_KEY
+# Set the other required secrets using the same versioned command.
+# Inspect the final version's binding names without printing secret values.
+npx wrangler versions view <final-version-id>
+npx wrangler versions deploy <final-version-id>@100 --yes
+```
+
+Each secret update creates another version. Deploy the final version containing
+both the new server code and all required settings, not an earlier upload.
+Version uploads do not change production traffic. Check the custom-domain
+attachment in Cloudflare as well; code version promotion alone is not a substitute
+for domain configuration.
+
+Ordinary `wrangler secret put` immediately deploys a new version and refuses to
+run when the latest version is not currently deployed. Use `versions secret put`
+for staged changes. Never put an API key in the command argument: the argument is
+the setting name, and its value belongs in the interactive prompt.
 
 Better Auth runs inside the application Worker; there is no separate auth server
 to host. D1 stores its users, sessions, verification tokens, and rate-limit state.

@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vocab-builder",
+  "account_id": "168a8fd9b88ae669c145fa229de911c5",
+  "routes": [{ "pattern": "vocab-builder.marcoazzurrini.com", "custom_domain": true }],
   "main": "@tanstack/react-start/server-entry",
   "compatibility_date": "2026-09-11",
   "compatibility_flags": ["nodejs_compat"],
@@ -8,13 +10,12 @@
     {
       "binding": "DB",
       "database_name": "vocab-builder",
-      // Replace after `wrangler d1 create vocab-builder`. Never points at Supabase.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "a5aef066-fd28-45ac-9a06-16217f9b6dd1",
       "migrations_dir": "migrations",
     },
   ],
   "vars": {
-    "BETTER_AUTH_URL": "https://vocab-builder.example.com",
+    "BETTER_AUTH_URL": "https://vocab-builder.marcoazzurrini.com",
     "AUTH_EMAIL_MODE": "resend",
   },
 }
