@@ -1,5 +1,5 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "vocab-builder",
   "account_id": "168a8fd9b88ae669c145fa229de911c5",
   "routes": [{ "pattern": "vocab-builder.marcoazzurrini.com", "custom_domain": true }],

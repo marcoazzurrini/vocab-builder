@@ -2,10 +2,12 @@ import { readFile, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const args = process.argv.slice(2);
 const remote = args.includes("--remote");
-const source = args.find((arg) => !arg.startsWith("--")) ?? "data/words.json";
+const source =
+  args.find((arg) => !arg.startsWith("--")) ?? new URL("../data/words.json", import.meta.url);
 const words = JSON.parse(await readFile(source, "utf8"));
 if (!Array.isArray(words) || !words.length) throw new Error("Expected a nonempty array of words.");
 const quote = (value) => (value == null ? "NULL" : `'${String(value).replaceAll("'", "''")}'`);
@@ -39,18 +41,9 @@ try {
   const file = join(directory, "words.sql");
   await writeFile(file, statements.join("\n"));
   execFileSync(
-    "npx",
-    [
-      "--no-install",
-      "wrangler",
-      "d1",
-      "execute",
-      "DB",
-      remote ? "--remote" : "--local",
-      "--file",
-      file,
-    ],
-    { stdio: "inherit" },
+    "bun",
+    ["run", "wrangler", "d1", "execute", "DB", remote ? "--remote" : "--local", "--file", file],
+    { cwd: fileURLToPath(new URL("../", import.meta.url)), stdio: "inherit" },
   );
   console.log(`Imported ${words.length} words. No progress or authentication data was changed.`);
 } finally {

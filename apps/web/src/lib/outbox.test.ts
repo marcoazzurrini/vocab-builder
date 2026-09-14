@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnswerCommand } from "./commands";
+import type { AnswerCommand } from "@vocab/study/commands";
 import { createOutbox } from "./outbox";
 
 function answer(): AnswerCommand {

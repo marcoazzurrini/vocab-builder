@@ -1,71 +1,54 @@
 {
   "name": "vocab-builder",
-  "version": "0.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && npm run typecheck",
-    "ci": "npm run build && npm run check",
-    "preview": "vite preview",
+    "dev": "bun run --filter @vocab/web dev",
+    "build": "bun run --filter @vocab/web build",
+    "ci": "bun run build && bun run check",
+    "preview": "bun run --filter @vocab/web preview",
     "prepare": "lefthook install",
     "lint": "oxlint",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "typecheck": "wrangler types && tsc -b",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "db:test": "vitest run src/server/db/repository.test.ts src/server/auth.test.ts",
-    "cf:types": "wrangler types",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "db:seed": "node scripts/seed-words.mjs",
-    "db:export-words": "node scripts/export-supabase-words.mjs",
-    "deploy": "npm run ci && wrangler deploy",
-    "setup:local": "node scripts/setup-local.mjs"
-  },
-  "dependencies": {
-    "@better-auth/drizzle-adapter": "^1.7.4",
-    "@tanstack/react-router": "^1.170.35",
-    "@tanstack/react-start": "^1.168.52",
-    "better-auth": "^1.7.4",
-    "drizzle-orm": "^0.45.2",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "ts-fsrs": "^5.4.1",
-    "valibot": "^1.4.2"
+    "typecheck": "bun run --filter '*' typecheck",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
+    "test": "bun run --filter '*' test",
+    "test:watch": "bun run --filter '*' test:watch",
+    "db:test": "bun run --filter @vocab/web db:test",
+    "cf:types": "bun run --filter @vocab/web cf:types",
+    "db:generate": "bun run --filter @vocab/web db:generate",
+    "db:migrate": "bun run --filter @vocab/web db:migrate",
+    "db:migrate:remote": "bun run --filter @vocab/web db:migrate:remote",
+    "db:seed": "bun run --filter @vocab/web db:seed",
+    "db:export-words": "bun run --filter @vocab/web db:export-words",
+    "deploy": "bun run ci && bun run deploy:only",
+    "deploy:only": "bun run --filter @vocab/web deploy",
+    "setup:local": "bun run --filter @vocab/web setup:local"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.54.8",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/react": "^16.3.2",
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.4",
-    "drizzle-kit": "^0.31.10",
-    "fast-check": "^4.9.0",
-    "jsdom": "^29.1.1",
     "lefthook": "^2.1.10",
     "oxfmt": "^0.62.0",
     "oxlint": "^1.75.0",
-    "typescript": "7.0.2",
-    "vite": "^8.2.0",
-    "vitest": "^4.1.10",
-    "wrangler": "^4.120.0"
+    "typescript": "7.0.2"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.12"
     }
   },
-  "allowScripts": {
-    "esbuild@0.28.1": true,
-    "lefthook@2.1.10": true,
-    "workerd@1.20260911.1": true,
-    "fsevents@2.3.3": true,
-    "esbuild@0.25.12": true
-  }
+  "engines": {
+    "bun": ">=1.4.2",
+    "node": ">=24"
+  },
+  "packageManager": "bun@1.4.2",
+  "trustedDependencies": [
+    "esbuild",
+    "lefthook",
+    "workerd"
+  ]
 }

@@ -2,10 +2,10 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { createEmptyCard, fsrs } from "ts-fsrs";
 import * as v from "valibot";
-import { AnswerCommand } from "../../lib/commands";
-import { DEFAULT_SETTINGS, reviveFsrsCard } from "../../lib/deck";
-import { effortsFor } from "../../session/grading";
-import { matches } from "../../session/matching";
+import { AnswerCommand } from "@vocab/study/commands";
+import { DEFAULT_SETTINGS, reviveFsrsCard } from "@vocab/study/deck";
+import { effortsFor } from "@vocab/study/grading";
+import { matches } from "@vocab/study/matching";
 import * as schema from "./schema";
 
 export function database(binding: D1Database) {

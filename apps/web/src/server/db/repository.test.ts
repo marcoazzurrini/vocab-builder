@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { saveAnswer, readDeck, readSettings } from "./repository";
 import { testDatabase } from "./testing";
 import { attempts, cards, settings, user, words } from "./schema";
-import { buildDeck, DEFAULT_SETTINGS, reviveFsrsCard } from "../../lib/deck";
-import type { AnswerCommand } from "../../lib/commands";
+import { buildDeck, DEFAULT_SETTINGS, reviveFsrsCard } from "@vocab/study/deck";
+import type { AnswerCommand } from "@vocab/study/commands";
 
 let fixture: Awaited<ReturnType<typeof testDatabase>>;
 let serial = 0;
@@ -207,7 +207,7 @@ describe("D1 persistence", () => {
       )
       .run();
     const legacySeed = await readFile(
-      new URL("../../../supabase/migrations/20260809000001_seed_starter_deck.sql", import.meta.url),
+      new URL("../../../tests/fixtures/legacy-catalogue/seed.sql", import.meta.url),
       "utf8",
     );
     await fixture.binding
@@ -219,10 +219,7 @@ describe("D1 persistence", () => {
       )
       .run();
     const punctuation = await readFile(
-      new URL(
-        "../../../supabase/migrations/20260810000000_question_marks_on_chunks.sql",
-        import.meta.url,
-      ),
+      new URL("../../../tests/fixtures/legacy-catalogue/punctuation.sql", import.meta.url),
       "utf8",
     );
     for (const statement of punctuation

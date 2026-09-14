@@ -2,10 +2,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createEmptyCard, State } from "ts-fsrs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Deck } from "./lib/deck";
-import { DEFAULT_SETTINGS } from "./lib/deck";
-import type { AnswerCommand } from "./lib/commands";
-import type { Word } from "./session/types";
+import type { Deck } from "@vocab/study/deck";
+import { DEFAULT_SETTINGS } from "@vocab/study/deck";
+import type { AnswerCommand } from "@vocab/study/commands";
+import type { Word } from "@vocab/study/types";
 
 const loadDeck = vi.fn<(lang: string, now: Date) => Promise<Deck>>();
 const persistAnswer = vi.fn<(command: AnswerCommand, expectedUserId: string) => Promise<void>>();

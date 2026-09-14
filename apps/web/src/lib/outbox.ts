@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { AnswerCommand } from "./commands";
+import { AnswerCommand } from "@vocab/study/commands";
 
 /** Durable, user-scoped, ordered answers. A failure blocks later answers until retry succeeds. */
 export function createOutbox(options: {

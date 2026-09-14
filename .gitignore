@@ -1,42 +1,37 @@
 # Dependencies
 node_modules/
-.pnp/
-.pnp.js
-.yarn/
 
 # Build output
 dist/
-dist-ssr/
 build/
-*.local
 
-# Environment
-#
-# *.local files hold real secrets (service role keys, the Azure key later) and
-# never leave the machine. Plain .env files hold the Supabase URL and publishable
-# key, which are compiled into the client bundle and served to every visitor —
-# public by construction, protected by RLS rather than by secrecy.
+# Secrets and local environment overrides
 .env
 .env.*
 !.env.example
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+*.local
+
+# Generated framework/runtime files and local Worker state
 .wrangler/
 .tanstack/
-src/routeTree.gen.ts
+.generated/
+routeTree.gen.ts
+
+# Private catalogue exports and verification backups
 exports/
 
-# Logs
+# Logs and caches
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+.cache/
+.vite/
+*.tsbuildinfo
+coverage/
 
-# Editors
+# Editors and OS
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -45,20 +40,5 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Test / coverage
-coverage/
-
-# Caches
-.cache/
-.vite/
-*.tsbuildinfo
-
-# Supabase local dev
-supabase/.branches/
-supabase/.temp/
-worker-configuration.d.ts

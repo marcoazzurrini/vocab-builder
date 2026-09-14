@@ -1,13 +1,13 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import { dayStart } from "./lib/day";
+import { dayStart } from "@vocab/study/day";
 import { loadDeck, loadSettings, persistAnswer } from "./lib/repository";
-import { DEFAULT_SETTINGS } from "./lib/deck";
-import type { Settings } from "./lib/deck";
-import { commandFor, SyncConflict } from "./lib/commands";
+import { DEFAULT_SETTINGS } from "@vocab/study/deck";
+import type { Settings } from "@vocab/study/deck";
+import { commandFor, SyncConflict } from "@vocab/study/commands";
 import { createOutbox } from "./lib/outbox";
 import { speak, warmUpVoices } from "./lib/speak";
-import { createSession } from "./session";
-import type { Effort, Session } from "./session";
+import { createSession } from "@vocab/study";
+import type { Effort, Session } from "@vocab/study";
 
 const EFFORT_LABEL: Record<Effort, string> = {
   hard: "Difficile",

@@ -1,6 +1,6 @@
-import { SyncConflict } from "./commands";
-import type { AnswerCommand } from "./commands";
-import { buildDeck } from "./deck";
+import { SyncConflict } from "@vocab/study/commands";
+import type { AnswerCommand } from "@vocab/study/commands";
+import { buildDeck } from "@vocab/study/deck";
 import { getDeck, getSettings, recordAnswer } from "../server/functions";
 
 export const loadSettings = () => getSettings();

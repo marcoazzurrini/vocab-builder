@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeaders } from "@tanstack/react-start/server";
 import * as v from "valibot";
-import { AnswerCommand } from "../lib/commands";
+import { AnswerCommand } from "@vocab/study/commands";
 
 // Imports inside handlers stay on the server. No database binding or secret enters the client bundle.
 async function context(expectedUserId?: string) {

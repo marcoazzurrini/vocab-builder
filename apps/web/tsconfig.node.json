@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext"
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "drizzle.config.ts", "scripts/**/*.test.ts"]
+}
