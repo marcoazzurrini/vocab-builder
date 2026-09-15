@@ -163,3 +163,156 @@ describe("building the deck", () => {
     expect(deck.cards[0]!.fsrs.due).toBeInstanceOf(Date);
   });
 });
+
+describe("deck reconstruction boundaries", () => {
+  it("seeds awaiting cards at their exact introduction time, not rebuild time", () => {
+    const introducedAt = "2026-08-09T18:23:45.678Z";
+    const deck = buildDeck([], [], [{ wordId: "old-guess", reviewedAt: introducedAt }], NOW);
+    expect(deck.cards).toHaveLength(1);
+    expect(deck.cards[0]!.wordId).toBe("old-guess");
+    expect(deck.cards[0]!.fsrs.due.toISOString()).toBe(introducedAt);
+    expect(deck.cards[0]!.fsrs.reps).toBe(0);
+    expect(deck.cards[0]!.fsrs.last_review).toBeUndefined();
+  });
+
+  for (const hour of [0, 4, 23]) {
+    it(`counts start inclusively and next start exclusively at rollover ${hour}`, () => {
+      const clock = String(hour).padStart(2, "0");
+      const start = new Date(`2026-08-10T${clock}:00:00`);
+      const nextStart = new Date(`2026-08-11T${clock}:00:00`);
+      const now = new Date(`2026-08-10T${clock}:30:00`);
+      const cases = [
+        { at: new Date(start.getTime() - 1), count: 0 },
+        { at: start, count: 1 },
+        { at: new Date(nextStart.getTime() - 1), count: 1 },
+        { at: nextStart, count: 0 },
+        { at: new Date(nextStart.getTime() + 1), count: 0 },
+      ];
+      for (const { at, count } of cases) {
+        const deck = buildDeck(
+          [],
+          [],
+          [{ wordId: "edge", reviewedAt: at.toISOString() }],
+          now,
+          hour,
+        );
+        expect(deck.introducedToday).toBe(count);
+        expect(deck.cards[0]!.fsrs.due.getTime()).toBe(at.getTime());
+      }
+    });
+  }
+
+  it("counts deduplicated introductions even for stored cards or words outside the current catalogue", () => {
+    const guesses = [
+      { wordId: "stored", reviewedAt: NOW.toISOString() },
+      { wordId: "outside-catalogue", reviewedAt: NOW.toISOString() },
+      { wordId: "stored", reviewedAt: NOW.toISOString() },
+    ];
+    const stored = {
+      wordId: "stored",
+      schedule: JSON.stringify(createEmptyCard(new Date("2026-08-01T00:00:00Z"))),
+    };
+    const before = JSON.stringify({ guesses, stored });
+    const deck = buildDeck([], [stored], guesses, NOW);
+    expect(deck.introducedToday).toBe(2);
+    expect(deck.cards.map((card) => card.wordId)).toEqual(["stored", "outside-catalogue"]);
+    expect(deck.cards[0]!.fsrs.due.toISOString()).toBe("2026-08-01T00:00:00.000Z");
+    expect(JSON.stringify({ guesses, stored })).toBe(before);
+  });
+
+  for (const reviewedAt of ["", "not-a-date", "2026-99-99T00:00:00Z"]) {
+    for (const carded of [false, true]) {
+      it(`names invalid introduction ${JSON.stringify(reviewedAt)} even when carded=${carded}`, () => {
+        const rows = carded
+          ? [{ wordId: "bad-introduction", schedule: JSON.stringify(createEmptyCard(NOW)) }]
+          : [];
+        expect(() =>
+          buildDeck([], rows, [{ wordId: "bad-introduction", reviewedAt }], NOW),
+        ).toThrow(/Unreadable introduction time.*bad-introduction/);
+      });
+    }
+  }
+
+  it("validates every introduction before deduplicating", () => {
+    expect(() =>
+      buildDeck(
+        [],
+        [],
+        [
+          { wordId: "bad-first", reviewedAt: "invalid" },
+          { wordId: "bad-first", reviewedAt: NOW.toISOString() },
+        ],
+        NOW,
+      ),
+    ).toThrow(/bad-first/);
+  });
+
+  for (const schedule of [
+    "{",
+    "",
+    "not-json",
+    "null",
+    "[]",
+    "{}",
+    JSON.stringify({ ...createEmptyCard(NOW), last_review: "never" }),
+    JSON.stringify({ ...createEmptyCard(NOW), due: "soon" }),
+  ]) {
+    it(`names the card for unreadable schedule ${schedule}`, () => {
+      const row = { wordId: "broken-card-42", schedule };
+      expect(() => toCard(row)).toThrow(/Unreadable scheduling state.*broken-card-42/);
+      expect(() => buildDeck([], [row], [], NOW)).toThrow(
+        /Unreadable scheduling state.*broken-card-42/,
+      );
+    });
+  }
+
+  for (const { timezone, start, nextStart } of [
+    {
+      timezone: "Europe/Rome",
+      start: "2026-03-28T04:00:00+01:00",
+      nextStart: "2026-03-29T04:00:00+02:00",
+    },
+    {
+      timezone: "Europe/Rome",
+      start: "2026-10-24T04:00:00+02:00",
+      nextStart: "2026-10-25T04:00:00+01:00",
+    },
+    {
+      timezone: "America/New_York",
+      start: "2026-03-07T04:00:00-05:00",
+      nextStart: "2026-03-08T04:00:00-04:00",
+    },
+    {
+      timezone: "America/New_York",
+      start: "2026-10-31T04:00:00-04:00",
+      nextStart: "2026-11-01T04:00:00-05:00",
+    },
+  ]) {
+    it(`counts the calendar study day across ${timezone} ${start}`, () => {
+      // Isolate TZ from other tests. The explicit offsets are independent of studyDay.
+      const result = Bun.spawnSync({
+        cmd: [
+          process.execPath,
+          "--eval",
+          `
+          import assert from "node:assert/strict";
+          import { buildDeck } from ${JSON.stringify(new URL("./deck.ts", import.meta.url).href)};
+          const start = new Date(${JSON.stringify(start)}).getTime();
+          const nextStart = new Date(${JSON.stringify(nextStart)}).getTime();
+          const now = new Date(start + 3600000);
+          for (const [at, expected] of [[start - 1, 0], [start, 1], [nextStart - 1, 1], [nextStart, 0]]) {
+            const deck = buildDeck([], [], [{ wordId: "edge", reviewedAt: new Date(at).toISOString() }], now, 4);
+            assert.equal(deck.introducedToday, expected, new Date(at).toISOString());
+            assert.equal(deck.cards[0].fsrs.due.getTime(), at);
+          }
+        `,
+        ],
+        env: { ...process.env, TZ: timezone },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(result.stderr.toString()).toBe("");
+      expect(result.exitCode).toBe(0);
+    });
+  }
+});

@@ -103,7 +103,7 @@ describe("a word that is never got right", () => {
 
     const steps = l.sit(120);
     expect(steps.filter((s) => s.at === "recall").length).toBeGreaterThan(30);
-    expect(steps.at(-1)).toEqual({ at: "closed" }); // cut short, never finished
+    expect(steps.at(-1)).toMatchObject({ at: "closed", reason: "cut" });
   });
 
   it("still never repeats a card back to back while doing it", () => {
@@ -133,7 +133,7 @@ describe("a sitting that starts from nothing", () => {
     const l = learner(3, 3);
     const steps = l.sit();
 
-    expect(steps.at(-1)).toEqual({ at: "closed" });
+    expect(steps.at(-1)).toMatchObject({ at: "closed", reason: "done", eligibleWordIds: [] });
     expect(sittings(l.trace)).toHaveLength(1);
     expect(violations(l.trace, l.attempts)).toEqual([]);
   });

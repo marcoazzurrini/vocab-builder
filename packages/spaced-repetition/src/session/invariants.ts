@@ -8,7 +8,7 @@
  */
 
 import { State } from "ts-fsrs";
-import { dayEnd } from "../lib/day";
+import { studyBounds } from "./harness";
 import type { Step } from "./harness";
 import type { Attempt } from "./types";
 
@@ -82,12 +82,7 @@ export function exposuresAfterAFirstRecall(trace: readonly Step[]): PromptStep[]
 export function repeatsInARow(
   trace: readonly Step[],
 ): { previous: PromptStep; next: PromptStep }[] {
-  const allowed = new Set([
-    "guess→exposure",
-    "recall→feedback",
-    "exposure→recall",
-    "feedback→recall",
-  ]);
+  const allowed = new Set(["guess→exposure", "recall→feedback"]);
   const bad: { previous: PromptStep; next: PromptStep }[] = [];
 
   for (const sitting of sittings(trace)) {
@@ -96,6 +91,12 @@ export function repeatsInARow(
       const next = sitting[i]!;
       if (previous.word !== next.word) continue;
       if (allowed.has(`${previous.at}→${next.at}`)) continue;
+      if (
+        (previous.at === "exposure" || previous.at === "feedback") &&
+        next.at === "recall" &&
+        !next.eligibleWordIds.some((id) => id !== next.wordId)
+      )
+        continue;
       bad.push({ previous, next });
     }
   }
@@ -157,8 +158,71 @@ export function reviewsDraggedFromTheFuture(
 ): Attempt[] {
   return attempts.filter((a) => {
     if (a.phase !== "recall" || a.stateBefore.state !== State.Review) return false;
-    return a.stateBefore.due > dayEnd(a.reviewedAt, dayRolloverHour);
+    const shownAt = a.reviewedAt.getTime() - a.latencyMs;
+    return a.stateBefore.due.getTime() > studyBounds(shownAt, dayRolloverHour).end;
   });
+}
+
+/** Compare answers with independently recorded actions, not just row counts. */
+export function attemptMismatches(trace: readonly Step[], attempts: readonly Attempt[]): string[] {
+  const answered = trace.filter((s) => s.at === "guess" || s.at === "recall");
+  const bad: string[] = [];
+  if (answered.length !== attempts.length) bad.push("answer/attempt count differs");
+  for (const [i, step] of answered.entries()) {
+    const a = attempts[i];
+    if (!a) continue;
+    const rating =
+      step.at === "guess"
+        ? null
+        : !step.correct
+          ? 1
+          : step.effort === "hard"
+            ? 2
+            : step.effort === "easy" && !step.first
+              ? 4
+              : 3;
+    const expected = {
+      wordId: step.wordId,
+      phase: step.at,
+      typed: step.typed,
+      correct: step.correct,
+      rating,
+      latencyMs: Math.min(86_400_000, Math.max(0, step.actedAt - step.shownAt)),
+    };
+    for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
+      if (a[key] !== expected[key]) bad.push(`attempt ${i}: ${key} differs`);
+    }
+    if (a.reviewedAt.getTime() !== step.actedAt) bad.push(`attempt ${i}: reviewedAt differs`);
+    if (a.stateBefore.reps !== step.expectedReps) bad.push(`attempt ${i}: previous reps differ`);
+  }
+  return bad;
+}
+
+/** End screens are claims about remaining work, not synonyms for closing the app. */
+export function closureContradictions(trace: readonly Step[]): string[] {
+  const bad: string[] = [];
+  for (const [i, step] of trace.entries()) {
+    if (step.at !== "closed") continue;
+    if (step.reason !== "cut" && step.eligibleWordIds.length)
+      bad.push(`close ${i}: eligible work remains`);
+    const earliest = Math.min(...step.remainingLearning.map((c) => c.due));
+    if (step.reason === "done" && step.remainingLearning.length)
+      bad.push(`close ${i}: learning remains today`);
+    if (
+      step.reason === "caughtUp" &&
+      (!Number.isFinite(earliest) || earliest <= step.atMs || step.nextDueAt !== earliest)
+    ) {
+      bad.push(`close ${i}: incorrect next learning due`);
+    }
+    if (step.reason !== "caughtUp" && step.nextDueAt !== null)
+      bad.push(`close ${i}: unexpected nextDueAt`);
+    // Reopening at the promised due time must offer work rather than another end screen.
+    const next = trace[i + 1];
+    if (step.reason === "caughtUp" && next?.at === "closed" && next.atMs === step.nextDueAt) {
+      bad.push(`close ${i}: no work on reopening at nextDueAt`);
+    }
+  }
+  return bad;
 }
 
 /** Every check at once, as a list of human-readable failures. */
@@ -168,6 +232,8 @@ export function violations(
   dayRolloverHour = 0,
 ): string[] {
   return [
+    ...attemptMismatches(trace, attempts),
+    ...closureContradictions(trace),
     ...reviewsDraggedFromTheFuture(attempts, dayRolloverHour).map(
       (a) =>
         `review on ${a.wordId} was due ${a.stateBefore.due.toISOString()} ` +

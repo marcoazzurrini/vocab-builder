@@ -1,5 +1,5 @@
 import { State } from "ts-fsrs";
-import { dayEnd } from "../lib/day";
+import { studyDay } from "../lib/day";
 import type { Card, Word } from "./types";
 
 /**
@@ -113,8 +113,8 @@ function isLearning(card: Card): boolean {
   );
 }
 
-function endOfDay(q: Queue): Date {
-  return dayEnd(q.now, q.dayRolloverHour ?? 0);
+function nextDay(q: Queue): Date {
+  return studyDay(q.now, q.dayRolloverHour ?? 0).nextStart;
 }
 
 function earliestDue(cards: readonly Card[]): Card | undefined {
@@ -168,9 +168,9 @@ const newWord: Rule = (q) => {
 
 /** 3. A review due today. Day-scale, so the order within the block barely matters. */
 const dueReview: Rule = (q) => {
-  const eod = endOfDay(q);
+  const nextStart = nextDay(q);
   const card = earliestDue(
-    at(q, "scheduled").filter((c) => c.fsrs.state === State.Review && c.fsrs.due <= eod),
+    at(q, "scheduled").filter((c) => c.fsrs.state === State.Review && c.fsrs.due < nextStart),
   );
   return card ? { do: "recall", card } : null;
 };
@@ -217,12 +217,12 @@ const awaitingRecall: Rule = (q) => {
  * to mature reviews from future days.
  */
 const learnAhead: Rule = (q) => {
-  const eod = endOfDay(q);
+  const nextStart = nextDay(q);
   const card = earliestDue(
     at(q, "scheduled").filter(
       (c) =>
         isLearning(c) &&
-        c.fsrs.due <= eod &&
+        c.fsrs.due < nextStart &&
         c.wordId !== q.justShownId &&
         !q.pulledForward.has(c.wordId),
     ),
@@ -298,7 +298,7 @@ export function pickNext(queue: Queue): Slot {
         stageOf(c) === "scheduled" &&
         isLearning(c) &&
         c.fsrs.due > queue.now &&
-        c.fsrs.due <= endOfDay(queue),
+        c.fsrs.due < nextDay(queue),
     ),
   );
   return upcoming ? { do: "wait", until: upcoming.fsrs.due } : { do: "done" };

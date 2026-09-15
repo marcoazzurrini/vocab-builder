@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import fc from "fast-check";
 import { matches, normalise } from "./matching";
 
 // One rule: orthography is graded, typography is not.
@@ -86,6 +87,127 @@ describe("answer matching", () => {
 
     it("keeps accents while stripping everything else", () => {
       expect(normalise("  COMBIEN ça  COÛTE ?  ")).toBe("combien ça coûte");
+    });
+
+    it("removes all supported terminal punctuation and intervening whitespace in one pass", () => {
+      expect(normalise("bonjour ! ?")).toBe("bonjour");
+      expect(normalise("bonjour.\t!\n?\u00a0.\u202f")).toBe("bonjour");
+      expect(normalise(" !\t?\n. ")).toBe("");
+    });
+
+    it("preserves interior punctuation, accents, and unsupported terminal punctuation", () => {
+      expect(normalise("  Écoute ! Ça va ? Oui... très bien ! ? ")).toBe(
+        "écoute ! ça va ? oui... très bien",
+      );
+      expect(normalise("où, ça; là: peut-être…")).toBe("où, ça; là: peut-être…");
+      expect(matches("ça!va", "çava")).toBe(false);
+    });
+
+    it("composes accents exposed by ligature expansion", () => {
+      expect(normalise("Œ\u0301 ! ?")).toBe("oé");
+      expect(matches("œ\u0301", "oe\u0301")).toBe(true);
+      expect(matches("œ\u0301", "oe")).toBe(false);
+    });
+  });
+
+  describe("generated normalization invariants", () => {
+    const text = fc.oneof(
+      fc.string(),
+      fc
+        .array(
+          fc.oneof(
+            fc
+              .integer({ min: 0, max: 0x10ffff })
+              .map((codePoint) => String.fromCodePoint(codePoint)),
+            fc.constantFrom(
+              "œ",
+              "Œ",
+              "é",
+              "e\u0301",
+              "\u0301",
+              "’",
+              "!",
+              "?",
+              ".",
+              " ",
+              "\t",
+              "\n",
+              "\u00a0",
+              "\u202f",
+            ),
+          ),
+          { maxLength: 80 },
+        )
+        .map((characters) => characters.join("")),
+    );
+    const suffix = fc
+      .array(fc.constantFrom("!", "?", ".", " ", "\t", "\n", "\r", "\u00a0", "\u202f"), {
+        maxLength: 40,
+      })
+      .map((characters) => characters.join(""));
+
+    it("is idempotent, NFC-composed, and whitespace-normalized", () => {
+      fc.assert(
+        fc.property(text, (input) => {
+          const output = normalise(input);
+          expect(normalise(output)).toBe(output);
+          expect(output.normalize("NFC")).toBe(output);
+          expect(output.trim()).toBe(output);
+          expect(output).not.toMatch(/\s{2}|[^\S ]|[?!.\s]$/);
+        }),
+        { numRuns: 500 },
+      );
+    });
+
+    it("ignores arbitrary supported terminal punctuation and whitespace", () => {
+      fc.assert(
+        fc.property(text, suffix, (input, ending) => {
+          expect(normalise(input + ending)).toBe(normalise(input));
+        }),
+        { numRuns: 500 },
+      );
+    });
+
+    it("matches canonical Unicode equivalents and compares symmetrically", () => {
+      fc.assert(
+        fc.property(text, text, (left, right) => {
+          expect(matches(left, left.normalize("NFD"))).toBe(true);
+          expect(matches(left, right)).toBe(matches(right, left));
+        }),
+        { numRuns: 500 },
+      );
+    });
+
+    it("preserves generated interior punctuation and distinguishes accents", () => {
+      const prefix = fc
+        .array(fc.constantFrom("a", "b", "c", "d", "e"), { maxLength: 20 })
+        .map((letters) => letters.join(""));
+      const accent = fc.constantFrom(
+        ["é", "e"],
+        ["è", "e"],
+        ["ê", "e"],
+        ["à", "a"],
+        ["â", "a"],
+        ["î", "i"],
+        ["ô", "o"],
+        ["ù", "u"],
+        ["û", "u"],
+        ["ç", "c"],
+      );
+      fc.assert(
+        fc.property(
+          prefix,
+          accent,
+          fc.constantFrom("!", "?", ".", ",", ";", ":", "-", "'"),
+          (beginning, [accented, plain], punctuation) => {
+            const word = `${beginning}${accented}${punctuation}mot`;
+            expect(normalise(word)).toBe(word);
+            expect(matches(word, `${beginning}${plain}${punctuation}mot`)).toBe(false);
+            expect(matches(word, `${beginning}${accented}mot`)).toBe(false);
+          },
+        ),
+        { numRuns: 500 },
+      );
     });
   });
 });

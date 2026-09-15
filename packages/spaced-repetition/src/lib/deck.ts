@@ -2,7 +2,7 @@ import { createEmptyCard, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import * as v from "valibot";
 import type { Card, Word } from "../session/types";
-import { dayStart } from "./day";
+import { studyDay } from "./day";
 
 /** Storage-neutral progress. Only this package interprets the opaque schedule. */
 export type StoredCard = { wordId: string; schedule: string };
@@ -73,10 +73,13 @@ export function reviveFsrsCard(raw: unknown, cardId?: string): FsrsCard {
 }
 
 export function toCard(card: StoredCard): Card {
-  return {
-    wordId: card.wordId,
-    fsrs: reviveFsrsCard(JSON.parse(card.schedule), card.wordId),
-  };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(card.schedule);
+  } catch (cause) {
+    throw new Error(`Unreadable scheduling state for card ${card.wordId}: invalid JSON`, { cause });
+  }
+  return { wordId: card.wordId, fsrs: reviveFsrsCard(raw, card.wordId) };
 }
 
 export type Deck = {
@@ -111,9 +114,15 @@ export function buildDeck(
   now: Date,
   dayRolloverHour = 0,
 ): Deck {
-  const midnight = dayStart(now, dayRolloverHour).getTime();
+  const { start, nextStart } = studyDay(now, dayRolloverHour);
   const carded = new Set(storedCards.map((card) => card.wordId));
-  const guesses = new Map(introductions.map((guess) => [guess.wordId, guess]));
+  const guesses = new Map(
+    introductions.map((guess) => {
+      if (!Number.isFinite(new Date(guess.reviewedAt).getTime()))
+        throw new Error(`Unreadable introduction time for word ${guess.wordId}.`);
+      return [guess.wordId, guess] as const;
+    }),
+  );
 
   return {
     words: [...words],
@@ -129,8 +138,9 @@ export function buildDeck(
     // Counted from the guesses rather than tracked separately, so reopening
     // the app mid-day resumes the allowance instead of restarting it. Guesses
     // are append-only, so not even deleting cards can refund a spent slot.
-    introducedToday: [...guesses.values()].filter(
-      (g) => new Date(g.reviewedAt).getTime() >= midnight,
-    ).length,
+    introducedToday: [...guesses.values()].filter((g) => {
+      const at = new Date(g.reviewedAt);
+      return at >= start && at < nextStart;
+    }).length,
   };
 }

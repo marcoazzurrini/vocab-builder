@@ -49,7 +49,9 @@ export function usePracticeSession(userId: string) {
         const created = createSession({
           snapshot,
           settings,
-          onAnswer: (answer) => queue.push(answer),
+          acceptAnswer: (answer) => {
+            queue.push(answer);
+          },
         });
         sessionRef.current = created;
         setSession(created);
@@ -125,8 +127,13 @@ export function usePracticeSession(userId: string) {
 
   function act(action: (current: Session) => void) {
     if (!session || loadError || writeError) return;
-    action(session);
-    rerender();
+    try {
+      action(session);
+      rerender();
+    } catch (error) {
+      setWriteError(error instanceof Error ? error.message : String(error));
+      setSyncConflict(error instanceof SyncConflict);
+    }
   }
 
   return {

@@ -42,8 +42,8 @@ imports between workspaces and imports of unexported source are not.
 
 The `@vocab/spaced-repetition` browser-safe entrypoint exposes:
 
-- `createSession({ snapshot, settings, onAnswer, clock })`: reconstruct progress,
-  apply the local study-day allowance, run the session, and emit durable commands.
+- `createSession({ snapshot, settings, acceptAnswer, clock })`: reconstruct progress,
+  apply the local study-day allowance, run the session, and accept durable commands.
 - `Session`: its current view and guess, exposure, recall, and feedback operations.
 - Settings, answer validation, view types, and a study-day boundary helper.
 
@@ -58,8 +58,26 @@ then produces the next schedule and audit details. Browser session transitions
 and server evaluation use the same private grading and scheduling primitives.
 Neither owns storage or network behavior.
 
-Command shape, command IDs, and scheduling semantics are preserved. Existing
-pending browser answers must remain readable and replayable across deployment.
+An action computes a detached candidate state, including queue selection. The full
+command must validate and `acceptAnswer` must return before a single assignment
+publishes that state. If either rejects, phase, schedule, allowance, and statistics
+remain unchanged. The acceptance callback is synchronous and returns `undefined`:
+write to the durable local outbox, or throw without accepting the command. Network
+synchronization happens separately. Do not pass an async function or perform
+optional notifications inside this acceptance contract. Reentrant actions reject.
+An omitted sink is useful for ephemeral sessions; command validation still runs.
+
+Internal phase-specific state ties the active card, feedback, or waiting date to
+the phase that needs it. A guess command has no rating and revision zero; a recall
+command carries a rating and expected revision. Existing valid command JSON keeps
+its field order, IDs, and storage representation so pending answers remain replayable.
+
+Study days use device-local calendar boundaries `[start, nextStart)`, not 24-hour
+arithmetic. A skipped rollover hour shifts forward by the clock gap; a repeated
+hour uses its earlier occurrence. Tomorrow's boundary independently uses tomorrow's
+calendar date and the configured hour. There is no persisted account timezone.
+Normalization produces a canonical answer: repeated normalization cannot further
+change it. Typography is ignored, while spelling and accents remain significant.
 
 ## Database
 
@@ -131,6 +149,11 @@ account. Rebuilds disable the old prompt and drain pending writes before reading
 a fresh snapshot. Cancelled loads cannot replace a newer mounted session.
 
 The outbox preserves existing user-scoped localStorage keys and answer payloads.
+A new answer enters memory only after its localStorage write succeeds. A failed
+write throws back to the session without advancing it or sending the answer.
+Identical pending IDs are idempotent; changed payloads for an existing ID reject.
+An identical answer already stored by another tab is adopted without rewriting it,
+so waiting for this queue also waits for every answer it accepted.
 An answer is removed only after acknowledgement; retries reuse its ID. Conflicts
 require explicit confirmation before discarding pending work. Failed local
 storage or server writes must be visible, not silently dropped.

@@ -10,8 +10,8 @@
 /** `'` and friends. Phone and desktop keyboards disagree about which they emit. */
 const APOSTROPHES = /[’‘ʼʹ´`′]/g;
 
-/** Stored and shown for TTS prosody (§7), never typed by the user. */
-const TERMINAL_PUNCTUATION = /[?!.]+$/;
+/** Stored for TTS prosody (§7); terminal marks may have whitespace between them. */
+const TERMINAL_PUNCTUATION = /[?!.\s]+$/;
 
 export function normalise(input: string): string {
   return (
@@ -32,6 +32,8 @@ export function normalise(input: string): string {
       // French writes cœur and coeur both ways; only the ligature is optional,
       // never the accents.
       .replace(/œ/g, "oe")
+      // Expanding a ligature can expose a new base for a combining accent.
+      .normalize("NFC")
       .replace(TERMINAL_PUNCTUATION, "")
       // Chunks are several words, so an extra space between them is a typo in
       // the typing, not in the French.

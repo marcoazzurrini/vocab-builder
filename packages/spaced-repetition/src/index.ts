@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import { buildDeck, DEFAULT_SETTINGS } from "./lib/deck";
 import type { ReviewSnapshot, Settings } from "./lib/deck";
 import { commandFor } from "./lib/commands";
@@ -15,17 +16,29 @@ export type { Session } from "./session";
 export type SessionOptions = {
   snapshot: ReviewSnapshot;
   settings?: Settings;
-  onAnswer?: (answer: AnswerCommand) => void;
+  /** Persist to a local outbox synchronously, or throw without accepting the command. */
+  acceptAnswer?: (answer: AnswerCommand) => undefined;
   clock?: () => Date;
 };
 
-/** Reconstruct progress, enforce the daily allowance, and emit durable answer commands. */
+const SessionSettings = v.object({
+  lang: v.pipe(v.string(), v.minLength(1), v.maxLength(16)),
+  newPerDay: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100)),
+  dayRolloverHour: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(23)),
+});
+
+/** Reconstruct progress, enforce the daily allowance, and accept durable answer commands. */
 export function createSession({
   snapshot,
   settings = DEFAULT_SETTINGS,
-  onAnswer,
+  acceptAnswer,
   clock = () => new Date(),
 }: SessionOptions): Session {
+  if (acceptAnswer?.constructor.name === "AsyncFunction")
+    throw new TypeError(
+      "Answer acceptance must be synchronous; synchronize the outbox separately.",
+    );
+  settings = v.parse(SessionSettings, settings);
   const deck = buildDeck(
     snapshot.words,
     snapshot.cards,
@@ -38,6 +51,10 @@ export function createSession({
     newPerDay: settings.newPerDay,
     dayRolloverHour: settings.dayRolloverHour,
     clock,
-    onAttempt: onAnswer ? (attempt) => onAnswer(commandFor(attempt)) : undefined,
+    accept: ({ attempt }) => {
+      // Validate even without a sink. Rejection must precede publishing session state.
+      const command = commandFor(attempt);
+      acceptAnswer?.(command);
+    },
   });
 }

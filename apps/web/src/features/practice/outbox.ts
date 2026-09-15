@@ -26,23 +26,22 @@ export function createOutbox(options: {
   let running: Promise<void> | undefined;
   let failure: Error | undefined;
 
-  function persist(answer: AnswerCommand) {
-    // One key per answer: another tab acknowledging its answer cannot erase ours.
-    options.storage.setItem(prefix + answer.id, JSON.stringify(answer));
-  }
   function drain(): Promise<void> {
     if (running) return running;
     running = (async () => {
       while (items.length && !failure) {
         const answer = items[0]!;
         try {
-          persist(answer);
-          await options.send(answer);
+          await options.send(structuredClone(answer));
           options.storage.removeItem(prefix + answer.id);
           items.shift();
         } catch (error) {
           failure = error instanceof Error ? error : new Error(String(error));
-          options.onError(failure);
+          try {
+            options.onError(failure);
+          } catch {
+            // Notifications cannot undo durable acceptance or break retry handling.
+          }
         }
       }
     })().finally(() => {
@@ -54,13 +53,22 @@ export function createOutbox(options: {
   return {
     push(command: AnswerCommand) {
       const answer = v.parse(AnswerCommand, structuredClone(command));
-      items.push(answer);
-      try {
-        persist(answer);
-      } catch (error) {
-        failure = error instanceof Error ? error : new Error(String(error));
-        options.onError(failure);
+      const payload = JSON.stringify(answer);
+      const existing = items.find((item) => item.id === answer.id);
+      const stored = options.storage.getItem(prefix + answer.id);
+      if (
+        (existing && JSON.stringify(existing) !== payload) ||
+        (stored !== null && JSON.stringify(v.parse(AnswerCommand, JSON.parse(stored))) !== payload)
+      ) {
+        throw new Error("An answer with this ID already has a different payload.");
       }
+      if (existing) return;
+
+      // Adopt an identical durable answer written by another tab, so settled()
+      // covers everything this queue accepted. Server retries are idempotent.
+      // A failed new write must leave both session and queue unchanged.
+      if (stored === null) options.storage.setItem(prefix + answer.id, payload);
+      items.push(answer);
       void drain();
     },
     get pending() {

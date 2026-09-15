@@ -217,6 +217,38 @@ describe("the session screen", () => {
     await waitFor(() => expect(window.localStorage.length).toBe(0));
   });
 
+  it("recovers from a rejected local write without sending or losing the unanswered prompt", async () => {
+    render(<SessionScreen userId="u1" />);
+    await screen.findByText("cane");
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage full");
+    });
+
+    expect(() => fireEvent.click(screen.getByText("Continua"))).not.toThrow();
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "Salvataggio non riuscito: storage full",
+    );
+    expect(persistAnswer).not.toHaveBeenCalled();
+    expect(window.localStorage.length).toBe(0);
+    expect(screen.queryByText("chien")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+
+    write.mockRestore();
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await screen.findByText("cane");
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("textbox")).toBeDefined();
+    expect(persistAnswer).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Continua"));
+    await screen.findByText("chien");
+    await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
+    expect(persistAnswer.mock.calls[0]![0]).toMatchObject({ wordId: "w1", phase: "guess" });
+    await waitFor(() => expect(window.localStorage.length).toBe(0));
+  });
+
   it("reports a write failure it cannot act on", async () => {
     persistAnswer.mockRejectedValue(new Error("network down"));
 

@@ -47,8 +47,10 @@ function makeSession(words: Word[], newPerDay = 10, cards: Card[] = []): Session
     cards,
     newPerDay,
     clock: () => new Date(clockMs),
-    onAttempt: (a) => attempts.push(a),
-    onCardChange: (c) => changed.push(c),
+    accept: ({ attempt, card }) => {
+      attempts.push(attempt);
+      if (card) changed.push(card);
+    },
   });
 }
 
@@ -332,8 +334,10 @@ describe("session", () => {
         newPerDay: 1,
         introducedToday: 1,
         clock: () => new Date(clockMs),
-        onAttempt: (a) => attempts.push(a),
-        onCardChange: (c) => changed.push(c),
+        accept: ({ attempt, card }) => {
+          attempts.push(attempt);
+          if (card) changed.push(card);
+        },
       });
       expect(s.view.phase).toBe("exposure");
       s.exposureDone();

@@ -177,6 +177,37 @@ The database and authentication test commands allow 30 seconds per test or hook
 for local D1 startup. Run `bun run --filter @vocab/authentication test` to target a
 single package, or `bun run db:test` for both database and authentication tests.
 
+### Learning-engine regression checks
+
+```sh
+bun run --filter @vocab/spaced-repetition test
+bun run --filter @vocab/spaced-repetition test:coverage
+bun run --filter @vocab/spaced-repetition test --randomize --seed 42
+```
+
+The coverage command prints a report and writes an ignored `coverage/lcov.info`
+inside the package. GitHub Actions repeats the core suite in randomized order,
+using its run number as the reproducible order seed, and uploads the coverage file.
+Coverage helps locate unexercised code; it is not a correctness score or a substitute
+for assertions. Fast-check reports its own failing seed and shrink path, which are
+separate from Bun's test-order seed. Preserve both when reporting a failure.
+
+Calendar tests launch isolated subprocesses with explicit timezones. They include
+spring and autumn transitions, repeated/missing hours, a 30-minute clock change,
+and a skipped civil date. They never change the running test process's timezone.
+The generated learner uses the public session and server interfaces with JSON
+round trips. Independent trace checks distinguish completed, waiting, and manually
+interrupted sittings, account for thinking time, and verify when repeat exceptions
+are actually permitted. Negative-control tests deliberately corrupt traces to
+prove that these assertions detect failures.
+
+Before changing command, queue, or calendar contracts, run targeted mutation checks
+in a temporary checkout: intentionally break a behavior, then require a specific
+regression test to fail. Useful probes include constant answer IDs, revision zero,
+incorrect grades, dropped previous schedules, fixed 24-hour days, disabled input
+limits, and callback failure after a tentative state change. Do not weaken a check
+merely to obtain full coverage, or run fault injections against a working database.
+
 D1 and authentication tests share the public `@vocab/database/testing` helper. It
 creates an ephemeral local `workerd` database, applies the real migrations, and
 provides cleanup. It does not depend on the test runner and never uses development

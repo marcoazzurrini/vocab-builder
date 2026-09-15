@@ -282,13 +282,20 @@ Learning tests, UI tests, persistence tests, and authentication integration test
 **Examples** for the rules we decided on — one per claim, each carrying the
 reason it exists.
 
-**A round-trip harness** (`packages/spaced-repetition/src/session/harness.ts`) for the rest. Every earlier test
-built its starting cards by hand, and a hand-built fixture can only hold the
-states someone already thought of — which is exactly the set with no bugs in it.
-The harness never writes a card: it runs a sitting, keeps what the session
-emitted, pushes it through the same JSON round trip persistence does, and rebuilds
-the next sitting with the same `buildDeck` the app uses. Closing the app at every
-step of a sitting is then one loop rather than an act of imagination.
+**A round-trip harness** (`packages/spaced-repetition/src/session/harness.ts`) explores
+reachable histories alongside focused fixtures for difficult scheduling states.
+It uses public `createSession` and `evaluateAnswer`, serializes commands and server
+schedules through JSON, and reconstructs the next sitting from a public snapshot.
+It does not bypass command validation with internal persistence callbacks.
+Thinking time advances before the corresponding answer; the trace checks its
+latency, timestamp, word, phase, rating, and revision against the recorded attempt.
+Closing the app at every step is then one loop rather than an act of imagination.
+
+**Failure contracts** exercise invalid actions in every phase, rejected acceptance,
+oversized answers, retries, and immutable snapshots. An action calculates a candidate
+state and validates its command before the local outbox accepts it. Only successful,
+synchronous acceptance publishes that state. Server synchronization remains a
+separate idempotent operation; network failure does not undo a locally accepted answer.
 
 **D1 integration tests** run the checked-in migrations in isolated local
 `workerd` databases through Wrangler. They cover rollback when the second write
@@ -301,9 +308,12 @@ No hosted database or real email delivery is required.
 reachable state nobody imagined is found by generating the ways of reaching it,
 not by thinking harder. The invariants in `packages/spaced-repetition/src/session/invariants.ts` are the claims
 this document makes: a first recall is always preceded by its exposure in the
-same sitting, no card appears twice running, every card's history opens with
-exactly one guess, `Again` if and only if the answer was wrong, a review is never
-dragged back from a future day, and a sitting always reaches an honest pause.
+same sitting, a repeat exception is used only when no alternative work exists,
+every card's history opens with exactly one guess, `Again` if and only if the answer
+was wrong, a review is never dragged back from a future day, and a sitting reaches
+an honest pause. Completed, waiting, and manually interrupted sittings have distinct
+trace records. Invariant checkers have negative-control tests that deliberately
+corrupt histories and prove that the checks notice.
 That last one found a real defect the day it was written — two cards alternating
 forever, each dragged forward inside its own learning step.
 

@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "bun:test";
 import { catalogue, createLearner } from "./harness";
 import type { Behaviour, Learner, Step } from "./harness";
-import { violations } from "./invariants";
+import { attemptMismatches, closureContradictions, violations } from "./invariants";
 import type { Effort } from "./types";
 
 /**
@@ -23,8 +23,23 @@ const NINE_AM = new Date("2026-08-10T09:00:00");
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
+// Local wall-clock dates cover leap days, year ends, DST seasons and rollovers.
+const startDates = fc.constantFrom(
+  "2024-02-28T23:59:30",
+  "2024-02-29T03:59:30",
+  "2026-12-31T23:59:30",
+  "2026-03-08T01:59:30",
+  "2026-03-29T01:59:30",
+  "2026-10-25T02:30:00",
+  "2026-11-01T01:30:00",
+  "2026-08-10T09:00:00",
+  "2026-08-10T03:59:30",
+);
 
 type Scenario = {
+  start: string;
+  rollover: number;
+  variedCatalogue: boolean;
   words: number;
   newPerDay: number;
   /** One entry per sitting: how many prompts before the app is closed. */
@@ -44,6 +59,9 @@ type Scenario = {
 
 function scenario(options: { maxGap: number }) {
   return fc.record({
+    start: startDates,
+    rollover: fc.integer({ min: 0, max: 23 }),
+    variedCatalogue: fc.boolean(),
     words: fc.integer({ min: 1, max: 25 }),
     newPerDay: fc.integer({ min: 0, max: 12 }),
     cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
@@ -58,10 +76,12 @@ function scenario(options: { maxGap: number }) {
 }
 
 function behaviourFor(s: Scenario): Behaviour {
+  let guessed = 0;
   let answered = 0;
   let graded = 0;
   let thought = 0;
   return {
+    guessCorrect: () => s.answers[guessed++ % s.answers.length]!,
     correct: () => s.answers[answered++ % s.answers.length]!,
     effort: () => s.efforts[graded++ % s.efforts.length]!,
     msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
@@ -77,12 +97,25 @@ function behaviourFor(s: Scenario): Behaviour {
  * failing keeps coming back, exactly as it should. Termination is asserted
  * separately, against a learner who sometimes gets one right.
  */
+function wordsFor(s: Scenario) {
+  return catalogue(s.words).map((word, i) =>
+    s.variedCatalogue
+      ? {
+          ...word,
+          text: i % 2 ? `l'été ${i}` : `être${i}`,
+          freqRank: i % 3 === 0 ? null : Math.floor((s.words - i) / 2),
+        }
+      : word,
+  );
+}
+
 function live(s: Scenario): Learner {
   const learner = createLearner({
-    words: catalogue(s.words),
+    words: wordsFor(s),
     newPerDay: s.newPerDay,
-    start: NINE_AM,
+    start: new Date(s.start),
     behaviour: behaviourFor(s),
+    dayRolloverHour: s.rollover,
   });
 
   s.cuts.forEach((cut, i) => {
@@ -101,9 +134,9 @@ describe("however the history goes", () => {
     fc.assert(
       fc.property(scenario({ maxGap: 3 * DAY }), fc.integer({ min: 0, max: 23 }), (s, rollover) => {
         const learner = createLearner({
-          words: catalogue(s.words),
+          words: wordsFor(s),
           newPerDay: s.newPerDay,
-          start: NINE_AM,
+          start: new Date(s.start),
           behaviour: behaviourFor(s),
           dayRolloverHour: rollover,
         });
@@ -132,6 +165,8 @@ describe("however the history goes", () => {
     fc.assert(
       fc.property(
         fc.record({
+          start: startDates,
+          rollover: fc.integer({ min: 0, max: 23 }),
           words: fc.integer({ min: 1, max: 25 }),
           newPerDay: fc.integer({ min: 0, max: 12 }),
           cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
@@ -148,7 +183,8 @@ describe("however the history goes", () => {
           const learner = createLearner({
             words: catalogue(s.words),
             newPerDay: s.newPerDay,
-            start: NINE_AM,
+            start: new Date(s.start),
+            dayRolloverHour: s.rollover,
             behaviour: {
               correct: (word, n) => n > stumblesFor(word.id),
               msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
@@ -161,9 +197,36 @@ describe("however the history goes", () => {
           });
           learner.sit();
 
-          expect(learner.trace.at(-1)).toEqual({ at: "closed" });
+          const end = learner.trace.at(-1)!;
+          expect(end.at).toBe("closed");
+          if (end.at !== "closed") throw new Error("missing closed marker");
+          expect(end.reason).not.toBe("cut");
+          expect(closureContradictions(learner.trace)).toEqual([]);
+          expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
         },
       ),
+      { numRuns: 200 },
+    );
+  });
+
+  it("reopens caught-up histories at the earliest remaining learning due", () => {
+    fc.assert(
+      fc.property(scenario({ maxGap: 3 * DAY }), (s) => {
+        const learner = live(s);
+        const end = learner.trace.at(-1)!;
+        if (end.at !== "closed" || end.reason !== "caughtUp") return;
+        expect(closureContradictions(learner.trace)).toEqual([]);
+        const due = end.nextDueAt!;
+        learner.wait(due - learner.now.getTime());
+        const reopened = learner.sit(1)[0]!;
+        expect(reopened.at).toBe("recall");
+        if (reopened.at !== "recall") throw new Error("reopen did not serve due learning");
+        expect(reopened.shownAt).toBe(due);
+        expect(
+          end.remainingLearning.some((c) => c.wordId === reopened.wordId && c.due === due),
+        ).toBe(true);
+        expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
+      }),
       { numRuns: 200 },
     );
   });
@@ -222,6 +285,10 @@ describe("however the history goes", () => {
           (step) => step.at === "guess" || step.at === "recall",
         );
         expect(learner.attempts).toHaveLength(answered.length);
+        expect(attemptMismatches(learner.trace, learner.attempts)).toEqual([]);
+        expect(learner.commands.map((c) => c.id).length).toBe(
+          new Set(learner.commands.map((c) => c.id)).size,
+        );
       }),
       { numRuns: 200 },
     );

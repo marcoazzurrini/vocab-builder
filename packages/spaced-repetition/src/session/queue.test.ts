@@ -265,3 +265,183 @@ describe("the next-card rule", () => {
     expect(ask({ cards: [], words: [], allowanceLeft: 5 })).toEqual({ do: "done" });
   });
 });
+
+describe("queue edge cases", () => {
+  for (const state of [State.Learning, State.Relearning, State.New]) {
+    it(`serves rated state ${state} due exactly now before introducing words`, () => {
+      const card = scheduled("w1", state, NOW);
+      expect(stageOf(card)).toBe("scheduled");
+      expect(ask({ cards: [card], allowanceLeft: 1, pulledForward: new Set(["w1"]) })).toEqual({
+        do: "recall",
+        card,
+      });
+    });
+
+    it(`pulls rated state ${state} forward once, then waits`, () => {
+      const card = scheduled("w1", state, new Date(NOW.getTime() + MINUTE));
+      expect(ask({ cards: [card] })).toEqual({ do: "recall", card, pulledForward: true });
+      expect(ask({ cards: [card], pulledForward: new Set(["w1"]) })).toEqual({
+        do: "wait",
+        until: card.fsrs.due,
+      });
+    });
+
+    it(`serves spent state ${state} at its due time even if it was just shown`, () => {
+      const card = scheduled("w1", state, NOW);
+      const later = scheduled("w2", state, new Date(NOW.getTime() + MINUTE));
+      expect(
+        ask({ cards: [later, card], justShownId: "w1", pulledForward: new Set(["w1", "w2"]) }),
+      ).toEqual({ do: "recall", card });
+    });
+
+    it(`does not let spent learn-ahead block genuinely due state ${state}`, () => {
+      const future = scheduled("w1", state, new Date(NOW.getTime() + MINUTE));
+      const due = scheduled("w2", state, NOW);
+      expect(
+        ask({ cards: [future, due], pulledForward: new Set(["w1", "w2"]), allowanceLeft: 1 }),
+      ).toEqual({ do: "recall", card: due });
+    });
+  }
+
+  for (const state of [State.Learning, State.Relearning, State.New, State.Review]) {
+    for (const hour of [0, 4]) {
+      it(`excludes rated state ${state} at the next study day, rollover ${hour}`, () => {
+        const nextStart = new Date(`2026-08-11T${String(hour).padStart(2, "0")}:00:00`);
+        const edge = scheduled("w1", state, nextStart);
+        expect(ask({ cards: [edge], dayRolloverHour: hour })).toEqual({ do: "done" });
+        expect(
+          ask({
+            cards: [edge],
+            dayRolloverHour: hour,
+            justShownId: "w1",
+            pulledForward: new Set(["w1"]),
+          }),
+        ).toEqual({ do: "done" });
+        const last = scheduled("w1", state, new Date(nextStart.getTime() - 1));
+        expect(ask({ cards: [last], dayRolloverHour: hour })).toEqual(
+          state === State.Review
+            ? { do: "recall", card: last }
+            : { do: "recall", card: last, pulledForward: true },
+        );
+        if (state !== State.Review) {
+          expect(
+            ask({ cards: [last], dayRolloverHour: hour, pulledForward: new Set(["w1"]) }),
+          ).toEqual({ do: "wait", until: last.fsrs.due });
+        }
+      });
+    }
+  }
+
+  it("orders reviews by due date rather than input or frequency rank", () => {
+    const later = scheduled("w1", State.Review, NOW);
+    const earlier = scheduled("w3", State.Review, new Date(NOW.getTime() - HOUR));
+    expect(ask({ cards: [later, earlier] })).toEqual({ do: "recall", card: earlier });
+  });
+
+  it("preserves input order for equal due dates without sorting the caller's cards", () => {
+    const first = scheduled("w2", State.Learning, NOW);
+    const second = scheduled("w1", State.Learning, NOW);
+    const cards = [first, second];
+    expect(ask({ cards })).toEqual({ do: "recall", card: first });
+    expect(cards).toEqual([first, second]);
+    expect(ask({ cards: [second, first] })).toEqual({ do: "recall", card: second });
+  });
+
+  it("preserves introduction order when awaiting cards have equal timestamps", () => {
+    const first = awaiting("w2");
+    const second = awaiting("w1");
+    expect(ask({ cards: [first, second] })).toEqual({ do: "expose", card: first });
+    expect(ask({ cards: [first, second], exposed: new Set(["w1", "w2"]) })).toEqual({
+      do: "recall",
+      card: first,
+    });
+  });
+
+  it("puts null frequency ranks after every ranked word without mutating the catalogue", () => {
+    const unranked: Word = { ...word("unranked", 1), freqRank: null };
+    const ranked = word("ranked", 999_999);
+    const words = [unranked, ranked];
+    expect(ask({ cards: [], words, allowanceLeft: 1 })).toEqual({ do: "introduce", word: ranked });
+    expect(words).toEqual([unranked, ranked]);
+    expect(ask({ cards: [awaiting("ranked")], words, allowanceLeft: 1 })).toEqual({
+      do: "introduce",
+      word: unranked,
+    });
+  });
+
+  for (const freqRank of [10, null]) {
+    it(`preserves catalogue order for tied frequency rank ${freqRank}`, () => {
+      const first: Word = { ...word("z", 1), freqRank };
+      const second: Word = { ...word("a", 1), freqRank };
+      expect(ask({ cards: [], words: [first, second], allowanceLeft: 1 })).toEqual({
+        do: "introduce",
+        word: first,
+      });
+      expect(ask({ cards: [], words: [second, first], allowanceLeft: 1 })).toEqual({
+        do: "introduce",
+        word: second,
+      });
+    });
+  }
+
+  for (const { timezone, start, nextStart } of [
+    {
+      timezone: "Europe/Rome",
+      start: "2026-03-28T04:00:00+01:00",
+      nextStart: "2026-03-29T04:00:00+02:00",
+    },
+    {
+      timezone: "Europe/Rome",
+      start: "2026-10-24T04:00:00+02:00",
+      nextStart: "2026-10-25T04:00:00+01:00",
+    },
+    {
+      timezone: "America/New_York",
+      start: "2026-03-07T04:00:00-05:00",
+      nextStart: "2026-03-08T04:00:00-04:00",
+    },
+    {
+      timezone: "America/New_York",
+      start: "2026-10-31T04:00:00-04:00",
+      nextStart: "2026-11-01T04:00:00-05:00",
+    },
+  ]) {
+    it(`uses calendar rather than 24-hour review and learn-ahead boundaries in ${timezone} ${start}`, () => {
+      const result = Bun.spawnSync({
+        cmd: [
+          process.execPath,
+          "--eval",
+          `
+          import assert from "node:assert/strict";
+          import { createEmptyCard, State } from ${JSON.stringify(import.meta.resolve("ts-fsrs"))};
+          import { pickNext } from ${JSON.stringify(new URL("./queue.ts", import.meta.url).href)};
+          const now = new Date(new Date(${JSON.stringify(start)}).getTime() + 3600000);
+          const nextStart = new Date(${JSON.stringify(nextStart)}).getTime();
+          for (const state of [State.Learning, State.Relearning, State.New, State.Review]) {
+            const cardAt = (at) => ({ wordId: "edge", fsrs: { ...createEmptyCard(now), reps: 1, state, due: new Date(at) } });
+            const ask = (card, spent = false) => pickNext({
+              cards: [card], words: [], now, dayRolloverHour: 4, allowanceLeft: 0,
+              exposed: new Set(), pulledForward: new Set(spent ? ["edge"] : []),
+            });
+            const edge = cardAt(nextStart);
+            assert.deepEqual(ask(edge), { do: "done" });
+            assert.deepEqual(ask(edge, true), { do: "done" });
+            const last = cardAt(nextStart - 1);
+            assert.deepEqual(ask(last), state === State.Review
+              ? { do: "recall", card: last }
+              : { do: "recall", card: last, pulledForward: true });
+            assert.deepEqual(ask(last, true), state === State.Review
+              ? { do: "recall", card: last }
+              : { do: "wait", until: last.fsrs.due });
+          }
+        `,
+        ],
+        env: { ...process.env, TZ: timezone },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(result.stderr.toString()).toBe("");
+      expect(result.exitCode).toBe(0);
+    });
+  }
+});

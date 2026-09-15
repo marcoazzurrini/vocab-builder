@@ -1,5 +1,6 @@
 import { createEmptyCard, fsrs } from "ts-fsrs";
 import type { FSRS } from "ts-fsrs";
+import { validateAnswerText } from "../lib/commands";
 import { effortsFor, gradeRecall } from "./grading";
 import { transition } from "./transition";
 import { pickNext } from "./queue";
@@ -7,26 +8,16 @@ import type { Attempt, Card, Effort, Prompt, SessionStats, SessionView, Word } f
 
 export type { Attempt, Card, Effort, Prompt, SessionStats, SessionView, Word };
 
+/** An answer and its derived card are accepted together, never as separate notifications. */
+export type AnswerChange = { attempt: Attempt; card: Card | null };
 export type SessionOptions = {
-  /** The catalogue. Words without a card are candidates for introduction. */
   words: Word[];
-  /** Existing cards for this user. */
   cards: Card[];
-  /** Today's new-word ceiling. Controls future workload, so it is never exceeded. */
   newPerDay: number;
-  /** New words already introduced today, so a resumed session does not restart. */
   introducedToday?: number;
-  /** The hour the study day rolls over. Midnight unless told otherwise. */
   dayRolloverHour?: number;
-  /** Emitted per answered prompt, guesses included. Persisting them is the caller's job. */
-  onAttempt?: (attempt: Attempt) => void;
-  /**
-   * Emitted whenever FSRS moves a card — which includes the first rating, the
-   * moment the card row is born. Nothing is announced before that: attempts
-   * are keyed by word, so the guess needs no row to point at.
-   */
-  onCardChange?: (card: Card) => void;
-  /** Injectable so tests are deterministic and latency is measurable. */
+  /** Synchronously accept the complete change or throw without accepting it. */
+  accept?: (change: AnswerChange) => void;
   clock?: () => Date;
   scheduler?: FSRS;
 };
@@ -39,251 +30,240 @@ export type Session = {
   dismissFeedback(): void;
 };
 
-type Phase = SessionView["phase"];
-
 type Current = { card: Card; word: Word };
+type PromptPhase = "guess" | "exposure" | "recall";
+type Flow =
+  | { [P in PromptPhase]: { phase: P; current: Current } }[PromptPhase]
+  | { phase: "feedback"; current: Current; typed: string }
+  | { phase: "caughtUp"; until: Date }
+  | { phase: "done" };
+
+type SessionState = {
+  flow: Flow;
+  cards: Card[];
+  allowanceLeft: number;
+  promptShownAt: Date;
+  justShownId?: string;
+  exposed: Set<string>;
+  pulledForward: Set<string>;
+  stats: SessionStats;
+};
+
+type Action =
+  | { type: "guess"; typed: string }
+  | { type: "exposure" }
+  | { type: "recall"; typed: string; effort: Effort }
+  | { type: "feedback" };
 
 function promptOf(word: Word): Prompt {
-  return {
-    gloss: word.gloss,
-    hint: word.hint,
-    image: word.image,
-    kind: word.kind,
-  };
+  return { gloss: word.gloss, hint: word.hint, image: word.image, kind: word.kind };
 }
 
 /**
- * The session owns *what happens next*; the component owns *how it looks*.
- *
- * Everything the pipeline decides lives behind this one function: accent-strict
- * comparison, the wrong-is-always-Again rule, guesses being logged but never
- * rated, which effort buttons exist, FSRS, the next-card rule, the daily
- * allowance, and when the session has genuinely run out. None of it is
- * reachable from the UI, so none of it can be got wrong there.
+ * Each action builds a private candidate. Validation, scheduling, queue selection,
+ * and acceptance must all succeed before a single assignment publishes that state.
+ * A rejected action therefore cannot spend allowance, rate a card, or change phase.
  */
 export function createSession(options: SessionOptions): Session {
   const clock = options.clock ?? (() => new Date());
   const scheduler = options.scheduler ?? fsrs({ enable_short_term: true });
+  const words = structuredClone(options.words);
+  const wordById = new Map(words.map((word) => [word.id, word]));
+  let processing = false;
 
-  const cards: Card[] = [...options.cards];
-  let allowanceLeft = Math.max(0, options.newPerDay - (options.introducedToday ?? 0));
-
-  let phase: Phase = "done";
-  let current: Current | null = null;
-  let promptShownAt = clock();
-  let lastTyped = "";
-  /** When the next card comes due, while the phase is "caughtUp". */
-  let nextDueAt: Date | null = null;
-  let justShownId: string | undefined;
-  /** Both passed to the rule rather than kept here — see `Queue.exposed`. */
-  const exposedThisSession = new Set<string>();
-  const pulledForwardThisSession = new Set<string>();
-  const stats: SessionStats = { introduced: 0, recalls: 0, correct: 0, wrong: 0 };
-
-  const wordById = new Map(options.words.map((w) => [w.id, w]));
-
-  /** The word a card points at, or undefined if it has left the catalogue. */
-  function wordFor(card: Card): Word | undefined {
-    return wordById.get(card.wordId);
+  function readClock(): Date {
+    const now = new Date(clock());
+    if (!Number.isFinite(now.getTime()))
+      throw new Error("The session clock returned an invalid date.");
+    return now;
   }
 
-  function advance(): void {
-    const now = clock();
-
-    // A card whose word is no longer in the catalogue cannot be shown. Dropping
-    // them up front means the rule below only ever sees showable cards, so there
-    // is no unshowable answer to recover from afterwards.
-    for (let i = cards.length - 1; i >= 0; i--) {
-      if (!wordFor(cards[i]!)) cards.splice(i, 1);
-    }
-
+  function advance(draft: SessionState, now: Date): void {
+    draft.cards = draft.cards.filter((card) => wordById.has(card.wordId));
     const slot = pickNext({
-      cards,
-      words: options.words,
+      cards: draft.cards,
+      words,
       now,
-      allowanceLeft,
-      exposed: exposedThisSession,
-      pulledForward: pulledForwardThisSession,
-      justShownId,
+      allowanceLeft: draft.allowanceLeft,
+      exposed: draft.exposed,
+      pulledForward: draft.pulledForward,
+      justShownId: draft.justShownId,
       dayRolloverHour: options.dayRolloverHour,
     });
-
-    promptShownAt = now;
-
+    draft.promptShownAt = now;
     switch (slot.do) {
       case "done":
-        current = null;
-        phase = "done";
+        draft.flow = { phase: "done" };
         return;
-
       case "wait":
-        current = null;
-        nextDueAt = slot.until;
-        phase = "caughtUp";
+        draft.flow = { phase: "caughtUp", until: slot.until };
         return;
-
-      case "introduce": {
-        // Nothing is pushed or spent yet: the word only becomes real at the
-        // guess. Abandon this screen and no trace remains anywhere — which is
-        // the truth of what happened.
-        current = { card: { wordId: slot.word.id, fsrs: createEmptyCard(now) }, word: slot.word };
-        justShownId = slot.word.id;
-        // A word never met starts with a guess: retrieval before exposure aids
-        // retention even when the guess is wrong, and costs nothing when it is.
-        phase = "guess";
+      case "introduce":
+        draft.justShownId = slot.word.id;
+        draft.flow = {
+          phase: "guess",
+          current: { card: { wordId: slot.word.id, fsrs: createEmptyCard(now) }, word: slot.word },
+        };
         return;
-      }
-
       case "expose":
-      case "recall": {
-        if (slot.do === "recall" && slot.pulledForward) {
-          pulledForwardThisSession.add(slot.card.wordId);
-        }
-        current = { card: slot.card, word: wordFor(slot.card)! };
-        justShownId = slot.card.wordId;
-        phase = slot.do === "expose" ? "exposure" : "recall";
-        return;
+      case "recall":
+        if (slot.do === "recall" && slot.pulledForward) draft.pulledForward.add(slot.card.wordId);
+        draft.justShownId = slot.card.wordId;
+        draft.flow = {
+          phase: slot.do === "expose" ? "exposure" : "recall",
+          current: { card: slot.card, word: wordById.get(slot.card.wordId)! },
+        };
+    }
+  }
+
+  function current(draft: SessionState, expected: PromptPhase | "feedback"): Current {
+    const flow = draft.flow;
+    if (flow.phase === "done" || flow.phase === "caughtUp" || flow.phase !== expected)
+      throw new Error(`expected phase "${expected}", session is in "${flow.phase}"`);
+    return flow.current;
+  }
+
+  const now = readClock();
+  let state: SessionState = {
+    flow: { phase: "done" },
+    cards: structuredClone(options.cards),
+    allowanceLeft: Math.max(0, options.newPerDay - (options.introducedToday ?? 0)),
+    promptShownAt: now,
+    exposed: new Set(),
+    pulledForward: new Set(),
+    stats: { introduced: 0, recalls: 0, correct: 0, wrong: 0 },
+  };
+  advance(state, now);
+
+  function apply(draft: SessionState, action: Action, now: Date): AnswerChange | undefined {
+    const { card, word } = current(draft, action.type);
+    if (action.type === "guess" || action.type === "recall") validateAnswerText(action.typed);
+    const latencyMs = Math.min(
+      Math.max(0, now.getTime() - draft.promptShownAt.getTime()),
+      86_400_000,
+    );
+    switch (action.type) {
+      case "guess": {
+        const result = transition(
+          card.fsrs,
+          word.text,
+          { typed: action.typed, phase: "guess", rating: null },
+          now,
+          scheduler,
+        );
+        const change: AnswerChange = {
+          card: null,
+          attempt: {
+            wordId: card.wordId,
+            phase: "guess",
+            typed: action.typed,
+            correct: result.correct,
+            rating: null,
+            latencyMs,
+            stateBefore: card.fsrs,
+            reviewedAt: now,
+          },
+        };
+        // The guess, not merely displaying a prompt, introduces this word.
+        card.fsrs = createEmptyCard(now);
+        draft.cards.push(card);
+        draft.allowanceLeft -= 1;
+        draft.stats.introduced += 1;
+        draft.flow = { phase: "exposure", current: { card, word } };
+        return change;
       }
+      case "exposure":
+        draft.exposed.add(card.wordId);
+        advance(draft, now);
+        return;
+      case "recall": {
+        const before = card.fsrs;
+        const { correct, rating } = gradeRecall(
+          action.typed,
+          word.text,
+          action.effort,
+          effortsFor(before),
+        );
+        card.fsrs = transition(
+          before,
+          word.text,
+          { typed: action.typed, phase: "recall", rating },
+          now,
+          scheduler,
+        ).after!;
+        const change: AnswerChange = {
+          card,
+          attempt: {
+            wordId: card.wordId,
+            phase: "recall",
+            typed: action.typed,
+            correct,
+            rating,
+            latencyMs,
+            stateBefore: before,
+            reviewedAt: now,
+          },
+        };
+        draft.stats.recalls += 1;
+        if (correct) {
+          draft.stats.correct += 1;
+          advance(draft, now);
+        } else {
+          draft.stats.wrong += 1;
+          draft.flow = { phase: "feedback", current: { card, word }, typed: action.typed };
+        }
+        return change;
+      }
+      case "feedback":
+        advance(draft, now);
+        return;
     }
   }
 
-  function requirePhase(expected: Phase): Current {
-    if (phase !== expected) {
-      throw new Error(`expected phase "${expected}", session is in "${phase}"`);
+  function dispatch(action: Action): void {
+    if (processing) throw new Error("A session action is already being processed.");
+    processing = true;
+    try {
+      const draft = structuredClone(state);
+      const change = apply(draft, action, readClock());
+      // The sink receives detached values. It cannot modify the candidate or
+      // re-enter this session while durable acceptance is in progress.
+      if (change) options.accept?.(structuredClone(change));
+      state = draft;
+    } finally {
+      processing = false;
     }
-    if (!current) throw new Error(`phase "${phase}" with no current card`);
-    return current;
   }
-
-  function record(attempt: Attempt): void {
-    options.onAttempt?.(attempt);
-  }
-
-  /**
-   * How long the prompt was on screen, within reason.
-   *
-   * `attempts.latency_ms` is an `integer`, so a tab left open for a month
-   * overflows it and Postgres rejects the whole row — losing the answer itself
-   * over a number that is only ever read for analysis. A clock that steps
-   * backwards, which phones do, would send a negative one. Neither is a real
-   * measurement, and neither is worth losing a rep over.
-   */
-  function latencySince(shownAt: Date, now: Date): number {
-    const A_DAY = 24 * 60 * 60_000;
-    return Math.min(Math.max(0, now.getTime() - shownAt.getTime()), A_DAY);
-  }
-
-  advance();
 
   return {
     get view(): SessionView {
-      switch (phase) {
+      const flow = state.flow;
+      switch (flow.phase) {
         case "guess":
-          return { phase, prompt: promptOf(current!.word) };
+          return { phase: flow.phase, prompt: promptOf(flow.current.word) };
         case "exposure":
           return {
-            phase,
-            prompt: promptOf(current!.word),
-            answer: current!.word.text,
+            phase: flow.phase,
+            prompt: promptOf(flow.current.word),
+            answer: flow.current.word.text,
           };
         case "recall":
           return {
-            phase,
-            prompt: promptOf(current!.word),
-            efforts: effortsFor(current!.card.fsrs),
+            phase: flow.phase,
+            prompt: promptOf(flow.current.word),
+            efforts: effortsFor(flow.current.card.fsrs),
           };
         case "feedback":
-          return { phase, expected: current!.word.text, typed: lastTyped };
+          return { phase: flow.phase, expected: flow.current.word.text, typed: flow.typed };
         case "caughtUp":
-          return { phase, nextDueAt: nextDueAt!, stats: { ...stats } };
+          return { phase: flow.phase, nextDueAt: new Date(flow.until), stats: { ...state.stats } };
         case "done":
-          return { phase, stats: { ...stats } };
+          return { phase: flow.phase, stats: { ...state.stats } };
       }
     },
-
-    submitGuess(typed: string): void {
-      const { card, word } = requirePhase("guess");
-      const now = clock();
-      // Logged but never rated. Grading every guess Again would start every card
-      // at the same stability and destroy the initial-difficulty signal. An
-      // empty string is a valid answer — a shrug is a legitimate pretest.
-      record({
-        wordId: card.wordId,
-        phase: "guess",
-        typed,
-        correct: transition(
-          card.fsrs,
-          word.text,
-          { typed, phase: "guess", rating: null },
-          now,
-          scheduler,
-        ).correct,
-        rating: null,
-        latencyMs: latencySince(promptShownAt, now),
-        stateBefore: card.fsrs,
-        reviewedAt: now,
-      });
-      // The guess is the moment the word becomes real: the attempt is on
-      // record, so the card joins the deck and the allowance is spent — not at
-      // the introduce slot, where abandoning would have left a ghost.
-      cards.push(card);
-      allowanceLeft -= 1;
-      stats.introduced += 1;
-      phase = "exposure";
-    },
-
-    exposureDone(): void {
-      const { card } = requirePhase("exposure");
-      exposedThisSession.add(card.wordId);
-      // Back to the queue rather than straight to recall. Producing a word two
-      // seconds after being shown it is trivial, so the rating it yields — which
-      // is FSRS's first, the one that sets initial difficulty — would measure
-      // short-term memory rather than the word. The next-card rule puts real
-      // work in between instead.
-      advance();
-    },
-
-    submitRecall(typed: string, effort: Effort): void {
-      const { card, word } = requirePhase("recall");
-      const now = clock();
-      const stateBefore = card.fsrs;
-      const { correct, rating } = gradeRecall(typed, word.text, effort, effortsFor(stateBefore));
-
-      card.fsrs = transition(
-        stateBefore,
-        word.text,
-        { typed, phase: "recall", rating },
-        now,
-        scheduler,
-      ).after!;
-      options.onCardChange?.(card);
-
-      record({
-        wordId: card.wordId,
-        phase: "recall",
-        typed,
-        correct,
-        rating,
-        latencyMs: latencySince(promptShownAt, now),
-        stateBefore,
-        reviewedAt: now,
-      });
-
-      stats.recalls += 1;
-      if (correct) {
-        stats.correct += 1;
-        // Nothing to read on a correct answer, so no pause.
-        advance();
-      } else {
-        stats.wrong += 1;
-        lastTyped = typed;
-        phase = "feedback";
-      }
-    },
-
-    dismissFeedback(): void {
-      requirePhase("feedback");
-      advance();
-    },
+    submitGuess: (typed) => dispatch({ type: "guess", typed }),
+    exposureDone: () => dispatch({ type: "exposure" }),
+    submitRecall: (typed, effort) => dispatch({ type: "recall", typed, effort }),
+    dismissFeedback: () => dispatch({ type: "feedback" }),
   };
 }
