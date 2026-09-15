@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createSession, DEFAULT_SETTINGS, studyDayStart } from "@vocab/spaced-repetition";
 import type { Effort, Session, Settings } from "@vocab/spaced-repetition";
 import { loadSettings, loadSnapshot, persistAnswer } from "./transport";
@@ -11,11 +11,18 @@ export function usePracticeSession(userId: string) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [syncConflict, setSyncConflict] = useState(false);
-  const [reloadCount, reload] = useReducer((n: number) => n + 1, 0);
+  const [reloadCount, requestReload] = useReducer((n: number) => n + 1, 0);
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const sessionRef = useRef<Session | null>(null);
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
   const loadedOnRef = useRef(studyDayStart(new Date(), DEFAULT_SETTINGS.dayRolloverHour).getTime());
+  const reload = useCallback(() => {
+    // Invalidate before rendering cleared errors, not later in the loading effect.
+    // Otherwise the old prompt briefly accepts answers that the reload can replace.
+    sessionRef.current = null;
+    setSession(null);
+    requestReload();
+  }, []);
 
   // One queue survives all reloads. A rebuild must read its own acknowledged writes.
   const queueRef = useRef<ReturnType<typeof createOutbox> | null>(null);
@@ -89,7 +96,7 @@ export function usePracticeSession(userId: string) {
     }
     document.addEventListener("visibilitychange", recheck);
     return () => document.removeEventListener("visibilitychange", recheck);
-  }, []);
+  }, [reload]);
 
   const view = session?.view;
   const nextDue = view?.phase === "caughtUp" ? view.nextDueAt.getTime() : null;
@@ -97,7 +104,7 @@ export function usePracticeSession(userId: string) {
     if (nextDue === null) return;
     const timer = setTimeout(reload, Math.max(1000, nextDue - Date.now() + 1000));
     return () => clearTimeout(timer);
-  }, [nextDue]);
+  }, [nextDue, reload]);
 
   async function retry() {
     try {
@@ -126,9 +133,10 @@ export function usePracticeSession(userId: string) {
   }
 
   function act(action: (current: Session) => void) {
-    if (!session || loadError || writeError) return;
+    const current = sessionRef.current;
+    if (!current || current !== session || loadError || writeError) return;
     try {
-      action(session);
+      action(current);
       rerender();
     } catch (error) {
       setWriteError(error instanceof Error ? error.message : String(error));

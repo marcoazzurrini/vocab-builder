@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReviewSnapshot } from "@vocab/spaced-repetition";
 import { DEFAULT_SETTINGS } from "@vocab/spaced-repetition";
@@ -19,6 +27,7 @@ vi.mock("./transport", () => ({
 }));
 
 const { SessionScreen } = await import("./SessionScreen");
+const { usePracticeSession } = await import("./use-practice-session");
 
 const CHIEN: Word = {
   id: "w1",
@@ -247,6 +256,37 @@ describe("the session screen", () => {
     await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
     expect(persistAnswer.mock.calls[0]![0]).toMatchObject({ wordId: "w1", phase: "guess" });
     await waitFor(() => expect(window.localStorage.length).toBe(0));
+  });
+
+  it("never exposes the stale prompt between clearing an error and starting a retry reload", async () => {
+    const visiblePrompts: string[] = [];
+    const { result } = renderHook(() => {
+      const practice = usePracticeSession("u1");
+      if (!practice.writeError && !practice.loadError && practice.view?.phase === "guess") {
+        visiblePrompts.push(practice.view.prompt.gloss);
+      }
+      return practice;
+    });
+    await waitFor(() => expect(result.current.view?.phase).toBe("guess"));
+    const submitOldPrompt = result.current.submitGuess;
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage full");
+    });
+    act(() => result.current.submitGuess(""));
+    expect(result.current.writeError).toBe("storage full");
+    write.mockRestore();
+    loadSnapshot.mockResolvedValue(deck([{ ...CHIEN, id: "w2", text: "chat", gloss: "gatto" }]));
+    visiblePrompts.length = 0;
+    await act(async () => {
+      await result.current.retry();
+    });
+    await waitFor(() =>
+      expect(result.current.view).toMatchObject({ phase: "guess", prompt: { gloss: "gatto" } }),
+    );
+    expect(visiblePrompts).not.toContain("cane");
+    act(() => submitOldPrompt("chien"));
+    expect(result.current.view).toMatchObject({ phase: "guess", prompt: { gloss: "gatto" } });
+    expect(persistAnswer).not.toHaveBeenCalled();
   });
 
   it("reports a write failure it cannot act on", async () => {
