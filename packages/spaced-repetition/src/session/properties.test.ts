@@ -19,6 +19,10 @@ import type { Effort } from "./types";
  * previous sitting actually wrote.
  */
 
+// Hundreds of complete histories can exceed Bun's five-second default on shared CI CPUs.
+// Give these properties more time without reducing their run counts or other tests' limits.
+const HISTORY_TIMEOUT_MS = 30_000;
+
 const NINE_AM = new Date("2026-08-10T09:00:00");
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -127,170 +131,199 @@ function live(s: Scenario): Learner {
 }
 
 describe("however the history goes", () => {
-  it("holds every invariant", () => {
-    // The rollover hour is generated too: what "today" means shifts with it,
-    // and the invariants must agree with the queue about the boundary at any
-    // setting, not just midnight.
-    fc.assert(
-      fc.property(scenario({ maxGap: 3 * DAY }), fc.integer({ min: 0, max: 23 }), (s, rollover) => {
-        const learner = createLearner({
-          words: wordsFor(s),
-          newPerDay: s.newPerDay,
-          start: new Date(s.start),
-          behaviour: behaviourFor(s),
-          dayRolloverHour: rollover,
-        });
-        s.cuts.forEach((cut, i) => {
-          learner.sit(cut);
-          learner.wait(s.gaps[i % s.gaps.length]!);
-        });
-        learner.sit(200);
-        expect(violations(learner.trace, learner.attempts, rollover)).toEqual([]);
-      }),
-      { numRuns: 300 },
-    );
-  });
+  it(
+    "holds every invariant",
+    () => {
+      // The rollover hour is generated too: what "today" means shifts with it,
+      // and the invariants must agree with the queue about the boundary at any
+      // setting, not just midnight.
+      fc.assert(
+        fc.property(
+          scenario({ maxGap: 3 * DAY }),
+          fc.integer({ min: 0, max: 23 }),
+          (s, rollover) => {
+            const learner = createLearner({
+              words: wordsFor(s),
+              newPerDay: s.newPerDay,
+              start: new Date(s.start),
+              behaviour: behaviourFor(s),
+              dayRolloverHour: rollover,
+            });
+            s.cuts.forEach((cut, i) => {
+              learner.sit(cut);
+              learner.wait(s.gaps[i % s.gaps.length]!);
+            });
+            learner.sit(200);
+            expect(violations(learner.trace, learner.attempts, rollover)).toEqual([]);
+          },
+        ),
+        { numRuns: 300 },
+      );
+    },
+    HISTORY_TIMEOUT_MS,
+  );
 
-  it("ends for any learner who eventually gets each word right", () => {
-    // A learner who keeps failing a word forever genuinely never finishes: the
-    // card is rated Again and comes back due in a minute, which is the
-    // scheduler working — that is the leech gap in the README, and a decision
-    // rather than a bug. The promise this pins is the complement: stumble on
-    // each word a bounded number of times and the session always ends. The
-    // earlier form of this property ("one wrong answer in every N") was
-    // quietly weaker — cycled across enough slow-paced cards it can pin every
-    // wrong answer onto the same word, which is the forever-failing learner
-    // again. `sit()` throws rather than hangs if the end never comes, so
-    // reaching the assertion at all is most of the property.
-    fc.assert(
-      fc.property(
-        fc.record({
-          start: startDates,
-          rollover: fc.integer({ min: 0, max: 23 }),
-          words: fc.integer({ min: 1, max: 25 }),
-          newPerDay: fc.integer({ min: 0, max: 12 }),
-          cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
-          gaps: fc.array(fc.integer({ min: 0, max: 7 * DAY }), { minLength: 1, maxLength: 8 }),
-          stumbles: fc.array(fc.integer({ min: 0, max: 3 }), { minLength: 1, maxLength: 25 }),
-          thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), {
-            minLength: 1,
-            maxLength: 10,
+  it(
+    "ends for any learner who eventually gets each word right",
+    () => {
+      // A learner who keeps failing a word forever genuinely never finishes: the
+      // card is rated Again and comes back due in a minute, which is the
+      // scheduler working — that is the leech gap in the README, and a decision
+      // rather than a bug. The promise this pins is the complement: stumble on
+      // each word a bounded number of times and the session always ends. The
+      // earlier form of this property ("one wrong answer in every N") was
+      // quietly weaker — cycled across enough slow-paced cards it can pin every
+      // wrong answer onto the same word, which is the forever-failing learner
+      // again. `sit()` throws rather than hangs if the end never comes, so
+      // reaching the assertion at all is most of the property.
+      fc.assert(
+        fc.property(
+          fc.record({
+            start: startDates,
+            rollover: fc.integer({ min: 0, max: 23 }),
+            words: fc.integer({ min: 1, max: 25 }),
+            newPerDay: fc.integer({ min: 0, max: 12 }),
+            cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
+            gaps: fc.array(fc.integer({ min: 0, max: 7 * DAY }), { minLength: 1, maxLength: 8 }),
+            stumbles: fc.array(fc.integer({ min: 0, max: 3 }), { minLength: 1, maxLength: 25 }),
+            thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), {
+              minLength: 1,
+              maxLength: 10,
+            }),
           }),
+          (s) => {
+            let thought = 0;
+            const stumblesFor = (id: string) =>
+              s.stumbles[Number(id.slice(1)) % s.stumbles.length]!;
+            const learner = createLearner({
+              words: catalogue(s.words),
+              newPerDay: s.newPerDay,
+              start: new Date(s.start),
+              dayRolloverHour: s.rollover,
+              behaviour: {
+                correct: (word, n) => n > stumblesFor(word.id),
+                msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
+              },
+            });
+
+            s.cuts.forEach((cut, i) => {
+              learner.sit(cut);
+              learner.wait(s.gaps[i % s.gaps.length]!);
+            });
+            learner.sit();
+
+            const end = learner.trace.at(-1)!;
+            expect(end.at).toBe("closed");
+            if (end.at !== "closed") throw new Error("missing closed marker");
+            expect(end.reason).not.toBe("cut");
+            expect(closureContradictions(learner.trace)).toEqual([]);
+            expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
+          },
+        ),
+        { numRuns: 200 },
+      );
+    },
+    HISTORY_TIMEOUT_MS,
+  );
+
+  it(
+    "reopens caught-up histories at the earliest remaining learning due",
+    () => {
+      fc.assert(
+        fc.property(scenario({ maxGap: 3 * DAY }), (s) => {
+          const learner = live(s);
+          const end = learner.trace.at(-1)!;
+          if (end.at !== "closed" || end.reason !== "caughtUp") return;
+          expect(closureContradictions(learner.trace)).toEqual([]);
+          const due = end.nextDueAt!;
+          learner.wait(due - learner.now.getTime());
+          const reopened = learner.sit(1)[0]!;
+          expect(reopened.at).toBe("recall");
+          if (reopened.at !== "recall") throw new Error("reopen did not serve due learning");
+          expect(reopened.shownAt).toBe(due);
+          expect(
+            end.remainingLearning.some((c) => c.wordId === reopened.wordId && c.due === due),
+          ).toBe(true);
+          expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
         }),
-        (s) => {
-          let thought = 0;
-          const stumblesFor = (id: string) => s.stumbles[Number(id.slice(1)) % s.stumbles.length]!;
+        { numRuns: 200 },
+      );
+    },
+    HISTORY_TIMEOUT_MS,
+  );
+
+  it(
+    "never exceeds the day's new-word allowance",
+    () => {
+      // Gaps stay inside the day: the allowance is read once when the app opens,
+      // so a sitting that runs past midnight is the UI's problem to solve by
+      // reloading, not something the rule can see.
+      fc.assert(
+        fc.property(scenario({ maxGap: HOUR }), (s) => {
           const learner = createLearner({
             words: catalogue(s.words),
             newPerDay: s.newPerDay,
-            start: new Date(s.start),
-            dayRolloverHour: s.rollover,
-            behaviour: {
-              correct: (word, n) => n > stumblesFor(word.id),
-              msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
-            },
+            start: NINE_AM,
+            behaviour: behaviourFor(s),
           });
 
-          s.cuts.forEach((cut, i) => {
+          for (const [i, cut] of s.cuts.entries()) {
             learner.sit(cut);
+            expect(learner.introducedToday).toBeLessThanOrEqual(s.newPerDay);
             learner.wait(s.gaps[i % s.gaps.length]!);
-          });
-          learner.sit();
-
-          const end = learner.trace.at(-1)!;
-          expect(end.at).toBe("closed");
-          if (end.at !== "closed") throw new Error("missing closed marker");
-          expect(end.reason).not.toBe("cut");
-          expect(closureContradictions(learner.trace)).toEqual([]);
-          expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
-        },
-      ),
-      { numRuns: 200 },
-    );
-  });
-
-  it("reopens caught-up histories at the earliest remaining learning due", () => {
-    fc.assert(
-      fc.property(scenario({ maxGap: 3 * DAY }), (s) => {
-        const learner = live(s);
-        const end = learner.trace.at(-1)!;
-        if (end.at !== "closed" || end.reason !== "caughtUp") return;
-        expect(closureContradictions(learner.trace)).toEqual([]);
-        const due = end.nextDueAt!;
-        learner.wait(due - learner.now.getTime());
-        const reopened = learner.sit(1)[0]!;
-        expect(reopened.at).toBe("recall");
-        if (reopened.at !== "recall") throw new Error("reopen did not serve due learning");
-        expect(reopened.shownAt).toBe(due);
-        expect(
-          end.remainingLearning.some((c) => c.wordId === reopened.wordId && c.due === due),
-        ).toBe(true);
-        expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
-      }),
-      { numRuns: 200 },
-    );
-  });
-
-  it("never exceeds the day's new-word allowance", () => {
-    // Gaps stay inside the day: the allowance is read once when the app opens,
-    // so a sitting that runs past midnight is the UI's problem to solve by
-    // reloading, not something the rule can see.
-    fc.assert(
-      fc.property(scenario({ maxGap: HOUR }), (s) => {
-        const learner = createLearner({
-          words: catalogue(s.words),
-          newPerDay: s.newPerDay,
-          start: NINE_AM,
-          behaviour: behaviourFor(s),
-        });
-
-        for (const [i, cut] of s.cuts.entries()) {
-          learner.sit(cut);
+          }
+          learner.sit(200);
           expect(learner.introducedToday).toBeLessThanOrEqual(s.newPerDay);
-          learner.wait(s.gaps[i % s.gaps.length]!);
-        }
-        learner.sit(200);
-        expect(learner.introducedToday).toBeLessThanOrEqual(s.newPerDay);
-      }),
-      { numRuns: 300 },
-    );
-  });
+        }),
+        { numRuns: 300 },
+      );
+    },
+    HISTORY_TIMEOUT_MS,
+  );
 
-  it("never shows a word it has not introduced", () => {
-    // Restated from the trace rather than the attempts: every card that appears
-    // on screen at all must have been guessed first, in some sitting.
-    fc.assert(
-      fc.property(scenario({ maxGap: 2 * DAY }), (s) => {
-        const learner = live(s);
-        const introduced = new Set<string>();
+  it(
+    "never shows a word it has not introduced",
+    () => {
+      // Restated from the trace rather than the attempts: every card that appears
+      // on screen at all must have been guessed first, in some sitting.
+      fc.assert(
+        fc.property(scenario({ maxGap: 2 * DAY }), (s) => {
+          const learner = live(s);
+          const introduced = new Set<string>();
 
-        for (const step of learner.trace as Step[]) {
-          if (step.at === "closed") continue;
-          if (step.at === "guess") introduced.add(step.word);
-          else expect(introduced.has(step.word), `${step.at} of an unintroduced word`).toBe(true);
-        }
-      }),
-      { numRuns: 200 },
-    );
-  });
+          for (const step of learner.trace as Step[]) {
+            if (step.at === "closed") continue;
+            if (step.at === "guess") introduced.add(step.word);
+            else expect(introduced.has(step.word), `${step.at} of an unintroduced word`).toBe(true);
+          }
+        }),
+        { numRuns: 200 },
+      );
+    },
+    HISTORY_TIMEOUT_MS,
+  );
 
-  it("logs one attempt per prompt that takes an answer", () => {
-    // Guesses and recalls are answered; exposures and feedback are read. The
-    // attempts table is the source of truth for FSRS retraining, so a prompt
-    // that vanishes from it is history that cannot be rebuilt.
-    fc.assert(
-      fc.property(scenario({ maxGap: DAY }), (s) => {
-        const learner = live(s);
-        const answered = learner.trace.filter(
-          (step) => step.at === "guess" || step.at === "recall",
-        );
-        expect(learner.attempts).toHaveLength(answered.length);
-        expect(attemptMismatches(learner.trace, learner.attempts)).toEqual([]);
-        expect(learner.commands.map((c) => c.id).length).toBe(
-          new Set(learner.commands.map((c) => c.id)).size,
-        );
-      }),
-      { numRuns: 200 },
-    );
-  });
+  it(
+    "logs one attempt per prompt that takes an answer",
+    () => {
+      // Guesses and recalls are answered; exposures and feedback are read. The
+      // attempts table is the source of truth for FSRS retraining, so a prompt
+      // that vanishes from it is history that cannot be rebuilt.
+      fc.assert(
+        fc.property(scenario({ maxGap: DAY }), (s) => {
+          const learner = live(s);
+          const answered = learner.trace.filter(
+            (step) => step.at === "guess" || step.at === "recall",
+          );
+          expect(learner.attempts).toHaveLength(answered.length);
+          expect(attemptMismatches(learner.trace, learner.attempts)).toEqual([]);
+          expect(learner.commands.map((c) => c.id).length).toBe(
+            new Set(learner.commands.map((c) => c.id)).size,
+          );
+        }),
+        { numRuns: 200 },
+      );
+    },
+    HISTORY_TIMEOUT_MS,
+  );
 });
