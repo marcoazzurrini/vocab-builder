@@ -2,7 +2,9 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "vocab-builder",
   "account_id": "168a8fd9b88ae669c145fa229de911c5",
-  "routes": [{ "pattern": "vocab-builder.marcoazzurrini.com", "custom_domain": true }],
+  "routes": [
+    { "pattern": "vocab-builder.marcoazzurrini.com", "custom_domain": true },
+  ],
   "main": "@tanstack/react-start/server-entry",
   "compatibility_date": "2026-09-11",
   "compatibility_flags": ["nodejs_compat"],

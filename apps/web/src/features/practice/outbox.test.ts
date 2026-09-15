@@ -1,39 +1,53 @@
+import type { AnswerCommand } from "@vocab/spaced-repetition";
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnswerCommand } from "@vocab/spaced-repetition";
+
 import { createOutbox } from "./outbox";
+import { SyncConflict } from "./sync-conflict";
 
-function answer(): Extract<AnswerCommand, { phase: "guess" }> {
-  return {
-    id: crypto.randomUUID(),
-    wordId: "word",
-    phase: "guess",
-    typed: "",
-    rating: null,
-    latencyMs: 1,
-    reviewedAt: new Date().toISOString(),
-    expectedReps: 0,
-  };
-}
-const box = (send: (answer: AnswerCommand) => Promise<unknown>, onError = vi.fn(), userId = "u1") =>
-  createOutbox({ userId, storage: localStorage, send, onError });
+type Send = (command: AnswerCommand) => Promise<void>;
+type OnError = (error: Error) => void;
 
-beforeEach(() => localStorage.clear());
-afterEach(() => vi.restoreAllMocks());
+const answer = (): Extract<AnswerCommand, { phase: "guess" }> => ({
+  expectedReps: 0,
+  id: crypto.randomUUID(),
+  latencyMs: 1,
+  phase: "guess",
+  rating: null,
+  reviewedAt: new Date().toISOString(),
+  typed: "",
+  wordId: "word",
+});
+const box = (send: Send, onError = vi.fn<OnError>(), userId = "u1") =>
+  createOutbox({ onError, send, storage: localStorage, userId });
 
 describe("durable answer outbox", () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("preserves the existing synchronization error contract", () => {
+    const error = new SyncConflict();
+    expect(error).toBeInstanceOf(Error);
+    expect(error.constructor.name).toBe("SyncConflict");
+    expect(error.name).toBe("Error");
+    expect(String(error)).toBe(
+      "Error: I progressi sono cambiati su un altro dispositivo. Le risposte in attesa non sono state salvate."
+    );
+    expect(JSON.stringify(error)).toBe("{}");
+  });
+
   it("rejects a failed local write without accepting or sending the answer", async () => {
     const error = new Error("storage full");
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw error;
     });
-    const send = vi.fn().mockResolvedValue(undefined);
-    const onError = vi.fn();
+    const send = vi.fn<Send>(() => Promise.resolve());
+    const onError = vi.fn<OnError>();
     const queue = box(send, onError);
 
     expect(() => queue.push(answer())).toThrow(error);
     expect(queue.pending).toBe(0);
-    expect(localStorage.length).toBe(0);
+    expect(localStorage).toHaveLength(0);
     await queue.settled();
     await queue.retry();
     expect(send).not.toHaveBeenCalled();
@@ -41,13 +55,20 @@ describe("durable answer outbox", () => {
   });
 
   it("accepts the same answer after local storage recovers", async () => {
-    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
-      throw new Error("storage full");
-    });
+    const write = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementationOnce(() => {
+        throw new Error("storage full");
+      });
     const a = answer();
-    const send = vi.fn(async (command: AnswerCommand) => {
-      expect(JSON.parse(localStorage.getItem(localStorage.key(0)!)!)).toEqual(a);
-      expect(command).toEqual(a);
+    const send = vi.fn<Send>((command) => {
+      expect({
+        command,
+        stored: JSON.parse(
+          localStorage.getItem(localStorage.key(0) ?? "") ?? "null"
+        ),
+      }).toStrictEqual({ command: a, stored: a });
+      return Promise.resolve();
     });
     const queue = box(send);
 
@@ -56,42 +77,49 @@ describe("durable answer outbox", () => {
     await queue.settled();
     expect(write).toHaveBeenCalledTimes(2);
     expect(send).toHaveBeenCalledOnce();
-    expect(queue.pending).toBe(0);
-    expect(localStorage.length).toBe(0);
+    expect({
+      pending: queue.pending,
+      stored: localStorage.length,
+    }).toStrictEqual({
+      pending: 0,
+      stored: 0,
+    });
   });
 
   it("does not append or resend a duplicate pending answer", async () => {
-    const send = vi.fn().mockRejectedValue(new Error("offline"));
+    const send = vi.fn<Send>().mockRejectedValue(new Error("offline"));
     const queue = box(send);
     const a = answer();
     queue.push(a);
     await expect(queue.settled()).rejects.toThrow("offline");
     const write = vi.spyOn(Storage.prototype, "setItem");
 
-    // Property order is not part of the payload's identity.
-    queue.push(Object.fromEntries(Object.entries(a).reverse()) as AnswerCommand);
+    // SAFETY: Reversing entries preserves every field and value of the valid AnswerCommand; only property order changes.
+    queue.push(
+      Object.fromEntries(Object.entries(a).toReversed()) as AnswerCommand
+    );
     expect(queue.pending).toBe(1);
-    expect(localStorage.length).toBe(1);
+    expect(localStorage).toHaveLength(1);
     expect(write).not.toHaveBeenCalled();
     expect(send).toHaveBeenCalledOnce();
   });
 
   it.each([
     { wordId: "other-word" },
-    { phase: "guess" as const, rating: null, expectedReps: 0 as const },
+    { expectedReps: 0 as const, phase: "guess" as const, rating: null },
     { typed: "changed" },
     { rating: 1 as const },
     { latencyMs: 2 },
     { reviewedAt: "2026-01-01T00:00:00.000Z" },
     { expectedReps: 2 },
   ])("rejects a different payload for a pending ID: %j", async (change) => {
-    const send = vi.fn().mockRejectedValue(new Error("offline"));
+    const send = vi.fn<Send>().mockRejectedValue(new Error("offline"));
     const queue = box(send);
     const a = {
       ...answer(),
+      expectedReps: 1,
       phase: "recall" as const,
       rating: 3 as const,
-      expectedReps: 1,
       reviewedAt: "2026-02-01T00:00:00.000Z",
     };
     queue.push(a);
@@ -99,37 +127,48 @@ describe("durable answer outbox", () => {
 
     expect(() => queue.push({ ...a, ...change })).toThrow("different payload");
     expect(queue.pending).toBe(1);
-    expect(JSON.parse(localStorage.getItem(localStorage.key(0)!)!)).toEqual(a);
+    expect(
+      JSON.parse(localStorage.getItem(localStorage.key(0) ?? "") ?? "null")
+    ).toStrictEqual(a);
     expect(send).toHaveBeenCalledOnce();
   });
 
   it("checks duplicates against answers stored by another tab after initialization", async () => {
-    const first = box(vi.fn().mockRejectedValue(new Error("offline")));
-    const send = vi.fn().mockResolvedValue(undefined);
+    const first = box(vi.fn<Send>().mockRejectedValue(new Error("offline")));
+    const send = vi.fn<Send>(() => Promise.resolve());
     const second = box(send);
     const a = answer();
     first.push(a);
     await expect(first.settled()).rejects.toThrow("offline");
     const write = vi.spyOn(Storage.prototype, "setItem");
 
-    expect(() => second.push({ ...a, typed: "changed" })).toThrow("different payload");
+    expect(() => second.push({ ...a, typed: "changed" })).toThrow(
+      "different payload"
+    );
     expect(() => second.push(a)).not.toThrow();
     await second.settled();
-    expect(second.pending).toBe(0);
-    expect(write).not.toHaveBeenCalled();
-    expect(send).toHaveBeenCalledExactlyOnceWith(a);
-    expect(localStorage.length).toBe(0);
+    expect({
+      pending: second.pending,
+      stored: localStorage.length,
+    }).toStrictEqual({
+      pending: 0,
+      stored: 0,
+    });
+    expect({ sends: send.mock.calls, writes: write.mock.calls }).toStrictEqual({
+      sends: [[a]],
+      writes: [],
+    });
   });
 
   it("keeps accepted answers retryable when error notifications throw", async () => {
     const error = new Error("offline");
     const send = vi
-      .fn()
+      .fn<Send>()
       .mockImplementationOnce(() => {
         throw error;
       })
-      .mockResolvedValue(undefined);
-    const onError = vi.fn(() => {
+      .mockResolvedValue();
+    const onError = vi.fn<OnError>(() => {
       throw new Error("notification failed");
     });
     const queue = box(send, onError);
@@ -138,107 +177,120 @@ describe("durable answer outbox", () => {
     expect(() => queue.push(a)).not.toThrow();
     await expect(queue.settled()).rejects.toBe(error);
     expect(onError).toHaveBeenCalledWith(error);
-    expect(queue.pending).toBe(1);
-    expect(localStorage.length).toBe(1);
+    expect({
+      pending: queue.pending,
+      stored: localStorage.length,
+    }).toStrictEqual({
+      pending: 1,
+      stored: 1,
+    });
     await queue.retry();
-    expect(send.mock.calls.map(([command]) => command)).toEqual([a, a]);
-    expect(queue.pending).toBe(0);
-    expect(localStorage.length).toBe(0);
+    expect({
+      commands: send.mock.calls.map(([command]) => command),
+      pending: queue.pending,
+      stored: localStorage.length,
+    }).toStrictEqual({ commands: [a, a], pending: 0, stored: 0 });
   });
 
   it("protects the durable payload and ID from mutations by the send callback", async () => {
     const a = answer();
     const send = vi
-      .fn()
-      .mockImplementationOnce(async (command: AnswerCommand) => {
+      .fn<Send>()
+      .mockImplementationOnce((command) => {
         command.id = crypto.randomUUID();
         command.typed = "changed";
-        throw new Error("offline");
+        return Promise.reject(new Error("offline"));
       })
-      .mockResolvedValue(undefined);
+      .mockResolvedValue();
     const queue = box(send);
     queue.push(a);
     await expect(queue.settled()).rejects.toThrow("offline");
-    expect(JSON.parse(localStorage.getItem(localStorage.key(0)!)!)).toEqual(a);
+    expect(
+      JSON.parse(localStorage.getItem(localStorage.key(0) ?? "") ?? "null")
+    ).toStrictEqual(a);
     await queue.retry();
-    expect(send.mock.calls[1]![0]).toEqual(a);
+    expect(send.mock.calls[1]?.[0]).toStrictEqual(a);
     expect(queue.pending).toBe(0);
-    expect(localStorage.length).toBe(0);
+    expect(localStorage).toHaveLength(0);
   });
 
   it("sends in order and removes only acknowledged answers", async () => {
     const sent: string[] = [];
-    const queue = box(async (a) => {
+    const queue = box((a) => {
       sent.push(a.id);
+      return Promise.resolve();
     });
-    const a = answer(),
-      b = answer();
+    const a = answer();
+    const b = answer();
     queue.push(a);
+    // eslint-disable-next-line unicorn/prefer-single-call -- Custom queue.push accepts one command, not Array.push's variadic arguments.
     queue.push(b);
     await queue.settled();
-    expect(sent).toEqual([a.id, b.id]);
+    expect(sent).toStrictEqual([a.id, b.id]);
     expect(queue.pending).toBe(0);
-    expect(localStorage.length).toBe(0);
+    expect(localStorage).toHaveLength(0);
   });
 
   it("retains failures, blocks later answers, and retries the same IDs", async () => {
     const error = new Error("network down");
-    const send = vi.fn().mockRejectedValueOnce(error).mockResolvedValue(undefined);
-    const onError = vi.fn();
+    const send = vi.fn<Send>().mockRejectedValueOnce(error).mockResolvedValue();
+    const onError = vi.fn<OnError>();
     const queue = box(send, onError);
-    const a = answer(),
-      b = answer();
+    const a = answer();
+    const b = answer();
     queue.push(a);
+    // eslint-disable-next-line unicorn/prefer-single-call -- Custom queue.push accepts one command, not Array.push's variadic arguments.
     queue.push(b);
     await expect(queue.settled()).rejects.toBe(error);
     expect(onError).toHaveBeenCalledWith(error);
     expect(send).toHaveBeenCalledOnce();
-    expect(queue.pending).toBe(2);
-    expect(localStorage.length).toBe(2);
+    expect({
+      pending: queue.pending,
+      stored: localStorage.length,
+    }).toStrictEqual({
+      pending: 2,
+      stored: 2,
+    });
     await queue.retry();
-    expect(send.mock.calls.map(([value]) => value.id)).toEqual([a.id, a.id, b.id]);
-    expect(localStorage.length).toBe(0);
+    expect({
+      ids: send.mock.calls.map(([value]) => value.id),
+      stored: localStorage.length,
+    }).toStrictEqual({ ids: [a.id, a.id, b.id], stored: 0 });
   });
 
   it("restores pending answers after reload without crossing user boundaries", async () => {
-    const old = box(async () => {
-      throw new Error("offline");
-    });
+    const old = box(() => Promise.reject(new Error("offline")));
     const a = answer();
     old.push(a);
-    await expect(old.settled()).rejects.toThrow();
-    const otherUser = box(vi.fn(), vi.fn(), "u2");
+    await expect(old.settled()).rejects.toThrow("offline");
+    const otherUser = box(vi.fn<Send>(), vi.fn<OnError>(), "u2");
     expect(otherUser.pending).toBe(0);
-    const send = vi.fn().mockResolvedValue(undefined);
+    const send = vi.fn<Send>(() => Promise.resolve());
     const reloaded = box(send);
     await reloaded.settled();
     expect(send).toHaveBeenCalledWith(a);
-    expect(localStorage.length).toBe(0);
+    expect(localStorage).toHaveLength(0);
   });
 
   it("snapshots mutable input before background persistence", async () => {
-    const send = vi.fn().mockResolvedValue(undefined);
+    const send = vi.fn<Send>(() => Promise.resolve());
     const queue = box(send);
     const a = answer();
     queue.push(a);
     a.typed = "changed";
     await queue.settled();
-    expect(send.mock.calls[0]![0].typed).toBe("");
+    expect(send.mock.calls[0]?.[0].typed).toBe("");
   });
 
   it("does not erase another tab's pending answer", async () => {
-    const first = box(async () => {
-      throw new Error("offline");
-    });
+    const first = box(() => Promise.reject(new Error("offline")));
     first.push(answer());
-    await expect(first.settled()).rejects.toThrow();
+    await expect(first.settled()).rejects.toThrow("offline");
     // A second tab can retry the first answer safely, but an older tab cannot
     // overwrite the shared storage with its own stale copy of the entire queue.
-    const second = box(async () => {
-      throw new Error("offline");
-    });
+    const second = box(() => Promise.reject(new Error("offline")));
     second.push(answer());
-    await expect(second.settled()).rejects.toThrow();
-    expect(localStorage.length).toBe(2);
+    await expect(second.settled()).rejects.toThrow("offline");
+    expect(localStorage).toHaveLength(2);
   });
 });

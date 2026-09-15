@@ -1,16 +1,36 @@
 import { createEmptyCard, fsrs } from "ts-fsrs";
 import type { FSRS } from "ts-fsrs";
+
 import { validateAnswerText } from "../lib/commands";
 import { effortsFor, gradeRecall } from "./grading";
-import { transition } from "./transition";
 import { pickNext } from "./queue";
-import type { Attempt, Card, Effort, Prompt, SessionStats, SessionView, Word } from "./types";
+import { transition } from "./transition";
+import type {
+  Attempt,
+  Card,
+  Effort,
+  Prompt,
+  SessionStats,
+  SessionView,
+  Word,
+} from "./types";
 
-export type { Attempt, Card, Effort, Prompt, SessionStats, SessionView, Word };
+export type {
+  Attempt,
+  Card,
+  Effort,
+  Prompt,
+  SessionStats,
+  SessionView,
+  Word,
+} from "./types";
 
 /** An answer and its derived card are accepted together, never as separate notifications. */
-export type AnswerChange = { attempt: Attempt; card: Card | null };
-export type SessionOptions = {
+export interface AnswerChange {
+  attempt: Attempt;
+  card: Card | null;
+}
+export interface SessionOptions {
   words: Word[];
   cards: Card[];
   newPerDay: number;
@@ -20,17 +40,20 @@ export type SessionOptions = {
   accept?: (change: AnswerChange) => void;
   clock?: () => Date;
   scheduler?: FSRS;
-};
+}
 
-export type Session = {
+export interface Session {
   readonly view: SessionView;
-  submitGuess(typed: string): void;
-  exposureDone(): void;
-  submitRecall(typed: string, effort: Effort): void;
-  dismissFeedback(): void;
-};
+  submitGuess: (typed: string) => void;
+  exposureDone: () => void;
+  submitRecall: (typed: string, effort: Effort) => void;
+  dismissFeedback: () => void;
+}
 
-type Current = { card: Card; word: Word };
+interface Current {
+  card: Card;
+  word: Word;
+}
 type PromptPhase = "guess" | "exposure" | "recall";
 type Flow =
   | { [P in PromptPhase]: { phase: P; current: Current } }[PromptPhase]
@@ -38,7 +61,7 @@ type Flow =
   | { phase: "caughtUp"; until: Date }
   | { phase: "done" };
 
-type SessionState = {
+interface SessionState {
   flow: Flow;
   cards: Card[];
   allowanceLeft: number;
@@ -47,7 +70,7 @@ type SessionState = {
   exposed: Set<string>;
   pulledForward: Set<string>;
   stats: SessionStats;
-};
+}
 
 type Action =
   | { type: "guess"; typed: string }
@@ -55,154 +78,198 @@ type Action =
   | { type: "recall"; typed: string; effort: Effort }
   | { type: "feedback" };
 
-function promptOf(word: Word): Prompt {
-  return { gloss: word.gloss, hint: word.hint, image: word.image, kind: word.kind };
-}
+const promptOf = (word: Word): Prompt => ({
+  gloss: word.gloss,
+  hint: word.hint,
+  image: word.image,
+  kind: word.kind,
+});
+
+const current = (
+  draft: SessionState,
+  expected: PromptPhase | "feedback"
+): Current => {
+  const { flow } = draft;
+  if (
+    flow.phase === "done" ||
+    flow.phase === "caughtUp" ||
+    flow.phase !== expected
+  ) {
+    throw new Error(
+      `expected phase "${expected}", session is in "${flow.phase}"`
+    );
+  }
+  return flow.current;
+};
 
 /**
  * Each action builds a private candidate. Validation, scheduling, queue selection,
  * and acceptance must all succeed before a single assignment publishes that state.
  * A rejected action therefore cannot spend allowance, rate a card, or change phase.
  */
-export function createSession(options: SessionOptions): Session {
+export const createSession = (options: SessionOptions): Session => {
   const clock = options.clock ?? (() => new Date());
   const scheduler = options.scheduler ?? fsrs({ enable_short_term: true });
   const words = structuredClone(options.words);
   const wordById = new Map(words.map((word) => [word.id, word]));
   let processing = false;
 
-  function readClock(): Date {
+  const readClock = (): Date => {
     const now = new Date(clock());
-    if (!Number.isFinite(now.getTime()))
+    if (!Number.isFinite(now.getTime())) {
+      // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the existing Error category for invalid session clocks.
       throw new Error("The session clock returned an invalid date.");
+    }
     return now;
-  }
+  };
 
-  function advance(draft: SessionState, now: Date): void {
+  const advance = (draft: SessionState, now: Date): void => {
     draft.cards = draft.cards.filter((card) => wordById.has(card.wordId));
     const slot = pickNext({
-      cards: draft.cards,
-      words,
-      now,
       allowanceLeft: draft.allowanceLeft,
-      exposed: draft.exposed,
-      pulledForward: draft.pulledForward,
-      justShownId: draft.justShownId,
+      cards: draft.cards,
       dayRolloverHour: options.dayRolloverHour,
+      exposed: draft.exposed,
+      justShownId: draft.justShownId,
+      now,
+      pulledForward: draft.pulledForward,
+      words,
     });
     draft.promptShownAt = now;
     switch (slot.do) {
-      case "done":
+      case "done": {
         draft.flow = { phase: "done" };
         return;
-      case "wait":
+      }
+      case "wait": {
         draft.flow = { phase: "caughtUp", until: slot.until };
         return;
-      case "introduce":
+      }
+      case "introduce": {
         draft.justShownId = slot.word.id;
         draft.flow = {
+          current: {
+            card: { fsrs: createEmptyCard(now), wordId: slot.word.id },
+            word: slot.word,
+          },
           phase: "guess",
-          current: { card: { wordId: slot.word.id, fsrs: createEmptyCard(now) }, word: slot.word },
         };
         return;
+      }
       case "expose":
-      case "recall":
-        if (slot.do === "recall" && slot.pulledForward) draft.pulledForward.add(slot.card.wordId);
+      case "recall": {
+        if (slot.do === "recall" && slot.pulledForward) {
+          draft.pulledForward.add(slot.card.wordId);
+        }
+        const word = wordById.get(slot.card.wordId);
+        if (!word) {
+          throw new Error(`No word for selected card ${slot.card.wordId}.`);
+        }
         draft.justShownId = slot.card.wordId;
         draft.flow = {
+          current: { card: slot.card, word },
           phase: slot.do === "expose" ? "exposure" : "recall",
-          current: { card: slot.card, word: wordById.get(slot.card.wordId)! },
         };
+      }
+      // Slot is an exhaustive discriminated union.
+      // no default
     }
-  }
-
-  function current(draft: SessionState, expected: PromptPhase | "feedback"): Current {
-    const flow = draft.flow;
-    if (flow.phase === "done" || flow.phase === "caughtUp" || flow.phase !== expected)
-      throw new Error(`expected phase "${expected}", session is in "${flow.phase}"`);
-    return flow.current;
-  }
-
-  const now = readClock();
-  let state: SessionState = {
-    flow: { phase: "done" },
-    cards: structuredClone(options.cards),
-    allowanceLeft: Math.max(0, options.newPerDay - (options.introducedToday ?? 0)),
-    promptShownAt: now,
-    exposed: new Set(),
-    pulledForward: new Set(),
-    stats: { introduced: 0, recalls: 0, correct: 0, wrong: 0 },
   };
-  advance(state, now);
 
-  function apply(draft: SessionState, action: Action, now: Date): AnswerChange | undefined {
+  const startedAt = readClock();
+  let state: SessionState = {
+    allowanceLeft: Math.max(
+      0,
+      options.newPerDay - (options.introducedToday ?? 0)
+    ),
+    cards: structuredClone(options.cards),
+    exposed: new Set(),
+    flow: { phase: "done" },
+    promptShownAt: startedAt,
+    pulledForward: new Set(),
+    stats: { correct: 0, introduced: 0, recalls: 0, wrong: 0 },
+  };
+  advance(state, startedAt);
+
+  const apply = (
+    draft: SessionState,
+    action: Action,
+    now: Date
+  ): AnswerChange | undefined => {
     const { card, word } = current(draft, action.type);
-    if (action.type === "guess" || action.type === "recall") validateAnswerText(action.typed);
+    if (action.type === "guess" || action.type === "recall") {
+      validateAnswerText(action.typed);
+    }
     const latencyMs = Math.min(
       Math.max(0, now.getTime() - draft.promptShownAt.getTime()),
-      86_400_000,
+      86_400_000
     );
     switch (action.type) {
       case "guess": {
         const result = transition(
           card.fsrs,
           word.text,
-          { typed: action.typed, phase: "guess", rating: null },
+          { phase: "guess", rating: null, typed: action.typed },
           now,
-          scheduler,
+          scheduler
         );
         const change: AnswerChange = {
-          card: null,
           attempt: {
-            wordId: card.wordId,
-            phase: "guess",
-            typed: action.typed,
             correct: result.correct,
-            rating: null,
             latencyMs,
-            stateBefore: card.fsrs,
+            phase: "guess",
+            rating: null,
             reviewedAt: now,
+            stateBefore: card.fsrs,
+            typed: action.typed,
+            wordId: card.wordId,
           },
+          card: null,
         };
         // The guess, not merely displaying a prompt, introduces this word.
         card.fsrs = createEmptyCard(now);
         draft.cards.push(card);
         draft.allowanceLeft -= 1;
         draft.stats.introduced += 1;
-        draft.flow = { phase: "exposure", current: { card, word } };
+        draft.flow = { current: { card, word }, phase: "exposure" };
         return change;
       }
-      case "exposure":
+      case "exposure": {
         draft.exposed.add(card.wordId);
         advance(draft, now);
         return;
+      }
       case "recall": {
         const before = card.fsrs;
         const { correct, rating } = gradeRecall(
           action.typed,
           word.text,
           action.effort,
-          effortsFor(before),
+          effortsFor(before)
         );
-        card.fsrs = transition(
+        const { after } = transition(
           before,
           word.text,
-          { typed: action.typed, phase: "recall", rating },
+          { phase: "recall", rating, typed: action.typed },
           now,
-          scheduler,
-        ).after!;
+          scheduler
+        );
+        if (!after) {
+          throw new Error("A recall must produce a schedule.");
+        }
+        card.fsrs = after;
         const change: AnswerChange = {
-          card,
           attempt: {
-            wordId: card.wordId,
-            phase: "recall",
-            typed: action.typed,
             correct,
-            rating,
             latencyMs,
-            stateBefore: before,
+            phase: "recall",
+            rating,
             reviewedAt: now,
+            stateBefore: before,
+            typed: action.typed,
+            wordId: card.wordId,
           },
+          card,
         };
         draft.stats.recalls += 1;
         if (correct) {
@@ -210,60 +277,88 @@ export function createSession(options: SessionOptions): Session {
           advance(draft, now);
         } else {
           draft.stats.wrong += 1;
-          draft.flow = { phase: "feedback", current: { card, word }, typed: action.typed };
+          draft.flow = {
+            current: { card, word },
+            phase: "feedback",
+            typed: action.typed,
+          };
         }
         return change;
       }
-      case "feedback":
+      case "feedback": {
         advance(draft, now);
-        return;
+        break;
+      }
+      // Action is an exhaustive discriminated union.
+      // no default
     }
-  }
+  };
 
-  function dispatch(action: Action): void {
-    if (processing) throw new Error("A session action is already being processed.");
+  const dispatch = (action: Action): void => {
+    if (processing) {
+      throw new Error("A session action is already being processed.");
+    }
     processing = true;
     try {
       const draft = structuredClone(state);
       const change = apply(draft, action, readClock());
       // The sink receives detached values. It cannot modify the candidate or
       // re-enter this session while durable acceptance is in progress.
-      if (change) options.accept?.(structuredClone(change));
+      if (change) {
+        options.accept?.(structuredClone(change));
+      }
       state = draft;
     } finally {
       processing = false;
     }
-  }
+  };
 
   return {
+    dismissFeedback: () => dispatch({ type: "feedback" }),
+    exposureDone: () => dispatch({ type: "exposure" }),
+    submitGuess: (typed) => dispatch({ type: "guess", typed }),
+    submitRecall: (typed, effort) =>
+      dispatch({ effort, type: "recall", typed }),
     get view(): SessionView {
-      const flow = state.flow;
+      const { flow } = state;
       switch (flow.phase) {
-        case "guess":
+        case "guess": {
           return { phase: flow.phase, prompt: promptOf(flow.current.word) };
-        case "exposure":
+        }
+        case "exposure": {
           return {
-            phase: flow.phase,
-            prompt: promptOf(flow.current.word),
             answer: flow.current.word.text,
-          };
-        case "recall":
-          return {
             phase: flow.phase,
             prompt: promptOf(flow.current.word),
-            efforts: effortsFor(flow.current.card.fsrs),
           };
-        case "feedback":
-          return { phase: flow.phase, expected: flow.current.word.text, typed: flow.typed };
-        case "caughtUp":
-          return { phase: flow.phase, nextDueAt: new Date(flow.until), stats: { ...state.stats } };
-        case "done":
+        }
+        case "recall": {
+          return {
+            efforts: effortsFor(flow.current.card.fsrs),
+            phase: flow.phase,
+            prompt: promptOf(flow.current.word),
+          };
+        }
+        case "feedback": {
+          return {
+            expected: flow.current.word.text,
+            phase: flow.phase,
+            typed: flow.typed,
+          };
+        }
+        case "caughtUp": {
+          return {
+            nextDueAt: new Date(flow.until),
+            phase: flow.phase,
+            stats: { ...state.stats },
+          };
+        }
+        case "done": {
           return { phase: flow.phase, stats: { ...state.stats } };
+        }
+        // Flow is an exhaustive discriminated union.
+        // no default
       }
     },
-    submitGuess: (typed) => dispatch({ type: "guess", typed }),
-    exposureDone: () => dispatch({ type: "exposure" }),
-    submitRecall: (typed, effort) => dispatch({ type: "recall", typed, effort }),
-    dismissFeedback: () => dispatch({ type: "feedback" }),
   };
-}
+};

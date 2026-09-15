@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { dayEnd, dayStart, studyDay } from "./day";
 
 describe("the study day", () => {
@@ -46,123 +47,128 @@ describe("the study day", () => {
   });
 });
 
-type CalendarCase = { hour: number; boundaries: string[] };
+interface CalendarCase {
+  hour: number;
+  boundaries: string[];
+}
 
-function transitionCases(
+const transitionCases = (
   dates: [string, string, string],
   offsets: [string, string],
-  rollovers: [number, string][],
-): CalendarCase[] {
-  return rollovers.map(([hour, transition]) => {
+  rollovers: [number, string][]
+): CalendarCase[] =>
+  rollovers.map(([hour, transition]) => {
     const clock = `${String(hour).padStart(2, "0")}:00:00`;
     return {
-      hour,
       boundaries: [
         `${dates[0]}T${clock}${offsets[0]}`,
         `${dates[1]}T${transition}`,
         `${dates[2]}T${clock}${offsets[1]}`,
       ],
+      hour,
     };
   });
-}
 
 const calendars: { timezone: string; cases: CalendarCase[] }[] = [
   {
-    timezone: "Atlantic/Azores",
     cases: [
       {
-        hour: 4,
         boundaries: [
           "1916-06-16T04:00:00-02:00",
           "1916-06-17T04:00:00-02:00",
           "1916-06-18T04:00:00-01:00",
         ],
+        hour: 4,
       },
       {
-        hour: 23,
         boundaries: [
           "1916-06-16T23:00:00-02:00",
           "1916-06-18T00:00:00-01:00",
           "1916-06-18T23:00:00-01:00",
         ],
+        hour: 23,
       },
-    ], // A late-evening gap must not move unrelated morning rollovers.
+      // A late-evening gap must not move unrelated morning rollovers.
+    ],
+    timezone: "Atlantic/Azores",
   },
   {
-    timezone: "Antarctica/Casey",
     cases: [
       {
-        hour: 0,
         boundaries: [
           "2010-03-04T00:00:00+11:00",
           "2010-03-05T00:00:00+11:00",
           "2010-03-06T00:00:00+08:00",
         ],
+        hour: 0,
       },
-    ], // The three-hour rollback crosses midnight into the previous civil date.
+      // The three-hour rollback crosses midnight into the previous civil date.
+    ],
+    timezone: "Antarctica/Casey",
   },
   {
-    timezone: "Pacific/Apia",
     cases: [0, 4, 23].map((hour) => {
       const clock = `${String(hour).padStart(2, "0")}:00:00`;
       return {
-        hour,
         boundaries: [
           `2011-12-29T${clock}-10:00`,
           `2011-12-31T${clock}+14:00`,
           `2012-01-01T${clock}+14:00`,
         ],
+        hour,
       };
     }),
+    timezone: "Pacific/Apia",
   },
   {
-    timezone: "Australia/Lord_Howe",
     cases: [
       {
-        hour: 2,
         boundaries: [
           "2026-10-03T02:00:00+10:30",
           "2026-10-04T02:30:00+11:00",
           "2026-10-05T02:00:00+11:00",
         ],
+        hour: 2,
       },
       {
-        hour: 2,
         boundaries: [
           "2026-04-04T02:00:00+11:00",
           "2026-04-05T02:00:00+10:30",
           "2026-04-06T02:00:00+10:30",
         ],
+        hour: 2,
       },
     ],
+    timezone: "Australia/Lord_Howe",
   },
   {
-    timezone: "Europe/Rome",
     cases: [
       ...transitionCases(
         ["2026-03-28", "2026-03-29", "2026-03-30"],
         ["+01:00", "+02:00"],
         [
           [0, "00:00:00+01:00"],
-          [2, "03:00:00+02:00"], // The missing 02:00 shifts forward, only on March 29.
+          // The missing 02:00 shifts forward, only on March 29.
+          [2, "03:00:00+02:00"],
           [4, "04:00:00+02:00"],
           [23, "23:00:00+02:00"],
-        ],
+        ]
       ),
       ...transitionCases(
         ["2026-10-24", "2026-10-25", "2026-10-26"],
         ["+02:00", "+01:00"],
         [
           [0, "00:00:00+02:00"],
-          [2, "02:00:00+02:00"], // The earlier occurrence of the repeated hour.
+          // The earlier occurrence of the repeated hour.
+          [2, "02:00:00+02:00"],
           [4, "04:00:00+01:00"],
           [23, "23:00:00+01:00"],
-        ],
+        ]
       ),
     ],
+    timezone: "Europe/Rome",
   },
   {
-    timezone: "America/New_York",
     cases: [
       ...transitionCases(
         ["2026-03-07", "2026-03-08", "2026-03-09"],
@@ -172,7 +178,7 @@ const calendars: { timezone: string; cases: CalendarCase[] }[] = [
           [2, "03:00:00-04:00"],
           [4, "04:00:00-04:00"],
           [23, "23:00:00-04:00"],
-        ],
+        ]
       ),
       ...transitionCases(
         ["2026-10-31", "2026-11-01", "2026-11-02"],
@@ -182,9 +188,10 @@ const calendars: { timezone: string; cases: CalendarCase[] }[] = [
           [1, "01:00:00-04:00"],
           [4, "04:00:00-05:00"],
           [23, "23:00:00-05:00"],
-        ],
+        ]
       ),
     ],
+    timezone: "America/New_York",
   },
   ...(
     [
@@ -192,19 +199,23 @@ const calendars: { timezone: string; cases: CalendarCase[] }[] = [
       ["Asia/Kolkata", "+05:30"],
     ] as const
   ).map(([timezone, offset]) => ({
-    timezone,
     cases: [
       ["2026-03-28", "2026-03-29", "2026-03-30"],
       ["2026-10-24", "2026-10-25", "2026-10-26"],
       ["2026-12-31", "2027-01-01", "2027-01-02"],
       ["2028-02-28", "2028-02-29", "2028-03-01"],
-      ...(timezone === "UTC" ? [["0099-12-31", "0100-01-01", "0100-01-02"]] : []),
+      ...(timezone === "UTC"
+        ? [["0099-12-31", "0100-01-01", "0100-01-02"]]
+        : []),
     ].flatMap((dates) =>
       [0, 4, 23].map((hour) => ({
+        boundaries: dates.map(
+          (date) => `${date}T${String(hour).padStart(2, "0")}:00:00${offset}`
+        ),
         hour,
-        boundaries: dates.map((date) => `${date}T${String(hour).padStart(2, "0")}:00:00${offset}`),
-      })),
+      }))
     ),
+    timezone,
   })),
 ];
 
@@ -218,7 +229,7 @@ describe("device-local calendar boundaries", () => {
           "--eval",
           `
           import assert from "node:assert/strict";
-          import { studyDay, dayStart, dayEnd } from ${JSON.stringify(new URL("./day.ts", import.meta.url).href)};
+          import { studyDay, dayStart, dayEnd } from ${JSON.stringify(new URL("day.ts", import.meta.url).href)};
           const cases = ${JSON.stringify(cases)};
           for (const { hour, boundaries } of cases) {
             for (let i = 0; i < boundaries.length - 1; i++) {
@@ -253,8 +264,8 @@ describe("device-local calendar boundaries", () => {
         `,
         ],
         env: { ...process.env, TZ: timezone },
-        stdout: "pipe",
         stderr: "pipe",
+        stdout: "pipe",
       });
       expect(result.stderr.toString()).toBe("");
       expect(result.exitCode).toBe(0);

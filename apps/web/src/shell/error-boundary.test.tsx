@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ErrorBoundary } from "./ErrorBoundary";
 
-function Boom(): never {
+import { ErrorBoundary } from "./error-boundary";
+
+const Boom = (): never => {
   throw new Error('expected phase "recall", session is in "done"');
-}
+};
 
 describe("the last line before a blank page", () => {
   beforeEach(() => {
@@ -18,7 +19,7 @@ describe("the last line before a blank page", () => {
     render(
       <ErrorBoundary>
         <p>ciao</p>
-      </ErrorBoundary>,
+      </ErrorBoundary>
     );
     expect(screen.getByText("ciao")).toBeDefined();
   });
@@ -27,13 +28,13 @@ describe("the last line before a blank page", () => {
     render(
       <ErrorBoundary>
         <Boom />
-      </ErrorBoundary>,
+      </ErrorBoundary>
     );
 
     // The session throws on a call made in the wrong phase, which a double tap
     // can produce. Without this the whole tree unmounts to an empty page.
     expect(screen.getByRole("button", { name: "Ricarica" })).toBeDefined();
     // And it says the day's work is not lost, because it is not.
-    expect(screen.getByText(/salvate/i)).toBeDefined();
+    expect(screen.getByText(/salvate/iu)).toBeDefined();
   });
 });

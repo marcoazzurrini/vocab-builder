@@ -1,10 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 
-const target = process.argv[2];
-if (!target) throw new Error("Provide the target development environment file.");
-const email = process.argv[3] ?? "learner@example.com";
-if (!/^[^\s@=]+@[^\s@=]+\.[^\s@=]+$/.test(email)) throw new Error("Provide a valid email address.");
+const [target, email = "learner@example.com"] = process.argv.slice(2);
+if (!target) {
+  throw new Error("Provide the target development environment file.");
+}
+if (!/^[^\s@=]+@[^\s@=]+\.[^\s@=]+$/u.test(email)) {
+  throw new Error("Provide a valid email address.");
+}
 await writeFile(
   target,
   [
@@ -14,6 +17,8 @@ await writeFile(
     "AUTH_EMAIL_MODE=log",
     "",
   ].join("\n"),
-  { flag: "wx", mode: 0o600 },
+  { flag: "wx", mode: 0o600 }
 );
-console.log("Created .dev.vars. Local sign-in links appear only in the development terminal.");
+console.log(
+  "Created .dev.vars. Local sign-in links appear only in the development terminal."
+);

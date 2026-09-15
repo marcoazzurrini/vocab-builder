@@ -11,26 +11,37 @@ pre-commit:
   piped: true
   jobs:
     - name: format
-      run: bun run oxfmt {staged_files}
+      run: bun run oxfmt --no-error-on-unmatched-pattern {staged_files}
       glob:
         - "*.ts"
         - "*.tsx"
+        - "*.mts"
+        - "*.cts"
         - "*.js"
         - "*.cjs"
+        - "*.mjs"
         - "*.jsx"
         - "*.json"
+        - "*.jsonc"
         - "*.css"
+        - "*.md"
+        - "*.mdx"
+        - "*.yaml"
+        - "*.yml"
       # Re-stages what the formatter rewrote, so the commit contains the
       # formatted version rather than failing and asking you to stage again.
       stage_fixed: true
 
     - name: lint
-      run: bun run oxlint {staged_files}
+      run: bun run oxlint --deny-warnings --no-error-on-unmatched-pattern {staged_files}
       glob:
         - "*.ts"
         - "*.tsx"
+        - "*.mts"
+        - "*.cts"
         - "*.js"
         - "*.cjs"
+        - "*.mjs"
         - "*.jsx"
 
     # No files template: typechecking is whole-project by nature, since a change
@@ -41,6 +52,8 @@ pre-commit:
       glob:
         - "*.ts"
         - "*.tsx"
+        - "*.mts"
+        - "*.cts"
 
 pre-push:
   jobs:

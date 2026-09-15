@@ -1,7 +1,7 @@
 import type { Card as FsrsCard, Grade } from "ts-fsrs";
 
 /** A row from `words`. The catalogue, shared and read-only. */
-export type Word = {
+export interface Word {
   id: string;
   text: string;
   gloss: string;
@@ -9,7 +9,7 @@ export type Word = {
   image: string | null;
   kind: "word" | "chunk";
   freqRank: number | null;
-};
+}
 
 /**
  * One word's scheduling state for one user.
@@ -24,10 +24,10 @@ export type Word = {
  * introduced yet — a state with no representation, rather than a flag to keep
  * consistent.
  */
-export type Card = {
+export interface Card {
   wordId: string;
   fsrs: FsrsCard;
-};
+}
 
 /**
  * What the user says about how easily the answer came. Never "again" — that is
@@ -36,7 +36,7 @@ export type Card = {
 export type Effort = "hard" | "good" | "easy";
 
 /** A row for `attempts`. Emitted, never stored here — persistence is elsewhere. */
-export type Attempt = {
+export interface Attempt {
   /** Attempts are keyed by what they are about, not by the cache row. */
   wordId: string;
   phase: "guess" | "recall";
@@ -48,22 +48,22 @@ export type Attempt = {
   /** The card's FSRS state *before* this attempt, so history can be replayed. */
   stateBefore: FsrsCard;
   reviewedAt: Date;
-};
+}
 
 /** Everything needed to pose the question, and nothing that answers it. */
-export type Prompt = {
+export interface Prompt {
   gloss: string;
   hint: string | null;
   image: string | null;
   kind: "word" | "chunk";
-};
+}
 
-export type SessionStats = {
+export interface SessionStats {
   introduced: number;
   recalls: number;
   correct: number;
   wrong: number;
-};
+}
 
 /**
  * The entire surface the UI sees. A discriminated union rather than a phase

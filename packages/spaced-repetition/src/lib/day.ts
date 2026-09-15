@@ -18,9 +18,20 @@
  * shifts forward by the gap. Invalid dates and hours that are not integers in
  * 0–23 throw RangeError, as do boundaries outside Date's representable range.
  */
-export function studyDay(now: Date, rolloverHour: number): { start: Date; nextStart: Date } {
-  if (!Number.isFinite(now.getTime())) throw new RangeError("Invalid study day date");
-  if (!Number.isInteger(rolloverHour) || rolloverHour < 0 || rolloverHour > 23) {
+interface StudyDay {
+  start: Date;
+  nextStart: Date;
+}
+
+export const studyDay = (now: Date, rolloverHour: number): StudyDay => {
+  if (!Number.isFinite(now.getTime())) {
+    throw new RangeError("Invalid study day date");
+  }
+  if (
+    !Number.isInteger(rolloverHour) ||
+    rolloverHour < 0 ||
+    rolloverHour > 23
+  ) {
     throw new RangeError("Rollover hour must be an integer from 0 to 23");
   }
 
@@ -29,15 +40,21 @@ export function studyDay(now: Date, rolloverHour: number): { start: Date; nextSt
     // local date/time at once. Transplanting a date onto the epoch's local hour
     // can cross an unrelated DST gap before setHours gets to apply our rollover.
     const label = new Date(0);
-    label.setUTCFullYear(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset);
-    if (!Number.isFinite(label.getTime()))
+    label.setUTCFullYear(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + dayOffset
+    );
+    if (!Number.isFinite(label.getTime())) {
       throw new RangeError("Study day boundary is out of range");
+    }
     // ISO local parsing also preserves years 0–99 (the numeric constructor does not).
     const date = new Date(
-      `${label.toISOString().split("T")[0]}T${String(rolloverHour).padStart(2, "0")}:00:00.000`,
+      `${label.toISOString().split("T")[0]}T${String(rolloverHour).padStart(2, "0")}:00:00.000`
     );
-    if (!Number.isFinite(date.getTime()))
+    if (!Number.isFinite(date.getTime())) {
       throw new RangeError("Study day boundary is out of range");
+    }
     return date;
   };
 
@@ -45,21 +62,23 @@ export function studyDay(now: Date, rolloverHour: number): { start: Date; nextSt
   let start = boundary(dayOffset);
   // A timezone change can skip an entire civil date (for example Apia in
   // December 2011). Find actual enclosing instants, not merely yesterday's label.
-  while (start > now) start = boundary(--dayOffset);
+  while (start > now) {
+    dayOffset -= 1;
+    start = boundary(dayOffset);
+  }
   let nextStart = boundary(dayOffset + 1);
   while (nextStart <= now) {
     start = nextStart;
-    nextStart = boundary(++dayOffset + 1);
+    dayOffset += 1;
+    nextStart = boundary(dayOffset + 1);
   }
-  return { start, nextStart };
-}
+  return { nextStart, start };
+};
 
 /** The moment the current study day began: the last rollover boundary. */
-export function dayStart(now: Date, rolloverHour: number): Date {
-  return studyDay(now, rolloverHour).start;
-}
+export const dayStart = (now: Date, rolloverHour: number): Date =>
+  studyDay(now, rolloverHour).start;
 
 /** The last millisecond of the current study day (inclusive compatibility API). */
-export function dayEnd(now: Date, rolloverHour: number): Date {
-  return new Date(studyDay(now, rolloverHour).nextStart.getTime() - 1);
-}
+export const dayEnd = (now: Date, rolloverHour: number): Date =>
+  new Date(studyDay(now, rolloverHour).nextStart.getTime() - 1);

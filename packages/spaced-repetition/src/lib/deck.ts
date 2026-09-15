@@ -1,25 +1,32 @@
 import { createEmptyCard, State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 import * as v from "valibot";
+
 import type { Card, Word } from "../session/types";
 import { studyDay } from "./day";
 
 /** Storage-neutral progress. Only this package interprets the opaque schedule. */
-export type StoredCard = { wordId: string; schedule: string };
-export type Introduction = { wordId: string; reviewedAt: string };
+export interface StoredCard {
+  wordId: string;
+  schedule: string;
+}
+export interface Introduction {
+  wordId: string;
+  reviewedAt: string;
+}
 
 /** Serializable input for rebuilding a session in the learner's timezone. */
-export type ReviewSnapshot = {
+export interface ReviewSnapshot {
   words: Word[];
   cards: StoredCard[];
   guesses: Introduction[];
-};
+}
 
 /** A date as JSON returns it: an ISO string, or a Date if it never left. */
 const StoredDate = v.pipe(
   v.union([v.string(), v.date()]),
   v.transform((value) => new Date(value)),
-  v.check((date) => !Number.isNaN(date.getTime()), "unparseable date"),
+  v.check((date) => !Number.isNaN(date.getTime()), "unparseable date")
 );
 
 /**
@@ -43,16 +50,21 @@ const StoredDate = v.pipe(
  * unknown ones pass through untouched.
  */
 const FsrsState = v.looseObject({
-  due: StoredDate,
-  stability: v.number(),
   difficulty: v.number(),
+  due: StoredDate,
   elapsed_days: v.number(),
-  scheduled_days: v.number(),
+  lapses: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  last_review: v.optional(StoredDate),
   learning_steps: v.optional(v.number(), 0),
   reps: v.pipe(v.number(), v.integer(), v.minValue(0)),
-  lapses: v.pipe(v.number(), v.integer(), v.minValue(0)),
-  state: v.picklist([State.New, State.Learning, State.Review, State.Relearning]),
-  last_review: v.optional(StoredDate),
+  scheduled_days: v.number(),
+  stability: v.number(),
+  state: v.picklist([
+    State.New,
+    State.Learning,
+    State.Review,
+    State.Relearning,
+  ]),
 });
 
 /**
@@ -63,39 +75,49 @@ const FsrsState = v.looseObject({
  * if someone is told about it. Skipping the row instead would make the word look
  * uncarded, and re-introducing it would collide with the card already there.
  */
-export function reviveFsrsCard(raw: unknown, cardId?: string): FsrsCard {
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public storage boundary validates untrusted schedules with FsrsState.
+export const reviveFsrsCard = (raw: unknown, cardId?: string): FsrsCard => {
   const result = v.safeParse(FsrsState, raw);
   if (!result.success) {
     const where = cardId ? ` for card ${cardId}` : "";
-    throw new Error(`Unreadable scheduling state${where}: ${v.summarize(result.issues)}`);
+    throw new Error(
+      `Unreadable scheduling state${where}: ${v.summarize(result.issues)}`
+    );
   }
   return result.output;
-}
+};
 
-export function toCard(card: StoredCard): Card {
+export const toCard = (card: StoredCard): Card => {
   let raw: unknown;
   try {
     raw = JSON.parse(card.schedule);
-  } catch (cause) {
-    throw new Error(`Unreadable scheduling state for card ${card.wordId}: invalid JSON`, { cause });
+  } catch (error) {
+    throw new Error(
+      `Unreadable scheduling state for card ${card.wordId}: invalid JSON`,
+      { cause: error }
+    );
   }
-  return { wordId: card.wordId, fsrs: reviveFsrsCard(raw, card.wordId) };
-}
+  return { fsrs: reviveFsrsCard(raw, card.wordId), wordId: card.wordId };
+};
 
-export type Deck = {
+export interface Deck {
   words: Word[];
   cards: Card[];
   introducedToday: number;
-};
+}
 
-export type Settings = {
+export interface Settings {
   lang: string;
   newPerDay: number;
   dayRolloverHour: number;
-};
+}
 
 /** Mirrors the column defaults, for a user who has never written a row. */
-export const DEFAULT_SETTINGS: Settings = { lang: "fr", newPerDay: 15, dayRolloverHour: 4 };
+export const DEFAULT_SETTINGS: Settings = {
+  dayRolloverHour: 4,
+  lang: "fr",
+  newPerDay: 15,
+};
 
 /**
  * Everything `loadDeck` does except the queries.
@@ -107,25 +129,28 @@ export const DEFAULT_SETTINGS: Settings = { lang: "fr", newPerDay: 15, dayRollov
  * The schema guarantees one guess per word; deduplicating overlapping inputs
  * by word is exact rather than lossy.
  */
-export function buildDeck(
+export const buildDeck = (
   words: readonly Word[],
   storedCards: readonly StoredCard[],
   introductions: readonly Introduction[],
   now: Date,
-  dayRolloverHour = 0,
-): Deck {
+  dayRolloverHour = 0
+): Deck => {
   const { start, nextStart } = studyDay(now, dayRolloverHour);
   const carded = new Set(storedCards.map((card) => card.wordId));
   const guesses = new Map(
     introductions.map((guess) => {
-      if (!Number.isFinite(new Date(guess.reviewedAt).getTime()))
-        throw new Error(`Unreadable introduction time for word ${guess.wordId}.`);
+      if (!Number.isFinite(new Date(guess.reviewedAt).getTime())) {
+        // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the existing Error category for invalid stored timestamps.
+        throw new Error(
+          `Unreadable introduction time for word ${guess.wordId}.`
+        );
+      }
       return [guess.wordId, guess] as const;
-    }),
+    })
   );
 
   return {
-    words: [...words],
     cards: [
       ...storedCards.map(toCard),
       // A guess with no card row is a word waiting for its first rating: the
@@ -133,7 +158,10 @@ export function buildDeck(
       // the guess time so the exposure rule shows them in introduction order.
       ...[...guesses.values()]
         .filter((g) => !carded.has(g.wordId))
-        .map((g) => ({ wordId: g.wordId, fsrs: createEmptyCard(new Date(g.reviewedAt)) })),
+        .map((g) => ({
+          fsrs: createEmptyCard(new Date(g.reviewedAt)),
+          wordId: g.wordId,
+        })),
     ],
     // Counted from the guesses rather than tracked separately, so reopening
     // the app mid-day resumes the allowance instead of restarting it. Guesses
@@ -142,5 +170,6 @@ export function buildDeck(
       const at = new Date(g.reviewedAt);
       return at >= start && at < nextStart;
     }).length,
+    words: [...words],
   };
-}
+};

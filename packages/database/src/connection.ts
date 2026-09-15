@@ -1,10 +1,10 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { drizzle } from "drizzle-orm/d1";
+
 import * as schema from "./schema";
 
 export type DatabaseBinding = D1Database;
 
-export function connect(binding: DatabaseBinding) {
-  return drizzle(binding, { schema });
-}
+export const connect = (binding: DatabaseBinding) =>
+  drizzle(binding, { schema });
 export type Database = ReturnType<typeof connect>;

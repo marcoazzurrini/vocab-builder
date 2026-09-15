@@ -1,11 +1,11 @@
-import { Wordmark } from "./Wordmark";
+import { Wordmark } from "./wordmark";
 
 /* Only French exists today; the map is here so the day a second language
    lands, this is the one place the sidebar needs to learn about it. The name
    is written in its own language — that is why the CSS sets it in the serif. */
-const LANGUAGE_NAME: Record<string, string> = { fr: "français" };
+const LANGUAGE_NAME = { fr: "français" };
 
-export function Sidebar({
+export const Sidebar = ({
   email,
   open,
   onClose,
@@ -15,7 +15,7 @@ export function Sidebar({
   open: boolean;
   onClose: () => void;
   onSignOut: () => void;
-}) {
+}) => {
   const name = email ? (email.split("@")[0] ?? email) : "…";
 
   return (
@@ -56,4 +56,4 @@ export function Sidebar({
       </div>
     </aside>
   );
-}
+};

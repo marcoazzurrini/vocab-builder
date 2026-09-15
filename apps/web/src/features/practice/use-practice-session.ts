@@ -1,12 +1,21 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { createSession, DEFAULT_SETTINGS, studyDayStart } from "@vocab/spaced-repetition";
+import {
+  createSession,
+  DEFAULT_SETTINGS,
+  studyDayStart,
+} from "@vocab/spaced-repetition";
 import type { Effort, Session, Settings } from "@vocab/spaced-repetition";
-import { loadSettings, loadSnapshot, persistAnswer } from "./transport";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+
 import { createOutbox } from "./outbox";
 import { SyncConflict } from "./sync-conflict";
+import { practiceTransport } from "./transport";
+import type { PracticeTransport } from "./transport";
 
 /** Owns a user's session, durable answers, recovery, and safe reloads. Mount keyed by user ID. */
-export function usePracticeSession(userId: string) {
+export const usePracticeSession = (
+  userId: string,
+  transport: PracticeTransport = practiceTransport
+) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -15,7 +24,9 @@ export function usePracticeSession(userId: string) {
   const [, rerender] = useReducer((n: number) => n + 1, 0);
   const sessionRef = useRef<Session | null>(null);
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
-  const loadedOnRef = useRef(studyDayStart(new Date(), DEFAULT_SETTINGS.dayRolloverHour).getTime());
+  const loadedOnRef = useRef(
+    studyDayStart(new Date(), DEFAULT_SETTINGS.dayRolloverHour).getTime()
+  );
   const reload = useCallback(() => {
     // Invalidate before rendering cleared errors, not later in the loading effect.
     // Otherwise the old prompt briefly accepts answers that the reload can replace.
@@ -25,40 +36,50 @@ export function usePracticeSession(userId: string) {
   }, []);
 
   // One queue survives all reloads. A rebuild must read its own acknowledged writes.
-  const queueRef = useRef<ReturnType<typeof createOutbox> | null>(null);
-  queueRef.current ??= createOutbox({
-    userId,
-    storage: window.localStorage,
-    send: (command) => persistAnswer(command, userId),
-    onError: (error) => {
-      setWriteError(error.message);
-      setSyncConflict(error instanceof SyncConflict);
-    },
-  });
-  const queue = queueRef.current;
+  // eslint-disable-next-line react/hook-use-state -- The durable queue has immutable identity for this keyed account mount; replacing it would lose in-flight work.
+  const [queue] = useState(() =>
+    createOutbox({
+      onError: (error) => {
+        setWriteError(error.message);
+        setSyncConflict(error instanceof SyncConflict);
+      },
+      send: (command) => transport.persistAnswer(command, userId),
+      storage: window.localStorage,
+      userId,
+    })
+  );
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+    const load = async () => {
       // Disable the previous prompt before draining writes and fetching a new snapshot.
       // Otherwise an answer submitted during the fetch can disappear from the rebuilt session.
       sessionRef.current = null;
       setSession(null);
       try {
         await queue.settled();
-        if (cancelled) return;
-        const settings = await loadSettings();
-        if (cancelled) return;
-        const snapshot = await loadSnapshot(settings.lang);
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
+        const settings = await transport.loadSettings();
+        if (cancelled) {
+          return;
+        }
+        const snapshot = await transport.loadSnapshot(settings.lang);
+        if (cancelled) {
+          return;
+        }
         settingsRef.current = settings;
-        loadedOnRef.current = studyDayStart(new Date(), settings.dayRolloverHour).getTime();
+        loadedOnRef.current = studyDayStart(
+          new Date(),
+          settings.dayRolloverHour
+        ).getTime();
         const created = createSession({
-          snapshot,
-          settings,
           acceptAnswer: (answer) => {
             queue.push(answer);
           },
+          settings,
+          snapshot,
         });
         sessionRef.current = created;
         setSession(created);
@@ -66,34 +87,45 @@ export function usePracticeSession(userId: string) {
         setWriteError(null);
         setSyncConflict(false);
       } catch (error) {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : String(error));
+        }
       }
-    }
+    };
     void load();
     return () => {
       cancelled = true;
     };
-  }, [userId, reloadCount, queue]);
+    // eslint-disable-next-line react/exhaustive-effect-dependencies -- The reload counter intentionally invalidates the snapshot; accounts remount this hook by user ID.
+  }, [reloadCount, queue, transport]);
 
   // Local storage is the only copy until acknowledgement. Warn before leaving with pending work.
   useEffect(() => {
-    function warn(event: BeforeUnloadEvent) {
-      if (queue.pending > 0) event.preventDefault();
-    }
+    const warn = (event: BeforeUnloadEvent) => {
+      if (queue.pending > 0) {
+        event.preventDefault();
+      }
+    };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [queue]);
 
   useEffect(() => {
-    function recheck() {
-      if (document.visibilityState !== "visible") return;
+    const recheck = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
       const newDay =
-        studyDayStart(new Date(), settingsRef.current.dayRolloverHour).getTime() !==
-        loadedOnRef.current;
+        studyDayStart(
+          new Date(),
+          settingsRef.current.dayRolloverHour
+        ).getTime() !== loadedOnRef.current;
       const phase = sessionRef.current?.view.phase;
       // Never replace an active prompt merely because the tab became visible.
-      if (newDay || phase === "done" || phase === "caughtUp") reload();
-    }
+      if (newDay || phase === "done" || phase === "caughtUp") {
+        reload();
+      }
+    };
     document.addEventListener("visibilitychange", recheck);
     return () => document.removeEventListener("visibilitychange", recheck);
   }, [reload]);
@@ -101,12 +133,17 @@ export function usePracticeSession(userId: string) {
   const view = session?.view;
   const nextDue = view?.phase === "caughtUp" ? view.nextDueAt.getTime() : null;
   useEffect(() => {
-    if (nextDue === null) return;
-    const timer = setTimeout(reload, Math.max(1000, nextDue - Date.now() + 1000));
+    if (nextDue === null) {
+      return;
+    }
+    const timer = setTimeout(
+      reload,
+      Math.max(1000, nextDue - Date.now() + 1000)
+    );
     return () => clearTimeout(timer);
   }, [nextDue, reload]);
 
-  async function retry() {
+  const retry = async () => {
     try {
       await queue.retry();
       setLoadError(null);
@@ -117,10 +154,10 @@ export function usePracticeSession(userId: string) {
       setWriteError(error instanceof Error ? error.message : String(error));
       setSyncConflict(error instanceof SyncConflict);
     }
-  }
+  };
 
   /** The caller must obtain confirmation before discarding unsynchronized answers. */
-  function discard() {
+  const discard = () => {
     try {
       queue.discard();
       setLoadError(null);
@@ -130,11 +167,13 @@ export function usePracticeSession(userId: string) {
     } catch (error) {
       setWriteError(error instanceof Error ? error.message : String(error));
     }
-  }
+  };
 
-  function act(action: (current: Session) => void) {
-    const current = sessionRef.current;
-    if (!current || current !== session || loadError || writeError) return;
+  const act = (action: (current: Session) => void) => {
+    const { current } = sessionRef;
+    if (!current || current !== session || loadError || writeError) {
+      return;
+    }
     try {
       action(current);
       rerender();
@@ -142,19 +181,20 @@ export function usePracticeSession(userId: string) {
       setWriteError(error instanceof Error ? error.message : String(error));
       setSyncConflict(error instanceof SyncConflict);
     }
-  }
+  };
 
   return {
-    view,
-    loadError,
-    writeError,
-    syncConflict,
-    retry,
     discard,
-    submitGuess: (typed: string) => act((current) => current.submitGuess(typed)),
+    dismissFeedback: () => act((current) => current.dismissFeedback()),
     exposureDone: () => act((current) => current.exposureDone()),
+    loadError,
+    retry,
+    submitGuess: (typed: string) =>
+      act((current) => current.submitGuess(typed)),
     submitRecall: (typed: string, effort: Effort) =>
       act((current) => current.submitRecall(typed, effort)),
-    dismissFeedback: () => act((current) => current.dismissFeedback()),
+    syncConflict,
+    view,
+    writeError,
   };
-}
+};

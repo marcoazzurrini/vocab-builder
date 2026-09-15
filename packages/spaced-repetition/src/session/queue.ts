@@ -1,4 +1,5 @@
 import { State } from "ts-fsrs";
+
 import { studyDay } from "../lib/day";
 import type { Card, Word } from "./types";
 
@@ -35,9 +36,8 @@ export type Stage =
   | "scheduled";
 
 /** `reps` counts FSRS ratings, and guesses are never rated. */
-export function stageOf(card: Card): Stage {
-  return card.fsrs.reps > 0 ? "scheduled" : "awaiting";
-}
+export const stageOf = (card: Card): Stage =>
+  card.fsrs.reps > 0 ? "scheduled" : "awaiting";
 
 /**
  * What to do next — not which card to show next.
@@ -57,7 +57,7 @@ export type Slot =
   | { do: "wait"; until: Date }
   | { do: "done" };
 
-export type Queue = {
+export interface Queue {
   cards: readonly Card[];
   words: readonly Word[];
   now: Date;
@@ -100,33 +100,31 @@ export type Queue = {
   justShownId?: string;
   /** The hour the study day rolls over. Midnight unless told otherwise. */
   dayRolloverHour?: number;
-};
+}
 
 type Rule = (q: Queue) => Slot | null;
 
-function isLearning(card: Card): boolean {
-  return (
-    card.fsrs.state === State.Learning ||
-    card.fsrs.state === State.Relearning ||
-    // Rated but still New should not happen; showing it beats stranding it.
-    card.fsrs.state === State.New
-  );
-}
+const isLearning = (card: Card): boolean =>
+  card.fsrs.state === State.Learning ||
+  card.fsrs.state === State.Relearning ||
+  // Rated but still New should not happen; showing it beats stranding it.
+  card.fsrs.state === State.New;
 
-function nextDay(q: Queue): Date {
-  return studyDay(q.now, q.dayRolloverHour ?? 0).nextStart;
-}
+const nextDay = (q: Queue): Date =>
+  studyDay(q.now, q.dayRolloverHour ?? 0).nextStart;
 
-function earliestDue(cards: readonly Card[]): Card | undefined {
-  return cards.reduce<Card | undefined>(
-    (best, c) => (!best || c.fsrs.due < best.fsrs.due ? c : best),
-    undefined,
-  );
-}
+const earliestDue = (cards: readonly Card[]): Card | undefined => {
+  let best: Card | undefined;
+  for (const card of cards) {
+    if (!best || card.fsrs.due < best.fsrs.due) {
+      best = card;
+    }
+  }
+  return best;
+};
 
-function at(q: Queue, stage: Stage): Card[] {
-  return q.cards.filter((c) => stageOf(c) === stage);
-}
+const at = (q: Queue, stage: Stage): Card[] =>
+  q.cards.filter((c) => stageOf(c) === stage);
 
 /**
  * 1. A rated learning card that is genuinely due. Minute-scale, time-critical.
@@ -140,10 +138,10 @@ function at(q: Queue, stage: Stage): Card[] {
 const dueLearning: Rule = (q) => {
   const card = earliestDue(
     at(q, "scheduled").filter(
-      (c) => isLearning(c) && c.fsrs.due <= q.now && c.wordId !== q.justShownId,
-    ),
+      (c) => isLearning(c) && c.fsrs.due <= q.now && c.wordId !== q.justShownId
+    )
   );
-  return card ? { do: "recall", card } : null;
+  return card ? { card, do: "recall" } : null;
 };
 
 /**
@@ -158,21 +156,35 @@ const dueLearning: Rule = (q) => {
  * different thing — it is "awaiting", and rules 4 and 5 own it.
  */
 const newWord: Rule = (q) => {
-  if (q.allowanceLeft <= 0) return null;
+  if (q.allowanceLeft <= 0) {
+    return null;
+  }
   const carded = new Set(q.cards.map((c) => c.wordId));
   const [word] = q.words
     .filter((w) => !carded.has(w.id))
-    .sort((a, b) => (a.freqRank ?? Infinity) - (b.freqRank ?? Infinity));
+    .toSorted((a, b) => (a.freqRank ?? Infinity) - (b.freqRank ?? Infinity));
   return word ? { do: "introduce", word } : null;
 };
 
-/** 3. A review due today. Day-scale, so the order within the block barely matters. */
+/**
+ * 3. A review due today, not rated again since this study day began.
+ *
+ * FSRS's one-day interval is 24 elapsed hours. On a 25-hour study day a new
+ * Review due can still fall before the next rollover. Its persisted last rating
+ * keeps that graduation out of today's review block, including after reopening.
+ * Learning and Relearning remain governed by their minute-scale rules.
+ */
 const dueReview: Rule = (q) => {
-  const nextStart = nextDay(q);
+  const { start, nextStart } = studyDay(q.now, q.dayRolloverHour ?? 0);
   const card = earliestDue(
-    at(q, "scheduled").filter((c) => c.fsrs.state === State.Review && c.fsrs.due < nextStart),
+    at(q, "scheduled").filter(
+      (c) =>
+        c.fsrs.state === State.Review &&
+        c.fsrs.due < nextStart &&
+        (c.fsrs.last_review === undefined || c.fsrs.last_review < start)
+    )
   );
-  return card ? { do: "recall", card } : null;
+  return card ? { card, do: "recall" } : null;
 };
 
 /**
@@ -184,8 +196,10 @@ const dueReview: Rule = (q) => {
  * batch is introduced before the first recall.
  */
 const needsExposure: Rule = (q) => {
-  const card = earliestDue(at(q, "awaiting").filter((c) => !q.exposed.has(c.wordId)));
-  return card ? { do: "expose", card } : null;
+  const card = earliestDue(
+    at(q, "awaiting").filter((c) => !q.exposed.has(c.wordId))
+  );
+  return card ? { card, do: "expose" } : null;
 };
 
 /**
@@ -202,9 +216,11 @@ const needsExposure: Rule = (q) => {
  */
 const awaitingRecall: Rule = (q) => {
   const card = earliestDue(
-    at(q, "awaiting").filter((c) => q.exposed.has(c.wordId) && c.wordId !== q.justShownId),
+    at(q, "awaiting").filter(
+      (c) => q.exposed.has(c.wordId) && c.wordId !== q.justShownId
+    )
   );
-  return card ? { do: "recall", card } : null;
+  return card ? { card, do: "recall" } : null;
 };
 
 /**
@@ -224,10 +240,10 @@ const learnAhead: Rule = (q) => {
         isLearning(c) &&
         c.fsrs.due < nextStart &&
         c.wordId !== q.justShownId &&
-        !q.pulledForward.has(c.wordId),
-    ),
+        !q.pulledForward.has(c.wordId)
+    )
   );
-  return card ? { do: "recall", card, pulledForward: true } : null;
+  return card ? { card, do: "recall", pulledForward: true } : null;
 };
 
 /**
@@ -243,8 +259,10 @@ const learnAhead: Rule = (q) => {
  * then never ask for it — again on the next sitting, and the one after that.
  */
 const showAnyway: Rule = (q) => {
-  const card = earliestDue(at(q, "awaiting").filter((c) => q.exposed.has(c.wordId)));
-  return card ? { do: "recall", card } : null;
+  const card = earliestDue(
+    at(q, "awaiting").filter((c) => q.exposed.has(c.wordId))
+  );
+  return card ? { card, do: "recall" } : null;
 };
 
 /**
@@ -258,8 +276,10 @@ const showAnyway: Rule = (q) => {
  * here.
  */
 const dueEvenIfJustShown: Rule = (q) => {
-  const card = earliestDue(at(q, "scheduled").filter((c) => isLearning(c) && c.fsrs.due <= q.now));
-  return card ? { do: "recall", card } : null;
+  const card = earliestDue(
+    at(q, "scheduled").filter((c) => isLearning(c) && c.fsrs.due <= q.now)
+  );
+  return card ? { card, do: "recall" } : null;
 };
 
 /**
@@ -283,10 +303,12 @@ export const RULE: readonly Rule[] = [
   dueEvenIfJustShown,
 ];
 
-export function pickNext(queue: Queue): Slot {
+export const pickNext = (queue: Queue): Slot => {
   for (const rule of RULE) {
     const slot = rule(queue);
-    if (slot) return slot;
+    if (slot) {
+      return slot;
+    }
   }
 
   // Nothing is servable right now. If a learning card is still coming today,
@@ -298,8 +320,8 @@ export function pickNext(queue: Queue): Slot {
         stageOf(c) === "scheduled" &&
         isLearning(c) &&
         c.fsrs.due > queue.now &&
-        c.fsrs.due < nextDay(queue),
-    ),
+        c.fsrs.due < nextDay(queue)
+    )
   );
   return upcoming ? { do: "wait", until: upcoming.fsrs.due } : { do: "done" };
-}
+};

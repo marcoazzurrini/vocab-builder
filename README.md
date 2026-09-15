@@ -1,7 +1,6 @@
 # vocab-builder
 
-A private vocabulary learning app. French first, Italian as L1. Built around
-productive recall, small exposures, and one FSRS scheduler throughout learning.
+A private vocabulary learning app. French first, Italian as L1. Built around productive recall, small exposures, and one FSRS scheduler throughout learning.
 
 ## Stack
 
@@ -10,10 +9,7 @@ productive recall, small exposures, and one FSRS scheduler throughout learning.
 - Bun workspaces and one lockfile. No separate API deployment or task orchestrator.
 - Bun's built-in test runner for packages; Vitest for the web app.
 
-Bun manages dependencies, workspace commands, administrative scripts, and package
-tests. Vite, web-app Vitest, and the Wrangler CLI retain their Node runtime. Database
-and authentication tests use Wrangler's local D1 proxy from Bun. Production uses
-Cloudflare's `workerd`. Deno is not part of the active toolchain.
+Bun manages dependencies, workspace commands, administrative scripts, and package tests. Vite, web-app Vitest, and the Wrangler CLI retain their Node runtime. Database and authentication tests use Wrangler's local D1 proxy from Bun. Production uses Cloudflare's `workerd`. Deno is not part of the active toolchain.
 
 ## Quick start
 
@@ -27,21 +23,13 @@ bun run db:seed
 bun run dev
 ```
 
-Local sign-in links appear in the terminal. Do not expose the development server
-or share those links. See [development and deployment](docs/development.md) for
-secrets, existing catalogue imports, and production safeguards.
+Local sign-in links appear in the terminal. Do not expose the development server or share those links. See [development and deployment](docs/development.md) for secrets, existing catalogue imports, and production safeguards.
 
 ## Install as an app
 
-On the HTTPS deployment, use your browser's install action. On iPhone or iPad,
-open the site in Safari and choose Share → Add to Home Screen (enable Open as Web
-App if offered). Installation adds a standalone app window; an internet connection
-is still required for sign-in and practice. There is no service worker or offline
-cache, and installation does not change answer persistence or authentication.
+On the HTTPS deployment, use your browser's install action. On iPhone or iPad, open the site in Safari and choose Share → Add to Home Screen (enable Open as Web App if offered). Installation adds a standalone app window; an internet connection is still required for sign-in and practice. There is no service worker or offline cache, and installation does not change answer persistence or authentication.
 
-The manifest lives in `apps/web/public/manifest.webmanifest`. Installation icons
-use the app's colors and are generated from `apps/web/public/favicon.svg`. To
-regenerate the checked-in PNGs after changing that SVG, run from the repository root:
+The manifest lives in `apps/web/public/manifest.webmanifest`. Installation icons use the app's colors and are generated from `apps/web/public/favicon.svg`. To regenerate the checked-in PNGs after changing that SVG, run from the repository root:
 
 ```sh
 bunx --yes --package sharp-cli sharp -i apps/web/public/favicon.svg -o apps/web/public/icons/pwa-192.png resize 192 192
@@ -49,9 +37,7 @@ bunx --yes --package sharp-cli sharp -i apps/web/public/favicon.svg -o apps/web/
 bunx --yes --package sharp-cli sharp -i apps/web/public/favicon.svg -o apps/web/public/icons/apple-touch-icon.png resize 180 180
 ```
 
-Keep the symbol inside the centered 80%-diameter circle so the 512px icon remains
-safe under maskable icon crops. Icon generation is a maintenance step, not a build
-or runtime dependency.
+Keep the symbol inside the centered 80%-diameter circle so the 512px icon remains safe under maskable icon crops. Icon generation is a maintenance step, not a build or runtime dependency.
 
 ## Repository
 
@@ -64,18 +50,9 @@ docs/                        Architecture, learning rationale, development
 .github/                     CI
 ```
 
-Packages expose small, explicit interfaces, not their source trees. Database owns
-serialization and transactions; spaced repetition owns learning rules;
-authentication owns session and sign-in policy. Web binds those modules to the
-Worker environment and presents their results. See [architecture](docs/architecture.md)
-for interfaces, dependencies, and enforced boundaries. UI remains app-local.
+Packages expose small, explicit interfaces, not their source trees. Database owns serialization and transactions; spaced repetition owns learning rules; authentication owns session and sign-in policy. Web binds those modules to the Worker environment and presents their results. See [architecture](docs/architecture.md) for interfaces, dependencies, and enforced boundaries. UI remains app-local.
 
-Generated files, local D1 state, secrets, and existing private exports stay ignored
-and app-local. The development catalogue and its importer live together in
-`packages/database/scripts/`. The local settings helper lives in `apps/web/scripts/`.
-Historical catalogue SQL survives as independent database test fixtures. Retired
-Supabase configuration and export tooling remain in Git history. This cleanup does
-not retire the hosted Supabase project or remove private backups.
+Generated files, local D1 state, secrets, and existing private exports stay ignored and app-local. The development catalogue and its importer live together in `packages/database/scripts/`. The local settings helper lives in `apps/web/scripts/`. Historical catalogue SQL survives as independent database test fixtures. Retired Supabase configuration and export tooling remain in Git history. This cleanup does not retire the hosted Supabase project or remove private backups.
 
 ## Checks
 
@@ -86,13 +63,9 @@ bun run db:test       # Isolated D1 and authentication integration tests
 bun run format
 ```
 
-Use `bun run test:watch` to watch all workspaces. Inside a package, `bun run test`
-and `bun run test:watch` use Bun directly. Bare `bun test` at the repository root
-is not the full-suite command: the web app still requires Vitest.
+Use `bun run test:watch` to watch all workspaces. Inside a package, `bun run test` and `bun run test:watch` use Bun directly. Bare `bun test` at the repository root is not the full-suite command: the web app still requires Vitest.
 
-Workspaces export TypeScript source, so the app bundles their production entrypoints
-without separate library builds. A fresh checkout needs `bun run build` before standalone
-`bun run typecheck` to generate the TanStack route tree.
+Workspaces export TypeScript source, so the app bundles their production entrypoints without separate library builds. A fresh checkout needs `bun run build` before standalone `bun run typecheck` to generate the TanStack route tree.
 
 ## Documentation
 
@@ -100,12 +73,8 @@ without separate library builds. A fresh checkout needs `bun run build` before s
 - [Learning design and product direction](docs/learning-design.md)
 - [Local development, database workflow, and production deployment](docs/development.md)
 
-The live catalogue import and initial Cloudflare deployment are complete.
-Cloudflare Builds is configured for the Bun workspace commands documented in the
-deployment guide. Pushes to `main` run checks and deploy the existing Worker.
+The live catalogue import and initial Cloudflare deployment are complete. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker.
 
 ## Conventions
 
-UI copy is Italian; target vocabulary is French; code and documentation are English.
-Learning changes cite the principle that motivates them. Keep SQL migrations
-reviewed and append-only. Keep the app mobile-first, but not mobile-only.
+UI copy is Italian; target vocabulary is French; code and documentation are English. Learning changes cite the principle that motivates them. Keep SQL migrations reviewed and append-only. Keep the app mobile-first, but not mobile-only.

@@ -1,16 +1,24 @@
 import * as v from "valibot";
+
 import type { Attempt } from "../session/types";
 
 const fields = {
   id: v.pipe(v.string(), v.uuid()),
-  wordId: v.pipe(v.string(), v.minLength(1), v.maxLength(128)),
-  typed: v.pipe(v.string(), v.maxLength(1000)),
-  latencyMs: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(86_400_000)),
+  latencyMs: v.pipe(
+    v.number(),
+    v.integer(),
+    v.minValue(0),
+    v.maxValue(86_400_000)
+  ),
   reviewedAt: v.pipe(v.string(), v.isoTimestamp()),
+  typed: v.pipe(v.string(), v.maxLength(1000)),
+  wordId: v.pipe(v.string(), v.minLength(1), v.maxLength(128)),
 };
 
 // Preserve the serialized field order: existing idempotency records contain this JSON.
+// oxlint-disable-next-line eslint/no-redeclare -- The public schema and inferred type intentionally share one export.
 export const AnswerCommand = v.variant("phase", [
+  // oxlint-disable-next-line eslint/sort-keys -- Valibot emits this persisted JSON order; sorting breaks idempotency comparisons.
   v.strictObject({
     id: fields.id,
     wordId: fields.wordId,
@@ -21,6 +29,7 @@ export const AnswerCommand = v.variant("phase", [
     reviewedAt: fields.reviewedAt,
     expectedReps: v.literal(0),
   }),
+  // oxlint-disable-next-line eslint/sort-keys -- Valibot emits this persisted JSON order; sorting breaks idempotency comparisons.
   v.strictObject({
     id: fields.id,
     wordId: fields.wordId,
@@ -35,19 +44,18 @@ export const AnswerCommand = v.variant("phase", [
 export type AnswerCommand = v.InferOutput<typeof AnswerCommand>;
 
 /** Reject malformed or oversized text before grading or schedule calculation. */
-export function validateAnswerText(typed: unknown): string {
-  return v.parse(fields.typed, typed);
-}
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This public boundary parses untrusted text with its owning schema.
+export const validateAnswerText = (typed: unknown): string =>
+  v.parse(fields.typed, typed);
 
-export function commandFor(attempt: Attempt): AnswerCommand {
-  return v.parse(AnswerCommand, {
-    id: crypto.randomUUID(),
-    wordId: attempt.wordId,
-    phase: attempt.phase,
-    typed: attempt.typed,
-    rating: attempt.rating,
-    latencyMs: attempt.latencyMs,
-    reviewedAt: attempt.reviewedAt.toISOString(),
+export const commandFor = (attempt: Attempt): AnswerCommand =>
+  v.parse(AnswerCommand, {
     expectedReps: attempt.stateBefore.reps,
+    id: crypto.randomUUID(),
+    latencyMs: attempt.latencyMs,
+    phase: attempt.phase,
+    rating: attempt.rating,
+    reviewedAt: attempt.reviewedAt.toISOString(),
+    typed: attempt.typed,
+    wordId: attempt.wordId,
   });
-}

@@ -1,34 +1,38 @@
 import { readFile, readdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { getPlatformProxy } from "wrangler";
+import path from "node:path";
+
 import type { D1Database } from "@cloudflare/workers-types";
+import { getPlatformProxy } from "wrangler";
+
 import { connect } from "./connection";
 
 /** Real local D1, isolated from development state, credentials, and remote bindings. */
-export async function testDatabase() {
-  const temporary = await mkdtemp(join(tmpdir(), "vocab-d1-test-"));
-  const configPath = join(temporary, "wrangler.json");
+export const testDatabase = async () => {
+  const temporary = await mkdtemp(path.join(tmpdir(), "vocab-d1-test-"));
+  const configPath = path.join(temporary, "wrangler.json");
   await writeFile(
     configPath,
     JSON.stringify({
-      name: "vocab-builder-test",
       compatibility_date: "2026-09-11",
       d1_databases: [
         {
           binding: "DB",
-          database_name: "test",
           database_id: "00000000-0000-0000-0000-000000000000",
+          database_name: "test",
         },
       ],
-    }),
+      name: "vocab-builder-test",
+    })
   );
-  let worker: Awaited<ReturnType<typeof getPlatformProxy<{ DB: D1Database }>>> | undefined;
+  let worker:
+    | Awaited<ReturnType<typeof getPlatformProxy<{ DB: D1Database }>>>
+    | undefined;
   const close = async () => {
     try {
       await worker?.dispose();
     } finally {
-      await rm(temporary, { recursive: true, force: true });
+      await rm(temporary, { force: true, recursive: true });
     }
   };
   try {
@@ -39,18 +43,23 @@ export async function testDatabase() {
     });
     const binding = worker.env.DB;
     const directory = new URL("../migrations/", import.meta.url);
-    const files = (await readdir(directory)).filter((file) => file.endsWith(".sql")).sort();
-    for (const file of files) {
-      const source = await readFile(new URL(file, directory), "utf8");
+    const entries = await readdir(directory);
+    const files = entries.filter((file) => file.endsWith(".sql")).toSorted();
+    const sources = await Promise.all(
+      files.map((file) => readFile(new URL(file, directory), "utf-8"))
+    );
+    for (const source of sources) {
       for (const statement of source
         .split("--> statement-breakpoint")
         .filter((part) => part.trim())) {
+        // Each migration statement depends on the schema created by previous statements.
+        // eslint-disable-next-line no-await-in-loop
         await binding.prepare(statement).run();
       }
     }
-    return { binding, db: connect(binding), close };
+    return { binding, close, db: connect(binding) };
   } catch (error) {
     await close();
     throw error;
   }
-}
+};

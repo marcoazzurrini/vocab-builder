@@ -2,86 +2,95 @@
 module.exports = {
   forbidden: [
     {
-      name: "no-unresolved-imports",
-      comment: "Resolve package exports instead of allowing imports into private source.",
-      severity: "error",
+      comment:
+        "Resolve package exports instead of allowing imports into private source.",
       from: {},
+      name: "no-unresolved-imports",
+      severity: "error",
       to: { couldNotResolve: true },
     },
     {
+      from: {},
       name: "no-undeclared-external-dependencies",
       severity: "error",
-      from: {},
       to: { dependencyTypes: ["npm-no-pkg", "npm-unknown"] },
     },
     {
-      name: "no-relative-cross-workspace-imports",
       comment: "Cross-workspace imports must use a public package entrypoint.",
-      severity: "error",
       from: { path: "^((?:apps|packages)/[^/]+)/" },
+      name: "no-relative-cross-workspace-imports",
+      severity: "error",
       to: {
-        pathNot: "^$1/",
         dependencyTypes: ["local"],
+        pathNot: "^$1/",
       },
     },
     {
+      from: { path: "^packages/" },
       name: "packages-cannot-import-apps",
       severity: "error",
-      from: { path: "^packages/" },
       to: { path: "^apps/" },
     },
     {
+      from: { path: "^packages/spaced-repetition/" },
       name: "spaced-repetition-is-independent",
       severity: "error",
-      from: { path: "^packages/spaced-repetition/" },
       to: { path: "^packages/", pathNot: "^packages/spaced-repetition/" },
     },
     {
+      from: { path: "^packages/database/" },
       name: "database-only-depends-on-spaced-repetition",
       severity: "error",
-      from: { path: "^packages/database/" },
-      to: { path: "^packages/", pathNot: "^packages/(database|spaced-repetition)/" },
+      to: {
+        path: "^packages/",
+        pathNot: "^packages/(database|spaced-repetition)/",
+      },
     },
     {
+      from: { path: "^packages/authentication/" },
       name: "authentication-only-depends-on-database",
       severity: "error",
-      from: { path: "^packages/authentication/" },
-      to: { path: "^packages/", pathNot: "^packages/(authentication|database)/" },
+      to: {
+        path: "^packages/",
+        pathNot: "^packages/(authentication|database)/",
+      },
     },
     {
+      from: { path: "^apps/web/" },
       name: "web-uses-module-interfaces",
       severity: "error",
-      from: { path: "^apps/web/" },
       to: {
         path: "(^|/)(drizzle-orm|drizzle-kit|better-auth|@better-auth/drizzle-adapter|ts-fsrs)(/|$)",
       },
     },
     {
+      from: { pathNot: "\\.test\\.[cm]?[jt]sx?$|/src/testing\\.ts$" },
       name: "test-infrastructure-stays-in-tests",
       severity: "error",
-      from: { pathNot: "\\.test\\.[cm]?[jt]sx?$|/src/testing\\.ts$" },
       to: { path: "^packages/[^/]+/src/testing\\.ts$|\\.test\\.[cm]?[jt]sx?$" },
     },
     {
-      name: "web-client-cannot-import-server-implementation",
-      comment: "TanStack transforms server/functions.ts into the browser's HTTP transport.",
-      severity: "error",
+      comment:
+        "TanStack transforms server/functions.ts into the browser's HTTP transport.",
       from: {
         path: "^apps/web/src/",
         pathNot: "^apps/web/src/(server|routes/api)/|\\.test\\.[cm]?[jt]sx?$",
       },
+      name: "web-client-cannot-import-server-implementation",
+      severity: "error",
       to: {
         path: "^apps/web/src/server/|^packages/database/|^packages/(authentication|spaced-repetition)/src/server\\.ts$|^cloudflare:",
         pathNot: "^apps/web/src/server/functions\\.ts$",
       },
     },
     {
-      name: "public-client-entrypoints-stay-browser-safe",
-      comment: "Also reject indirect imports through shared helpers and re-exports.",
-      severity: "error",
+      comment:
+        "Also reject indirect imports through shared helpers and re-exports.",
       from: {
         path: "^packages/(authentication/src/client|spaced-repetition/src/index)\\.ts$",
       },
+      name: "public-client-entrypoints-stay-browser-safe",
+      severity: "error",
       to: {
         path: "^packages/database/|^packages/(authentication|spaced-repetition)/src/server\\.ts$|^cloudflare:",
         reachable: true,
@@ -89,17 +98,17 @@ module.exports = {
     },
   ],
   options: {
-    // Include type-only imports in the architecture rules.
-    tsPreCompilationDeps: true,
+    builtInModules: { add: ["cloudflare:workers"] },
     doNotFollow: { path: "node_modules" },
+    enhancedResolveOptions: {
+      conditionNames: ["import", "require", "node", "default"],
+      exportsFields: ["exports"],
+    },
     exclude: {
       // Exclude our build output, not dependencies' dist/ entrypoints.
       path: "^(apps|packages)/[^/]+/(\\.generated|\\.wrangler|\\.tanstack|\\.cache|dist|build)/|(^|/)routeTree\\.gen(?:\\.ts)?$",
     },
-    builtInModules: { add: ["cloudflare:workers"] },
-    enhancedResolveOptions: {
-      exportsFields: ["exports"],
-      conditionNames: ["import", "require", "node", "default"],
-    },
+    // Include type-only imports in the architecture rules.
+    tsPreCompilationDeps: true,
   },
 };

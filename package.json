@@ -12,10 +12,10 @@
     "ci": "bun run build && bun run check",
     "preview": "bun run --filter @vocab/web preview",
     "prepare": "lefthook install",
-    "lint": "oxlint && bun run boundaries",
+    "lint": "oxlint --deny-warnings && bun run boundaries",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "tsc --noEmit --module nodenext --target esnext --skipLibCheck oxlint.config.ts oxfmt.config.ts && bun run --filter '*' typecheck",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
     "test": "bun run --filter '*' test",
     "test:watch": "bun run --parallel --filter '*' test:watch",
@@ -35,8 +35,9 @@
     "dependency-cruiser": "^18.3.1",
     "lefthook": "^2.1.10",
     "oxfmt": "^0.62.0",
-    "oxlint": "^1.75.0",
-    "typescript": "6.0.3"
+    "oxlint": "^1.79.0",
+    "typescript": "6.0.3",
+    "ultracite": "^7.12.0"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {

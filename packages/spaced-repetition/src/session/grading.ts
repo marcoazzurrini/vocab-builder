@@ -1,12 +1,13 @@
 import { Rating } from "ts-fsrs";
 import type { Card as FsrsCard, Grade } from "ts-fsrs";
+
 import { matches } from "./matching";
 import type { Effort } from "./types";
 
 const EFFORT_TO_RATING: Record<Effort, Grade> = {
-  hard: Rating.Hard,
-  good: Rating.Good,
   easy: Rating.Easy,
+  good: Rating.Good,
+  hard: Rating.Hard,
 };
 
 /**
@@ -16,9 +17,8 @@ const EFFORT_TO_RATING: Record<Effort, Grade> = {
  * `reps` counts FSRS ratings, and guesses are never rated, so reps === 0 means
  * exactly "this word has never been recalled".
  */
-export function effortsFor(card: FsrsCard): Effort[] {
-  return card.reps === 0 ? ["hard", "good"] : ["hard", "good", "easy"];
-}
+export const effortsFor = (card: FsrsCard): Effort[] =>
+  card.reps === 0 ? ["hard", "good"] : ["hard", "good", "easy"];
 
 /**
  * Typing decides pass/fail; the user only reports how hard it felt. A wrong
@@ -29,14 +29,21 @@ export function effortsFor(card: FsrsCard): Effort[] {
  * Good is the default action anyway, so the worst case is a slightly generous
  * rating rather than a session that dies mid-answer.
  */
-export function gradeRecall(
+interface RecallGrade {
+  correct: boolean;
+  rating: Grade;
+}
+
+export const gradeRecall = (
   typed: string,
   expected: string,
   effort: Effort,
-  offered: Effort[],
-): { correct: boolean; rating: Grade } {
+  offered: Effort[]
+): RecallGrade => {
   const correct = matches(typed, expected);
-  if (!correct) return { correct, rating: Rating.Again };
+  if (!correct) {
+    return { correct, rating: Rating.Again };
+  }
   const chosen = offered.includes(effort) ? effort : "good";
   return { correct, rating: EFFORT_TO_RATING[chosen] };
-}
+};

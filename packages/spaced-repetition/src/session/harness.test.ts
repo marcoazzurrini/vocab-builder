@@ -1,89 +1,209 @@
 import { describe, expect, it } from "bun:test";
+
+import * as v from "valibot";
+
 import { catalogue, createLearner, studyBounds } from "./harness";
 import { attemptMismatches, violations } from "./invariants";
 
+const checkedFixture = <T>(value: T | null | undefined): T => {
+  if (value === null || value === undefined) {
+    throw new Error("Expected a present test fixture");
+  }
+  return value;
+};
+
 const START = new Date("2026-08-10T09:00:00");
 
+const parseStoredSchedule = (serialized: string) =>
+  v.parse(
+    v.looseObject({ due: v.string(), reps: v.number() }),
+    JSON.parse(serialized)
+  );
+
 describe("public generated-history harness", () => {
+  it("keeps a saved Review graduation for the next study day after clocks fall back", () => {
+    const result = Bun.spawnSync({
+      cmd: [
+        process.execPath,
+        "--eval",
+        `
+        import assert from "node:assert/strict";
+        import { catalogue, createLearner } from ${JSON.stringify(new URL("harness.ts", import.meta.url).href)};
+        import { violations } from ${JSON.stringify(new URL("invariants.ts", import.meta.url).href)};
+        const cycle = (values) => { let i = 0; return () => values[i++ % values.length]; };
+        const learner = createLearner({
+          behaviour: {
+            correct: cycle([true, false]), guessCorrect: cycle([true, false]),
+            effort: () => "easy", msPerPrompt: 1000,
+          },
+          dayRolloverHour: 2, newPerDay: 1,
+          start: new Date("2026-10-25T02:30:00"), words: catalogue(1),
+        });
+        learner.sit(3);
+        learner.wait(0);
+        learner.sit(1);
+        learner.wait(0);
+        assert.equal(learner.sit(200).at(-1).reason, "done");
+        assert.deepEqual(violations(learner.trace, learner.attempts, 2), []);
+        assert.equal(learner.attempts.length, 4);
+        assert.equal(learner.sit(1)[0].reason, "done");
+        const nextDay = new Date("2026-10-26T02:00:00+01:00").getTime();
+        learner.wait(nextDay - learner.now.getTime() - 1);
+        // Even after its elapsed 24-hour interval, Review follows study days.
+        assert.equal(learner.sit(1)[0].reason, "done");
+        assert.equal(learner.attempts.length, 4);
+        learner.wait(1);
+        const reopened = learner.sit(1)[0];
+        assert.equal(reopened.at, "recall");
+        assert.equal(reopened.expectedReps, 3);
+        assert.equal(reopened.wordId, "w0");
+        assert.deepEqual(violations(learner.trace, learner.attempts, 2), []);
+      `,
+      ],
+      env: { ...process.env, TZ: "Europe/Rome" },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    expect(result.stderr.toString()).toBe("");
+    expect(result.exitCode).toBe(0);
+  });
+
   it("charges distinct thinking times to their own answers, including the first guess and reopen", () => {
-    const thinks = [1_100, 2_300, 4_700, 8_900, 13_100, 17_300, 19_700, 23_900];
+    const thinks = [1100, 2300, 4700, 8900, 13_100, 17_300, 19_700, 23_900];
     let thought = 0;
     const learner = createLearner({
-      words: catalogue(2),
+      behaviour: {
+        msPerPrompt: () => {
+          const duration = checkedFixture(thinks[thought]);
+          thought += 1;
+          return duration;
+        },
+      },
       newPerDay: 2,
       start: START,
-      behaviour: { msPerPrompt: () => thinks[thought++]! },
+      words: catalogue(2),
     });
     const first = learner.sit(5);
-    expect(first.filter((s) => s.at !== "closed").map((s) => s.actedAt - s.shownAt)).toEqual(
-      thinks.slice(0, 5),
-    );
-    expect(learner.attempts.map((a) => a.latencyMs)).toEqual([1_100, 4_700, 13_100]);
-    expect(learner.attempts.map((a) => a.reviewedAt.getTime() - START.getTime())).toEqual([
-      1_100, 8_100, 30_100,
+    expect(
+      first.filter((s) => s.at !== "closed").map((s) => s.actedAt - s.shownAt)
+    ).toEqual(thinks.slice(0, 5));
+    expect(learner.attempts.map((a) => a.latencyMs)).toEqual([
+      1100, 4700, 13_100,
     ]);
+    expect(
+      learner.attempts.map((a) => a.reviewedAt.getTime() - START.getTime())
+    ).toEqual([1100, 8100, 30_100]);
     learner.wait(60_000);
     const reopened = learner.sit(2);
-    expect(reopened.filter((s) => s.at !== "closed").map((s) => s.actedAt - s.shownAt)).toEqual([
-      17_300, 19_700,
-    ]);
+    expect(
+      reopened
+        .filter((s) => s.at !== "closed")
+        .map((s) => s.actedAt - s.shownAt)
+    ).toEqual([17_300, 19_700]);
     expect(attemptMismatches(learner.trace, learner.attempts)).toEqual([]);
     expect(learner.attempts.every((a) => a.latencyMs > 0)).toBe(true);
   });
 
   it("persists JSON commands and server schedules, rebuilding rowless guesses without re-guessing", () => {
-    const learner = createLearner({ words: catalogue(1), newPerDay: 1, start: START });
+    const learner = createLearner({
+      newPerDay: 1,
+      start: START,
+      words: catalogue(1),
+    });
     learner.sit(1);
     expect(learner.commands).toHaveLength(1);
-    expect(learner.commands[0]).toMatchObject({ phase: "guess", expectedReps: 0, rating: null });
+    expect(learner.commands[0]).toMatchObject({
+      expectedReps: 0,
+      phase: "guess",
+      rating: null,
+    });
     expect(learner.snapshot.cards).toEqual([]);
     expect(learner.snapshot.guesses).toEqual([
-      { wordId: "w0", reviewedAt: learner.commands[0]!.reviewedAt },
+      {
+        reviewedAt: checkedFixture(learner.commands[0]).reviewedAt,
+        wordId: "w0",
+      },
     ]);
     const resumed = learner.sit(2);
-    expect(resumed.slice(0, 2).map((s) => s.at)).toEqual(["exposure", "recall"]);
+    expect(resumed.slice(0, 2).map((s) => s.at)).toEqual([
+      "exposure",
+      "recall",
+    ]);
     expect(learner.snapshot.cards).toHaveLength(1);
     expect(learner.commands).toHaveLength(2);
-    const stored = learner.snapshot.cards[0]!;
-    const scheduled = JSON.parse(stored.schedule);
-    expect(typeof scheduled.due).toBe("string");
+    const stored = checkedFixture(learner.snapshot.cards[0]);
+    const scheduled = parseStoredSchedule(stored.schedule);
+    expect(scheduled.due).toBeString();
     expect(scheduled.reps).toBe(1);
-    expect(JSON.parse(JSON.stringify(learner.snapshot))).toEqual(learner.snapshot);
-    expect(JSON.parse(JSON.stringify(learner.commands))).toEqual(learner.commands);
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- Exercise JSON wire serialization, including Date strings and omitted undefined fields.
+    expect(JSON.parse(JSON.stringify(learner.snapshot))).toEqual(
+      learner.snapshot
+    );
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- Exercise JSON wire serialization, including Date strings and omitted undefined fields.
+    expect(JSON.parse(JSON.stringify(learner.commands))).toEqual(
+      learner.commands
+    );
     const detached = learner.snapshot;
-    detached.cards[0]!.schedule = "corrupted outside the database";
+    checkedFixture(detached.cards[0]).schedule =
+      "corrupted outside the database";
     expect(learner.snapshot.cards[0]).toEqual(stored);
     learner.wait(24 * 60 * 60_000);
     learner.sit(1);
-    const before = learner.attempts.at(-1)!.stateBefore;
+    const before = checkedFixture(learner.attempts.at(-1)).stateBefore;
+    // oxlint-disable-next-line unicorn/prefer-structured-clone -- Exercise JSON wire serialization, including Date strings and omitted undefined fields.
     expect(JSON.parse(JSON.stringify(before))).toEqual(scheduled);
     expect(violations(learner.trace, learner.attempts)).toEqual([]);
   });
 
   it("records caughtUp with the earliest remaining learning due and reopens at that time", () => {
-    const learner = createLearner({ words: catalogue(1), newPerDay: 1, start: START });
-    const end = learner.sit().at(-1)!;
+    const learner = createLearner({
+      newPerDay: 1,
+      start: START,
+      words: catalogue(1),
+    });
+    const end = checkedFixture(learner.sit().at(-1));
     expect(end.at).toBe("closed");
-    if (end.at !== "closed") throw new Error("missing closed marker");
+    if (end.at !== "closed") {
+      throw new Error("missing closed marker");
+    }
     expect(end.reason).toBe("caughtUp");
     expect(end.eligibleWordIds).toEqual([]);
-    expect(end.nextDueAt).toBe(Math.min(...end.remainingLearning.map((c) => c.due)));
-    expect(end.nextDueAt!).toBeGreaterThan(learner.now.getTime());
-    learner.wait(end.nextDueAt! - learner.now.getTime());
+    expect(end.nextDueAt).toBe(
+      Math.min(...end.remainingLearning.map((c) => c.due))
+    );
+    expect(checkedFixture(end.nextDueAt)).toBeGreaterThan(
+      learner.now.getTime()
+    );
+    learner.wait(checkedFixture(end.nextDueAt) - learner.now.getTime());
     const resumed = learner.sit(1);
-    expect(resumed[0]).toMatchObject({ at: "recall", wordId: "w0", shownAt: end.nextDueAt });
+    expect(resumed[0]).toMatchObject({
+      at: "recall",
+      shownAt: end.nextDueAt,
+      wordId: "w0",
+    });
     expect(violations(learner.trace, learner.attempts)).toEqual([]);
   });
 
   it("distinguishes a cut from done, including the last allowed action reaching an end screen", () => {
-    const learner = createLearner({ words: catalogue(1), newPerDay: 1, start: START });
-    expect(learner.sit(0).at(-1)).toMatchObject({ reason: "cut", eligibleWordIds: ["w0"] });
+    const learner = createLearner({
+      newPerDay: 1,
+      start: START,
+      words: catalogue(1),
+    });
+    expect(learner.sit(0).at(-1)).toMatchObject({
+      eligibleWordIds: ["w0"],
+      reason: "cut",
+    });
     expect(learner.commands).toEqual([]);
     expect(learner.sit(3).at(-1)).toMatchObject({ reason: "caughtUp" });
-    const idle = createLearner({ words: catalogue(1), newPerDay: 0, start: START });
+    const idle = createLearner({
+      newPerDay: 0,
+      start: START,
+      words: catalogue(1),
+    });
     expect(idle.sit(0).at(-1)).toMatchObject({
-      reason: "done",
       eligibleWordIds: [],
+      reason: "done",
       remainingLearning: [],
     });
   });
@@ -98,12 +218,12 @@ describe("public generated-history harness", () => {
       next.setDate(next.getDate() + 1);
       next.setHours(2, 0, 0, 0);
       expect(studyBounds(new Date(`${day}T01:59:59`).getTime(), 2)).toEqual({
-        start: previous.getTime(),
         end: new Date(`${day}T02:00:00`).getTime() - 1,
+        start: previous.getTime(),
       });
       expect(studyBounds(new Date(`${day}T03:00:00`).getTime(), 2)).toEqual({
-        start: new Date(`${day}T02:00:00`).getTime(),
         end: next.getTime() - 1,
+        start: new Date(`${day}T02:00:00`).getTime(),
       });
     }
   });
@@ -114,9 +234,9 @@ describe("public generated-history harness", () => {
       ["2027-01-01T00:00:00", "2026-12-31T04:00:00", "2027-01-01T04:00:00"],
       ["2026-03-29T04:00:00", "2026-03-29T04:00:00", "2026-03-30T04:00:00"],
     ]) {
-      expect(studyBounds(new Date(at!).getTime(), 4)).toEqual({
-        start: new Date(start!).getTime(),
-        end: new Date(next!).getTime() - 1,
+      expect(studyBounds(new Date(checkedFixture(at)).getTime(), 4)).toEqual({
+        end: new Date(checkedFixture(next)).getTime() - 1,
+        start: new Date(checkedFixture(start)).getTime(),
       });
     }
   });

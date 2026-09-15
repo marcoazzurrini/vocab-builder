@@ -1,30 +1,44 @@
+import { beforeEach, describe, expect, it } from "bun:test";
+
 import { Rating, State, createEmptyCard } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
-import { beforeEach, describe, expect, it } from "bun:test";
+
 import { createSession } from "./index";
 import type { Session } from "./index";
 import type { Attempt, Card, Word } from "./types";
 
+const checkedFixture = <T>(value: T | null | undefined): T => {
+  if (value === null || value === undefined) {
+    throw new Error("Expected a present test fixture");
+  }
+  return value;
+};
+
 const START = new Date("2026-08-10T09:00:00");
 
+const cardFor = (word: Word, fsrs: FsrsCard): Card => ({
+  fsrs,
+  wordId: word.id,
+});
+
 const CHIEN: Word = {
-  id: "w-chien",
-  text: "chien",
+  freqRank: 1,
   gloss: "cane",
   hint: null,
+  id: "w-chien",
   image: "🐶",
   kind: "word",
-  freqRank: 1,
+  text: "chien",
 };
 
 const FENETRE: Word = {
-  id: "w-fenetre",
-  text: "fenêtre",
+  freqRank: 2,
   gloss: "finestra",
   hint: null,
+  id: "w-fenetre",
   image: "🪟",
   kind: "word",
-  freqRank: 2,
+  text: "fenêtre",
 };
 
 let clockMs: number;
@@ -37,53 +51,73 @@ beforeEach(() => {
   changed = [];
 });
 
-function tick(ms: number) {
+const tick = (ms: number) => {
   clockMs += ms;
-}
+};
 
-function makeSession(words: Word[], newPerDay = 10, cards: Card[] = []): Session {
-  return createSession({
-    words,
-    cards,
-    newPerDay,
-    clock: () => new Date(clockMs),
+const makeSession = (
+  words: Word[],
+  newPerDay = 10,
+  cards: Card[] = []
+): Session =>
+  createSession({
     accept: ({ attempt, card }) => {
       attempts.push(attempt);
-      if (card) changed.push(card);
+      if (card) {
+        changed.push(card);
+      }
     },
+    cards,
+    clock: () => new Date(clockMs),
+    newPerDay,
+    words,
   });
-}
 
 /** Walk a new word through guess → exposure → recall. */
-function introduce(session: Session, typed: string, effort: "hard" | "good" | "easy") {
+const introduce = (
+  session: Session,
+  typed: string,
+  effort: "hard" | "good" | "easy"
+) => {
   session.submitGuess("boh");
   session.exposureDone();
   session.submitRecall(typed, effort);
-}
+};
 
 /** Work through introductions until a recall is asked for. */
-function stepUntilRecall(session: Session) {
-  for (let i = 0; i < 50; i++) {
-    const view = session.view;
-    if (view.phase === "guess") session.submitGuess("");
-    else if (view.phase === "exposure") session.exposureDone();
-    else return;
+const stepUntilRecall = (session: Session) => {
+  for (let i = 0; i < 50; i += 1) {
+    const { view } = session;
+    if (view.phase === "guess") {
+      session.submitGuess("");
+    } else if (view.phase === "exposure") {
+      session.exposureDone();
+    } else {
+      return;
+    }
   }
-}
+};
 
 /** Answer everything until the session pauses or finishes. */
-function drain(session: Session, answerFor: (gloss: string) => string) {
-  for (let guard = 0; guard < 200; guard++) {
-    const view = session.view;
-    if (view.phase === "done" || view.phase === "caughtUp") return;
-    if (view.phase === "guess") session.submitGuess("");
-    else if (view.phase === "exposure") session.exposureDone();
-    else if (view.phase === "recall") session.submitRecall(answerFor(view.prompt.gloss), "good");
-    else session.dismissFeedback();
+const drain = (session: Session, answerFor: (gloss: string) => string) => {
+  for (let guard = 0; guard < 200; guard += 1) {
+    const { view } = session;
+    if (view.phase === "done" || view.phase === "caughtUp") {
+      return;
+    }
+    if (view.phase === "guess") {
+      session.submitGuess("");
+    } else if (view.phase === "exposure") {
+      session.exposureDone();
+    } else if (view.phase === "recall") {
+      session.submitRecall(answerFor(view.prompt.gloss), "good");
+    } else {
+      session.dismissFeedback();
+    }
     tick(20_000);
   }
   throw new Error("session never finished");
-}
+};
 
 describe("session", () => {
   describe("a new word", () => {
@@ -100,7 +134,7 @@ describe("session", () => {
     it("reveals the word only at exposure", () => {
       const s = makeSession([CHIEN]);
       s.submitGuess("cane");
-      expect(s.view).toMatchObject({ phase: "exposure", answer: "chien" });
+      expect(s.view).toMatchObject({ answer: "chien", phase: "exposure" });
     });
 
     it("logs the guess without rating it", () => {
@@ -110,18 +144,22 @@ describe("session", () => {
 
       expect(attempts).toHaveLength(1);
       expect(attempts[0]).toMatchObject({
-        phase: "guess",
-        typed: "cani",
         correct: false,
-        rating: null,
         latencyMs: 3000,
+        phase: "guess",
+        rating: null,
+        typed: "cani",
       });
     });
 
     it("accepts an empty guess — a shrug is a valid pretest", () => {
       const s = makeSession([CHIEN]);
       expect(() => s.submitGuess("")).not.toThrow();
-      expect(attempts[0]).toMatchObject({ typed: "", correct: false, rating: null });
+      expect(attempts[0]).toMatchObject({
+        correct: false,
+        rating: null,
+        typed: "",
+      });
     });
 
     it("notices a guess that happened to be right, still without rating it", () => {
@@ -135,13 +173,23 @@ describe("session", () => {
       s.submitGuess("x");
       s.exposureDone();
       // Easy here would send a word met twenty seconds ago eight days out.
-      expect(s.view).toMatchObject({ phase: "recall", efforts: ["hard", "good"] });
+      expect(s.view).toMatchObject({
+        efforts: ["hard", "good"],
+        phase: "recall",
+      });
     });
 
     it("offers Easy once the card has been rated", () => {
-      const rated = { ...createEmptyCard(new Date(clockMs)), reps: 1, state: State.Learning };
-      const s = makeSession([CHIEN], 0, [{ wordId: CHIEN.id, fsrs: rated }]);
-      expect(s.view).toMatchObject({ phase: "recall", efforts: ["hard", "good", "easy"] });
+      const rated = {
+        ...createEmptyCard(new Date(clockMs)),
+        reps: 1,
+        state: State.Learning,
+      };
+      const s = makeSession([CHIEN], 0, [{ fsrs: rated, wordId: CHIEN.id }]);
+      expect(s.view).toMatchObject({
+        efforts: ["hard", "good", "easy"],
+        phase: "recall",
+      });
     });
   });
 
@@ -171,7 +219,8 @@ describe("session", () => {
       const s = makeSession([CHIEN]);
       s.submitGuess("x");
       s.exposureDone();
-      s.submitRecall("chien", "easy"); // not offered on a first recall
+      // not offered on a first recall
+      s.submitRecall("chien", "easy");
       const recall = attempts.find((a) => a.phase === "recall");
       expect(recall).toMatchObject({ rating: Rating.Good });
     });
@@ -188,17 +237,17 @@ describe("session", () => {
 
       s.submitRecall("chien", "good");
       expect(changed).toHaveLength(1);
-      expect(changed[0]!.wordId).toBe(CHIEN.id);
+      expect(checkedFixture(changed[0]).wordId).toBe(CHIEN.id);
     });
 
     it("captures the state from before the answer, so history can be replayed", () => {
       const s = makeSession([CHIEN]);
       introduce(s, "chien", "good");
-      const recall = attempts.find((a) => a.phase === "recall")!;
+      const recall = checkedFixture(attempts.find((a) => a.phase === "recall"));
       expect(recall.stateBefore.state).toBe(State.New);
       expect(recall.stateBefore.reps).toBe(0);
       // The card itself has moved on; the attempt kept the earlier state.
-      expect(changed.at(-1)!.fsrs.reps).toBe(1);
+      expect(checkedFixture(changed.at(-1)).fsrs.reps).toBe(1);
     });
   });
 
@@ -215,8 +264,8 @@ describe("session", () => {
       const s = makeSession([FENETRE]);
       introduce(s, "fenetre", "good");
       expect(s.view).toEqual({
-        phase: "feedback",
         expected: "fenêtre",
+        phase: "feedback",
         typed: "fenetre",
       });
     });
@@ -235,19 +284,23 @@ describe("session", () => {
       // genuinely due again at dismissal. It must still not come straight
       // back while another card could go between.
       const s = makeSession([CHIEN, FENETRE], 2);
-      stepUntilRecall(s); // both introduced; chien is asked first
+      // both introduced; chien is asked first
+      stepUntilRecall(s);
       s.submitRecall("zzz", "good");
       expect(s.view.phase).toBe("feedback");
 
       tick(61_000);
       s.dismissFeedback();
-      expect(s.view).toMatchObject({ phase: "recall", prompt: { gloss: "finestra" } });
+      expect(s.view).toMatchObject({
+        phase: "recall",
+        prompt: { gloss: "finestra" },
+      });
     });
 
     it("refuses a call made in the wrong phase", () => {
       const s = makeSession([CHIEN]);
-      expect(() => s.exposureDone()).toThrow(/expected phase/);
-      expect(() => s.submitRecall("chien", "good")).toThrow(/expected phase/);
+      expect(() => s.exposureDone()).toThrow(/expected phase/u);
+      expect(() => s.submitRecall("chien", "good")).toThrow(/expected phase/u);
     });
   });
 
@@ -256,16 +309,19 @@ describe("session", () => {
       const s = makeSession([CHIEN, FENETRE], 1);
       introduce(s, "chien", "good");
       // Caught up, not done: chien's next learning step is still coming today.
-      expect(s.view).toMatchObject({ phase: "caughtUp", stats: { introduced: 1 } });
+      expect(s.view).toMatchObject({
+        phase: "caughtUp",
+        stats: { introduced: 1 },
+      });
     });
 
     it("counts words already introduced earlier today", () => {
       const s = createSession({
-        words: [CHIEN, FENETRE],
         cards: [],
-        newPerDay: 3,
-        introducedToday: 3,
         clock: () => new Date(clockMs),
+        introducedToday: 3,
+        newPerDay: 3,
+        words: [CHIEN, FENETRE],
       });
       expect(s.view.phase).toBe("done");
     });
@@ -281,17 +337,19 @@ describe("session", () => {
       const s = makeSession([CHIEN], 1);
       introduce(s, "chien", "good");
       expect(s.view).toMatchObject({
+        nextDueAt: checkedFixture(changed.at(-1)).fsrs.due,
         phase: "caughtUp",
-        nextDueAt: changed.at(-1)!.fsrs.due,
       });
     });
 
     it("reports what happened", () => {
       const s = makeSession([CHIEN, FENETRE], 2);
       drain(s, (gloss) => (gloss === "cane" ? "chien" : "fenêtre"));
-      const view = s.view;
+      const { view } = s;
       expect(view.phase).toBe("done");
-      if (view.phase !== "done") return;
+      if (view.phase !== "done") {
+        return;
+      }
       expect(view.stats.introduced).toBe(2);
       expect(view.stats.wrong).toBe(0);
       expect(view.stats.correct).toBe(view.stats.recalls);
@@ -299,12 +357,13 @@ describe("session", () => {
 
     it("counts a wrong answer", () => {
       const s = makeSession([FENETRE], 1);
-      introduce(s, "fenetre", "good"); // missing accent
+      // missing accent
+      introduce(s, "fenetre", "good");
       s.dismissFeedback();
       // Caught up, not done: the failed card comes back in a minute.
       expect(s.view).toMatchObject({
         phase: "caughtUp",
-        stats: { introduced: 1, recalls: 1, correct: 0, wrong: 1 },
+        stats: { correct: 0, introduced: 1, recalls: 1, wrong: 1 },
       });
     });
   });
@@ -312,32 +371,32 @@ describe("session", () => {
   describe("resuming with cards that already exist", () => {
     // Every other test starts from an empty collection, which is only ever true
     // on day one. These cover the case that is true every day after.
-    function cardFor(word: Word, fsrs: FsrsCard): Card {
-      return { wordId: word.id, fsrs };
-    }
-
     it("resumes a guessed word at its exposure, not at a guess", () => {
       // An unrated card in the deck can only mean the word was guessed and the
       // app closed before its first rating: nothing is written before the
       // guess, and a guess is logged exactly once. So the pretest is already
       // on record and the word is shown again instead.
-      const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
-      expect(s.view).toMatchObject({ phase: "exposure", answer: "chien" });
+      const s = makeSession([CHIEN], 10, [
+        cardFor(CHIEN, createEmptyCard(new Date(clockMs))),
+      ]);
+      expect(s.view).toMatchObject({ answer: "chien", phase: "exposure" });
     });
 
     it("does not spend allowance again on a resumed word", () => {
       // Its guess already counts in introducedToday, so resuming must not take
       // a second slot on top of that.
       const s = createSession({
-        words: [CHIEN, FENETRE],
-        cards: [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))],
-        newPerDay: 1,
-        introducedToday: 1,
-        clock: () => new Date(clockMs),
         accept: ({ attempt, card }) => {
           attempts.push(attempt);
-          if (card) changed.push(card);
+          if (card) {
+            changed.push(card);
+          }
         },
+        cards: [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))],
+        clock: () => new Date(clockMs),
+        introducedToday: 1,
+        newPerDay: 1,
+        words: [CHIEN, FENETRE],
       });
       expect(s.view.phase).toBe("exposure");
       s.exposureDone();
@@ -350,14 +409,18 @@ describe("session", () => {
     it("logs no second guess for a resumed word", () => {
       // One guess per word is a schema-level promise (a partial unique index),
       // so the session must never emit another.
-      const s = makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
+      const s = makeSession([CHIEN], 10, [
+        cardFor(CHIEN, createEmptyCard(new Date(clockMs))),
+      ]);
       s.exposureDone();
       s.submitRecall("chien", "good");
       expect(attempts.filter((a) => a.phase === "guess")).toHaveLength(0);
     });
 
     it("does not write the card again when resuming", () => {
-      makeSession([CHIEN], 10, [cardFor(CHIEN, createEmptyCard(new Date(clockMs)))]);
+      makeSession([CHIEN], 10, [
+        cardFor(CHIEN, createEmptyCard(new Date(clockMs))),
+      ]);
       expect(changed).toHaveLength(0);
     });
 
@@ -377,20 +440,24 @@ describe("session", () => {
       // FSRS's first — the one that sets initial difficulty.
       const words = Array.from({ length: 5 }, (_, i) => ({
         ...CHIEN,
+        freqRank: i,
+        gloss: `parola${i}`,
         id: `w${i}`,
         text: `mot${i}`,
-        gloss: `parola${i}`,
-        freqRank: i,
       }));
       const s = makeSession(words, 5);
       const phases: string[] = [];
 
-      for (let i = 0; i < 10; i++) {
-        const view = s.view;
+      for (let i = 0; i < 10; i += 1) {
+        const { view } = s;
         phases.push(view.phase);
-        if (view.phase === "guess") s.submitGuess("");
-        else if (view.phase === "exposure") s.exposureDone();
-        else break;
+        if (view.phase === "guess") {
+          s.submitGuess("");
+        } else if (view.phase === "exposure") {
+          s.exposureDone();
+        } else {
+          break;
+        }
       }
 
       // Ten steps: five guesses and five exposures, no recall among them.

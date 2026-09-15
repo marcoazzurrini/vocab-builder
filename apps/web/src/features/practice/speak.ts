@@ -7,7 +7,10 @@
  * try/catch, which meant the one principle present on every single card could
  * stop working without anything saying so.
  */
-export function speak(text: string, onUnavailable?: (reason: string) => void): void {
+export const speak = (
+  text: string,
+  onUnavailable?: (reason: string) => void
+): void => {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onUnavailable?.("Questo browser non supporta la sintesi vocale.");
     return;
@@ -19,18 +22,24 @@ export function speak(text: string, onUnavailable?: (reason: string) => void): v
 
   // Chrome populates voices asynchronously, so the first call of a session
   // often sees an empty list. Falling back to lang alone still speaks French.
-  const french = window.speechSynthesis.getVoices().find((v) => v.lang?.startsWith("fr"));
-  if (french) utterance.voice = french;
+  const french = window.speechSynthesis
+    .getVoices()
+    .find((v) => v.lang?.startsWith("fr"));
+  if (french) {
+    utterance.voice = french;
+  }
 
-  utterance.onerror = (event) => onUnavailable?.(`Audio non riuscito (${event.error}).`);
+  utterance.addEventListener("error", (event) =>
+    onUnavailable?.(`Audio non riuscito (${event.error}).`)
+  );
 
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
-}
+};
 
 /** Ask the browser to load voices early, so the first card is not the slow one. */
-export function warmUpVoices(): void {
+export const warmUpVoices = (): void => {
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.getVoices();
   }
-}
+};

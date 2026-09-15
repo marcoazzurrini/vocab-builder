@@ -14,16 +14,25 @@ import type { ErrorInfo, ReactNode } from "react";
  * It is not gone. Every answer is written as it happens, so reloading resumes
  * from the last one. That is what this offers.
  */
-type Props = { children: ReactNode };
-type State = { error: Error | null };
+interface Props {
+  children: ReactNode;
+}
+interface State {
+  error: Error | null;
+}
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  constructor(props: Props) {
+    super(props);
+    this.state = { error: null };
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { error };
   }
 
+  // React requires an instance lifecycle method even when reporting uses no instance data.
+  // oxlint-disable-next-line eslint/class-methods-use-this
   componentDidCatch(error: Error, info: ErrorInfo) {
     // No reporting service yet, so the console is the only record there is.
     console.error("Session crashed:", error, info.componentStack);
@@ -31,13 +40,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     const { error } = this.state;
-    if (!error) return this.props.children;
+    if (!error) {
+      return this.props.children;
+    }
 
     return (
       <div className="stage">
         <p className="eyebrow wrong">qualcosa è andato storto</p>
         <p className="message">
-          Le risposte già date sono salvate. Ricarica per riprendere da dove eri.
+          Le risposte già date sono salvate. Ricarica per riprendere da dove
+          eri.
         </p>
         <div className="actions">
           <button type="button" onClick={() => window.location.reload()}>

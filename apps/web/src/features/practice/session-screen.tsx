@@ -1,17 +1,95 @@
-import { useEffect, useRef, useState } from "react";
 import type { Effort } from "@vocab/spaced-repetition";
-import { usePracticeSession } from "./use-practice-session";
+import { useEffect, useRef, useState } from "react";
+
 import { speak, warmUpVoices } from "./speak";
+import type { PracticeTransport } from "./transport";
+import { usePracticeSession } from "./use-practice-session";
 
 const EFFORT_LABEL: Record<Effort, string> = {
-  hard: "Difficile",
-  good: "Bene",
   easy: "Facile",
+  good: "Bene",
+  hard: "Difficile",
 };
 
-export function SessionScreen({ userId }: { userId: string }) {
-  const practice = usePracticeSession(userId);
-  const { view, loadError, writeError, syncConflict } = practice;
+const Prompt = ({
+  image,
+  gloss,
+  hint,
+}: {
+  image: string | null;
+  gloss: string;
+  hint: string | null;
+}) => (
+  <>
+    {image && <p className="image">{image}</p>}
+    <p className="gloss">{gloss}</p>
+    {hint && <p className="hint">{hint}</p>}
+  </>
+);
+
+const NextDueNote = ({ due }: { due: number }) => {
+  // eslint-disable-next-line react/hook-use-state -- Capture time when this due notice mounts; its keyed remount refreshes the estimate without impure renders.
+  const [now] = useState(Date.now);
+  return (
+    <p className="note">
+      Prossima carta tra ~{Math.max(1, Math.ceil((due - now) / 60_000))} min —
+      questa pagina riparte da sola.
+    </p>
+  );
+};
+
+const Recovery = ({
+  practice,
+}: {
+  practice: ReturnType<typeof usePracticeSession>;
+}) => (
+  <div>
+    <p role="alert" className="note wrong">
+      {practice.writeError
+        ? "Salvataggio non riuscito"
+        : "Caricamento non riuscito"}
+      : {practice.writeError ?? practice.loadError}
+    </p>
+    <p className="note">
+      Riprova prima di continuare. Non cancellare i dati del browser: potrebbero
+      contenere risposte da salvare.
+    </p>
+    <button
+      type="button"
+      onClick={() => {
+        void practice.retry();
+      }}
+    >
+      Riprova
+    </button>
+    {practice.syncConflict && (
+      <button
+        type="button"
+        onClick={() => {
+          // eslint-disable-next-line no-alert -- Discarding the only durable copy requires explicit user confirmation.
+          const confirmed = window.confirm(
+            "Scartare tutte le risposte non sincronizzate su questo dispositivo? Questa azione non può essere annullata. I progressi già salvati rimangono invariati."
+          );
+          if (confirmed) {
+            practice.discard();
+          }
+        }}
+      >
+        Scarta risposte in attesa e ricarica
+      </button>
+    )}
+  </div>
+);
+
+export const SessionScreen = ({
+  userId,
+  transport,
+}: {
+  userId: string;
+  transport?: PracticeTransport;
+}) => {
+  const practice = usePracticeSession(userId, transport);
+  const { view, loadError, writeError } = practice;
   const [audioError, setAudioError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,60 +103,32 @@ export function SessionScreen({ userId }: { userId: string }) {
   // The gloss changes whenever the card does, which is what should re-run these.
   const exposureAnswer = view?.phase === "exposure" ? view.answer : null;
   const promptGloss = view && "prompt" in view ? view.prompt.gloss : null;
-  const nextDueMs = view?.phase === "caughtUp" ? view.nextDueAt.getTime() : null;
 
   // One clean exposure: see it, hear it, say it (§2, §6).
   useEffect(() => {
-    if (exposureAnswer) speak(exposureAnswer, setAudioError);
+    if (exposureAnswer) {
+      speak(exposureAnswer, setAudioError);
+    }
   }, [exposureAnswer]);
 
   useEffect(() => {
-    if (phase === "guess" || phase === "recall") inputRef.current?.focus();
+    if (phase === "guess" || phase === "recall") {
+      inputRef.current?.focus();
+    }
+    // eslint-disable-next-line react/exhaustive-effect-dependencies -- A new card must refocus the remounted input even when its phase is unchanged.
   }, [phase, promptGloss]);
 
-  function act(fn: () => void) {
+  const act = (fn: () => void) => {
     fn();
     setTyped("");
-  }
+  };
 
-  if (loadError || writeError)
-    return (
-      <div>
-        <p role="alert" className="note wrong">
-          {writeError ? "Salvataggio non riuscito" : "Caricamento non riuscito"}:{" "}
-          {writeError ?? loadError}
-        </p>
-        <p className="note">
-          Riprova prima di continuare. Non cancellare i dati del browser: potrebbero contenere
-          risposte da salvare.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            void practice.retry();
-          }}
-        >
-          Riprova
-        </button>
-        {syncConflict && (
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                !window.confirm(
-                  "Scartare tutte le risposte non sincronizzate su questo dispositivo? Questa azione non può essere annullata. I progressi già salvati rimangono invariati.",
-                )
-              )
-                return;
-              practice.discard();
-            }}
-          >
-            Scarta risposte in attesa e ricarica
-          </button>
-        )}
-      </div>
-    );
-  if (!view) return <p className="note">Carico…</p>;
+  if (loadError || writeError) {
+    return <Recovery practice={practice} />;
+  }
+  if (!view) {
+    return <p className="note">Carico…</p>;
+  }
 
   return (
     // Keyed so the entrance animation replays when the phase or card changes —
@@ -92,7 +142,11 @@ export function SessionScreen({ userId }: { userId: string }) {
           }}
         >
           <p className="eyebrow">parola nuova · prova a indovinare</p>
-          <Prompt image={view.prompt.image} gloss={view.prompt.gloss} hint={view.prompt.hint} />
+          <Prompt
+            image={view.prompt.image}
+            gloss={view.prompt.gloss}
+            hint={view.prompt.hint}
+          />
           <input
             ref={inputRef}
             value={typed}
@@ -124,8 +178,11 @@ export function SessionScreen({ userId }: { userId: string }) {
             >
               Riascolta
             </button>
-            <button type="button" onClick={() => act(() => practice.exposureDone())}>
-              L'ho detta
+            <button
+              type="button"
+              onClick={() => act(() => practice.exposureDone())}
+            >
+              L&apos;ho detta
             </button>
           </div>
         </>
@@ -141,7 +198,11 @@ export function SessionScreen({ userId }: { userId: string }) {
           }}
         >
           <p className="eyebrow">scrivi la parola francese</p>
-          <Prompt image={view.prompt.image} gloss={view.prompt.gloss} hint={view.prompt.hint} />
+          <Prompt
+            image={view.prompt.image}
+            gloss={view.prompt.gloss}
+            hint={view.prompt.hint}
+          />
           <input
             ref={inputRef}
             value={typed}
@@ -184,7 +245,10 @@ export function SessionScreen({ userId }: { userId: string }) {
             hai scritto: <b>{view.typed || "—"}</b>
           </p>
           <div className="actions">
-            <button type="button" onClick={() => act(() => practice.dismissFeedback())}>
+            <button
+              type="button"
+              onClick={() => act(() => practice.dismissFeedback())}
+            >
               Continua
             </button>
           </div>
@@ -197,13 +261,13 @@ export function SessionScreen({ userId }: { userId: string }) {
           {/* Italian, so the sans voice — .answer is reserved for French. */}
           <p className="status">Tutto fatto, per ora</p>
           <p className="stats">
-            {view.stats.introduced} parole nuove · {view.stats.correct}/{view.stats.recalls}{" "}
-            richiami corretti
+            {view.stats.introduced} parole nuove · {view.stats.correct}/
+            {view.stats.recalls} richiami corretti
           </p>
-          <p className="note">
-            Prossima carta tra ~{Math.max(1, Math.ceil((nextDueMs! - Date.now()) / 60_000))} min —
-            questa pagina riparte da sola.
-          </p>
+          <NextDueNote
+            key={view.nextDueAt.getTime()}
+            due={view.nextDueAt.getTime()}
+          />
         </>
       )}
 
@@ -212,8 +276,8 @@ export function SessionScreen({ userId }: { userId: string }) {
           <p className="eyebrow">sessione finita</p>
           <p className="status">Bravo</p>
           <p className="stats">
-            {view.stats.introduced} parole nuove · {view.stats.correct}/{view.stats.recalls}{" "}
-            richiami corretti
+            {view.stats.introduced} parole nuove · {view.stats.correct}/
+            {view.stats.recalls} richiami corretti
           </p>
         </>
       )}
@@ -221,22 +285,4 @@ export function SessionScreen({ userId }: { userId: string }) {
       {audioError && <p className="note">{audioError}</p>}
     </div>
   );
-}
-
-function Prompt({
-  image,
-  gloss,
-  hint,
-}: {
-  image: string | null;
-  gloss: string;
-  hint: string | null;
-}) {
-  return (
-    <>
-      {image && <p className="image">{image}</p>}
-      <p className="gloss">{gloss}</p>
-      {hint && <p className="hint">{hint}</p>}
-    </>
-  );
-}
+};

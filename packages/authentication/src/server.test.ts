@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, spyOn } from "bun:test";
-import { createAuthentication } from "./server";
+
 import { testDatabase } from "@vocab/database/testing";
+
+import { createAuthentication } from "./server";
 
 let fixture: Awaited<ReturnType<typeof testDatabase>>;
 const baseURL = "http://localhost:5173";
@@ -8,11 +10,11 @@ let auth: ReturnType<typeof createAuthentication>;
 
 const makeAuth = () =>
   createAuthentication({
-    database: fixture.binding,
-    baseURL: baseURL,
-    secret: "a-local-test-secret-with-at-least-thirty-two-characters",
     allowedEmails: "learner@example.com",
+    baseURL,
+    database: fixture.binding,
     emailMode: "log",
+    secret: "a-local-test-secret-with-at-least-thirty-two-characters",
   });
 beforeAll(async () => {
   fixture = await testDatabase();
@@ -25,27 +27,28 @@ afterAll(async () => {
 const requestLink = (email: string, origin = baseURL) =>
   auth.handle(
     new Request(`${baseURL}/api/auth/sign-in/magic-link`, {
-      method: "POST",
+      body: JSON.stringify({ callbackURL: "/", email }),
       headers: {
         "Content-Type": "application/json",
-        Origin: origin,
         Cookie: "better-auth.session_token=untrusted",
+        Origin: origin,
       },
-      body: JSON.stringify({ email, callbackURL: "/" }),
-    }),
+      method: "POST",
+    })
   );
 
 describe("Better Auth on D1", () => {
   it("rejects unauthenticated access", async () => {
-    await expect(auth.requireUser(new Headers())).rejects.toThrow(/Sign in/);
+    await expect(auth.requireUser(new Headers())).rejects.toThrow(/Sign in/u);
   });
 
   it("signs in through a single-use magic link and supports sign-out", async () => {
     const logs = spyOn(console, "info").mockImplementation(() => {});
     try {
-      expect((await requestLink("learner@example.com")).status).toBe(200);
+      const response = await requestLink("learner@example.com");
+      expect(response.status).toBe(200);
       const line = logs.mock.calls.find(([value]) =>
-        String(value).startsWith("[local sign-in]"),
+        String(value).startsWith("[local sign-in]")
       )?.[0];
       expect(line).toBeDefined();
       const url = String(line).replace("[local sign-in] ", "");
@@ -57,19 +60,26 @@ describe("Better Auth on D1", () => {
         .join("; ");
       expect(cookie).toContain("session_token");
       const headers = new Headers({ cookie });
-      expect((await auth.requireUser(headers)).email).toBe("learner@example.com");
-      await expect(auth.requireUser(headers, "different-user")).rejects.toThrow(/account/);
+      const currentUser = await auth.requireUser(headers);
+      expect(currentUser.email).toBe("learner@example.com");
+      await expect(auth.requireUser(headers, "different-user")).rejects.toThrow(
+        /account/u
+      );
       const reused = await auth.handle(new Request(url));
-      expect(reused.headers.get("location")).toMatch(/error=/);
+      expect(reused.headers.get("location")).toMatch(/error=/u);
       const out = await auth.handle(
         new Request(`${baseURL}/api/auth/sign-out`, {
-          method: "POST",
-          headers: { cookie, Origin: baseURL, "Content-Type": "application/json" },
           body: "{}",
-        }),
+          headers: {
+            "Content-Type": "application/json",
+            Origin: baseURL,
+            cookie,
+          },
+          method: "POST",
+        })
       );
       expect(out.status).toBe(200);
-      await expect(auth.requireUser(headers)).rejects.toThrow(/Sign in/);
+      await expect(auth.requireUser(headers)).rejects.toThrow(/Sign in/u);
     } finally {
       logs.mockRestore();
     }
@@ -78,7 +88,8 @@ describe("Better Auth on D1", () => {
   it("does not deliver links to addresses outside the allowlist", async () => {
     const logs = spyOn(console, "info").mockImplementation(() => {});
     try {
-      expect((await requestLink("stranger@example.com")).status).toBe(200);
+      const response = await requestLink("stranger@example.com");
+      expect(response.status).toBe(200);
       expect(logs).not.toHaveBeenCalled();
     } finally {
       logs.mockRestore();
@@ -86,23 +97,31 @@ describe("Better Auth on D1", () => {
   });
 
   it("rejects an untrusted origin", async () => {
-    const response = await requestLink("learner@example.com", "https://attacker.example");
+    const response = await requestLink(
+      "learner@example.com",
+      "https://attacker.example"
+    );
     expect(response.status).toBe(403);
   });
 
   it("keeps email rate limits in D1 across fresh auth instances", async () => {
     const statuses = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 4; i += 1) {
+      // Each fresh instance must observe the previous request's persisted rate-limit count.
+      // eslint-disable-next-line no-await-in-loop
       const response = await makeAuth().handle(
         new Request(`${baseURL}/api/auth/sign-in/magic-link`, {
-          method: "POST",
+          body: JSON.stringify({
+            callbackURL: "/",
+            email: "stranger@example.com",
+          }),
           headers: {
             "Content-Type": "application/json",
             Origin: baseURL,
             "cf-connecting-ip": "192.0.2.10",
           },
-          body: JSON.stringify({ email: "stranger@example.com", callbackURL: "/" }),
-        }),
+          method: "POST",
+        })
       );
       statuses.push(response.status);
     }
@@ -110,13 +129,15 @@ describe("Better Auth on D1", () => {
   });
 
   it("fails closed when production secrets or an allowlist are absent", () => {
-    expect(() => createAuthentication({ database: fixture.binding })).toThrow(/BETTER_AUTH/);
+    expect(() => createAuthentication({ database: fixture.binding })).toThrow(
+      /BETTER_AUTH/u
+    );
     expect(() =>
       createAuthentication({
-        database: fixture.binding,
         baseURL: "https://vocab.example",
+        database: fixture.binding,
         secret: "x".repeat(32),
-      }),
-    ).toThrow(/ALLOWED_EMAILS/);
+      })
+    ).toThrow(/ALLOWED_EMAILS/u);
   });
 });

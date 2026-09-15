@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Sidebar } from "./Sidebar";
-import { Wordmark } from "./Wordmark";
-import { ErrorBoundary } from "./ErrorBoundary";
 
-export function AppShell({
+import { ErrorBoundary } from "./error-boundary";
+import { Sidebar } from "./sidebar";
+import { Wordmark } from "./wordmark";
+
+export const AppShell = ({
   email,
   onSignOut,
   children,
@@ -12,13 +13,17 @@ export function AppShell({
   email: string;
   onSignOut: () => void;
   children: ReactNode;
-}) {
+}) => {
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
-    if (!menuOpen) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setMenuOpen(false);
+    if (!menuOpen) {
+      return;
     }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
@@ -31,7 +36,13 @@ export function AppShell({
         onClose={() => setMenuOpen(false)}
         onSignOut={onSignOut}
       />
-      {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+      {menuOpen && (
+        <div
+          className="scrim"
+          onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <div className="col">
         <header>
           <button
@@ -63,4 +74,4 @@ export function AppShell({
       </div>
     </div>
   );
-}
+};

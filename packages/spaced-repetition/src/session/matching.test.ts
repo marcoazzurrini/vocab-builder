@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import fc from "fast-check";
+
+import * as fc from "fast-check";
+
 import { matches, normalise } from "./matching";
 
 // One rule: orthography is graded, typography is not.
@@ -45,8 +47,12 @@ describe("answer matching", () => {
     });
 
     it("accepts either apostrophe", () => {
-      expect(matches("qu’est-ce que c’est", "qu'est-ce que c'est ?")).toBe(true);
-      expect(matches("qu'est-ce que c'est", "qu’est-ce que c’est ?")).toBe(true);
+      expect(matches("qu’est-ce que c’est", "qu'est-ce que c'est ?")).toBe(
+        true
+      );
+      expect(matches("qu'est-ce que c'est", "qu’est-ce que c’est ?")).toBe(
+        true
+      );
     });
 
     it("ignores a missing question mark", () => {
@@ -74,7 +80,9 @@ describe("answer matching", () => {
 
     it("accepts the other single quotes a keyboard might emit", () => {
       for (const apostrophe of ["'", "’", "‘", "ʼ", "´", "`", "′"]) {
-        expect(matches(`qu${apostrophe}est-ce que c'est`, "qu'est-ce que c'est ?")).toBe(true);
+        expect(
+          matches(`qu${apostrophe}est-ce que c'est`, "qu'est-ce que c'est ?")
+        ).toBe(true);
       }
     });
   });
@@ -91,15 +99,17 @@ describe("answer matching", () => {
 
     it("removes all supported terminal punctuation and intervening whitespace in one pass", () => {
       expect(normalise("bonjour ! ?")).toBe("bonjour");
-      expect(normalise("bonjour.\t!\n?\u00a0.\u202f")).toBe("bonjour");
+      expect(normalise("bonjour.\t!\n?\u00A0.\u202F")).toBe("bonjour");
       expect(normalise(" !\t?\n. ")).toBe("");
     });
 
     it("preserves interior punctuation, accents, and unsupported terminal punctuation", () => {
       expect(normalise("  Écoute ! Ça va ? Oui... très bien ! ? ")).toBe(
-        "écoute ! ça va ? oui... très bien",
+        "écoute ! ça va ? oui... très bien"
       );
-      expect(normalise("où, ça; là: peut-être…")).toBe("où, ça; là: peut-être…");
+      expect(normalise("où, ça; là: peut-être…")).toBe(
+        "où, ça; là: peut-être…"
+      );
       expect(matches("ça!va", "çava")).toBe(false);
     });
 
@@ -117,7 +127,7 @@ describe("answer matching", () => {
         .array(
           fc.oneof(
             fc
-              .integer({ min: 0, max: 0x10ffff })
+              .integer({ max: 0x10_ff_ff, min: 0 })
               .map((codePoint) => String.fromCodePoint(codePoint)),
             fc.constantFrom(
               "œ",
@@ -132,18 +142,31 @@ describe("answer matching", () => {
               " ",
               "\t",
               "\n",
-              "\u00a0",
-              "\u202f",
-            ),
+              "\u00A0",
+              "\u202F"
+            )
           ),
-          { maxLength: 80 },
+          { maxLength: 80 }
         )
-        .map((characters) => characters.join("")),
+        .map((characters) => characters.join(""))
     );
     const suffix = fc
-      .array(fc.constantFrom("!", "?", ".", " ", "\t", "\n", "\r", "\u00a0", "\u202f"), {
-        maxLength: 40,
-      })
+      .array(
+        fc.constantFrom(
+          "!",
+          "?",
+          ".",
+          " ",
+          "\t",
+          "\n",
+          "\r",
+          "\u00A0",
+          "\u202F"
+        ),
+        {
+          maxLength: 40,
+        }
+      )
       .map((characters) => characters.join(""));
 
     it("is idempotent, NFC-composed, and whitespace-normalized", () => {
@@ -153,9 +176,9 @@ describe("answer matching", () => {
           expect(normalise(output)).toBe(output);
           expect(output.normalize("NFC")).toBe(output);
           expect(output.trim()).toBe(output);
-          expect(output).not.toMatch(/\s{2}|[^\S ]|[?!.\s]$/);
+          expect(output).not.toMatch(/\s{2}|[^\S ]|[?!.\s]$/u);
         }),
-        { numRuns: 500 },
+        { numRuns: 500 }
       );
     });
 
@@ -164,7 +187,7 @@ describe("answer matching", () => {
         fc.property(text, suffix, (input, ending) => {
           expect(normalise(input + ending)).toBe(normalise(input));
         }),
-        { numRuns: 500 },
+        { numRuns: 500 }
       );
     });
 
@@ -174,7 +197,7 @@ describe("answer matching", () => {
           expect(matches(left, left.normalize("NFD"))).toBe(true);
           expect(matches(left, right)).toBe(matches(right, left));
         }),
-        { numRuns: 500 },
+        { numRuns: 500 }
       );
     });
 
@@ -192,7 +215,7 @@ describe("answer matching", () => {
         ["ô", "o"],
         ["ù", "u"],
         ["û", "u"],
-        ["ç", "c"],
+        ["ç", "c"]
       );
       fc.assert(
         fc.property(
@@ -202,11 +225,13 @@ describe("answer matching", () => {
           (beginning, [accented, plain], punctuation) => {
             const word = `${beginning}${accented}${punctuation}mot`;
             expect(normalise(word)).toBe(word);
-            expect(matches(word, `${beginning}${plain}${punctuation}mot`)).toBe(false);
+            expect(matches(word, `${beginning}${plain}${punctuation}mot`)).toBe(
+              false
+            );
             expect(matches(word, `${beginning}${accented}mot`)).toBe(false);
-          },
+          }
         ),
-        { numRuns: 500 },
+        { numRuns: 500 }
       );
     });
   });

@@ -1,9 +1,22 @@
-import fc from "fast-check";
 import { describe, expect, it } from "bun:test";
+
+import * as fc from "fast-check";
+
 import { catalogue, createLearner } from "./harness";
-import type { Behaviour, Learner, Step } from "./harness";
-import { attemptMismatches, closureContradictions, violations } from "./invariants";
+import type { Behaviour, Learner } from "./harness";
+import {
+  attemptMismatches,
+  closureContradictions,
+  violations,
+} from "./invariants";
 import type { Effort } from "./types";
+
+const checkedFixture = <T>(value: T | null | undefined): T => {
+  if (value === null || value === undefined) {
+    throw new Error("Expected a present test fixture");
+  }
+  return value;
+};
 
 /**
  * The session's promises, checked against sequences nobody wrote down.
@@ -37,10 +50,10 @@ const startDates = fc.constantFrom(
   "2026-10-25T02:30:00",
   "2026-11-01T01:30:00",
   "2026-08-10T09:00:00",
-  "2026-08-10T03:59:30",
+  "2026-08-10T03:59:30"
 );
 
-type Scenario = {
+interface Scenario {
   start: string;
   rollover: number;
   variedCatalogue: boolean;
@@ -59,38 +72,50 @@ type Scenario = {
    * fixed 18s pace could never produce.
    */
   thinks: number[];
+}
+
+const scenario = (options: { maxGap: number }) =>
+  fc.record({
+    answers: fc.array(fc.boolean(), { maxLength: 20, minLength: 1 }),
+    cuts: fc.array(fc.integer({ max: 15, min: 1 }), {
+      maxLength: 8,
+      minLength: 1,
+    }),
+    efforts: fc.array(fc.constantFrom<Effort>("hard", "good", "easy"), {
+      maxLength: 8,
+      minLength: 1,
+    }),
+    gaps: fc.array(fc.integer({ max: options.maxGap, min: 0 }), {
+      maxLength: 8,
+      minLength: 1,
+    }),
+    newPerDay: fc.integer({ max: 12, min: 0 }),
+    rollover: fc.integer({ max: 23, min: 0 }),
+    start: startDates,
+    thinks: fc.array(fc.integer({ max: 5 * MINUTE, min: 1000 }), {
+      maxLength: 10,
+      minLength: 1,
+    }),
+    variedCatalogue: fc.boolean(),
+    words: fc.integer({ max: 25, min: 1 }),
+  });
+
+const cycleFixture = <T>(values: readonly T[]) => {
+  expect(values.length).toBeGreaterThan(0);
+  let index = 0;
+  return () => {
+    const value = checkedFixture(values[index]);
+    index = (index + 1) % values.length;
+    return value;
+  };
 };
 
-function scenario(options: { maxGap: number }) {
-  return fc.record({
-    start: startDates,
-    rollover: fc.integer({ min: 0, max: 23 }),
-    variedCatalogue: fc.boolean(),
-    words: fc.integer({ min: 1, max: 25 }),
-    newPerDay: fc.integer({ min: 0, max: 12 }),
-    cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
-    gaps: fc.array(fc.integer({ min: 0, max: options.maxGap }), { minLength: 1, maxLength: 8 }),
-    answers: fc.array(fc.boolean(), { minLength: 1, maxLength: 20 }),
-    efforts: fc.array(fc.constantFrom<Effort>("hard", "good", "easy"), {
-      minLength: 1,
-      maxLength: 8,
-    }),
-    thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), { minLength: 1, maxLength: 10 }),
-  });
-}
-
-function behaviourFor(s: Scenario): Behaviour {
-  let guessed = 0;
-  let answered = 0;
-  let graded = 0;
-  let thought = 0;
-  return {
-    guessCorrect: () => s.answers[guessed++ % s.answers.length]!,
-    correct: () => s.answers[answered++ % s.answers.length]!,
-    effort: () => s.efforts[graded++ % s.efforts.length]!,
-    msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
-  };
-}
+const behaviourFor = (s: Scenario): Behaviour => ({
+  correct: cycleFixture(s.answers),
+  effort: cycleFixture(s.efforts),
+  guessCorrect: cycleFixture(s.answers),
+  msPerPrompt: cycleFixture(s.thinks),
+});
 
 /**
  * Play a whole history out.
@@ -101,34 +126,33 @@ function behaviourFor(s: Scenario): Behaviour {
  * failing keeps coming back, exactly as it should. Termination is asserted
  * separately, against a learner who sometimes gets one right.
  */
-function wordsFor(s: Scenario) {
-  return catalogue(s.words).map((word, i) =>
+const wordsFor = (s: Scenario) =>
+  catalogue(s.words).map((word, i) =>
     s.variedCatalogue
       ? {
           ...word,
-          text: i % 2 ? `l'été ${i}` : `être${i}`,
           freqRank: i % 3 === 0 ? null : Math.floor((s.words - i) / 2),
+          text: i % 2 ? `l'été ${i}` : `être${i}`,
         }
-      : word,
+      : word
   );
-}
 
-function live(s: Scenario): Learner {
+const live = (s: Scenario): Learner => {
   const learner = createLearner({
-    words: wordsFor(s),
-    newPerDay: s.newPerDay,
-    start: new Date(s.start),
     behaviour: behaviourFor(s),
     dayRolloverHour: s.rollover,
+    newPerDay: s.newPerDay,
+    start: new Date(s.start),
+    words: wordsFor(s),
   });
 
-  s.cuts.forEach((cut, i) => {
+  for (const [i, cut] of s.cuts.entries()) {
     learner.sit(cut);
-    learner.wait(s.gaps[i % s.gaps.length]!);
-  });
+    learner.wait(checkedFixture(s.gaps[i % s.gaps.length]));
+  }
   learner.sit(200);
   return learner;
-}
+};
 
 describe("however the history goes", () => {
   it(
@@ -140,27 +164,29 @@ describe("however the history goes", () => {
       fc.assert(
         fc.property(
           scenario({ maxGap: 3 * DAY }),
-          fc.integer({ min: 0, max: 23 }),
+          fc.integer({ max: 23, min: 0 }),
           (s, rollover) => {
             const learner = createLearner({
-              words: wordsFor(s),
-              newPerDay: s.newPerDay,
-              start: new Date(s.start),
               behaviour: behaviourFor(s),
               dayRolloverHour: rollover,
+              newPerDay: s.newPerDay,
+              start: new Date(s.start),
+              words: wordsFor(s),
             });
-            s.cuts.forEach((cut, i) => {
+            for (const [i, cut] of s.cuts.entries()) {
               learner.sit(cut);
-              learner.wait(s.gaps[i % s.gaps.length]!);
-            });
+              learner.wait(checkedFixture(s.gaps[i % s.gaps.length]));
+            }
             learner.sit(200);
-            expect(violations(learner.trace, learner.attempts, rollover)).toEqual([]);
-          },
+            expect(
+              violations(learner.trace, learner.attempts, rollover)
+            ).toEqual([]);
+          }
         ),
-        { numRuns: 300 },
+        { numRuns: 300 }
       );
     },
-    HISTORY_TIMEOUT_MS,
+    HISTORY_TIMEOUT_MS
   );
 
   it(
@@ -179,51 +205,66 @@ describe("however the history goes", () => {
       fc.assert(
         fc.property(
           fc.record({
-            start: startDates,
-            rollover: fc.integer({ min: 0, max: 23 }),
-            words: fc.integer({ min: 1, max: 25 }),
-            newPerDay: fc.integer({ min: 0, max: 12 }),
-            cuts: fc.array(fc.integer({ min: 1, max: 15 }), { minLength: 1, maxLength: 8 }),
-            gaps: fc.array(fc.integer({ min: 0, max: 7 * DAY }), { minLength: 1, maxLength: 8 }),
-            stumbles: fc.array(fc.integer({ min: 0, max: 3 }), { minLength: 1, maxLength: 25 }),
-            thinks: fc.array(fc.integer({ min: 1000, max: 5 * MINUTE }), {
+            cuts: fc.array(fc.integer({ max: 15, min: 1 }), {
+              maxLength: 8,
               minLength: 1,
-              maxLength: 10,
             }),
+            gaps: fc.array(fc.integer({ max: 7 * DAY, min: 0 }), {
+              maxLength: 8,
+              minLength: 1,
+            }),
+            newPerDay: fc.integer({ max: 12, min: 0 }),
+            rollover: fc.integer({ max: 23, min: 0 }),
+            start: startDates,
+            stumbles: fc.array(fc.integer({ max: 3, min: 0 }), {
+              maxLength: 25,
+              minLength: 1,
+            }),
+            thinks: fc.array(fc.integer({ max: 5 * MINUTE, min: 1000 }), {
+              maxLength: 10,
+              minLength: 1,
+            }),
+            words: fc.integer({ max: 25, min: 1 }),
           }),
           (s) => {
-            let thought = 0;
+            const nextThinkingTime = cycleFixture(s.thinks);
             const stumblesFor = (id: string) =>
-              s.stumbles[Number(id.slice(1)) % s.stumbles.length]!;
+              checkedFixture(
+                s.stumbles[Number(id.slice(1)) % s.stumbles.length]
+              );
             const learner = createLearner({
-              words: catalogue(s.words),
-              newPerDay: s.newPerDay,
-              start: new Date(s.start),
-              dayRolloverHour: s.rollover,
               behaviour: {
                 correct: (word, n) => n > stumblesFor(word.id),
-                msPerPrompt: () => s.thinks[thought++ % s.thinks.length]!,
+                msPerPrompt: nextThinkingTime,
               },
+              dayRolloverHour: s.rollover,
+              newPerDay: s.newPerDay,
+              start: new Date(s.start),
+              words: catalogue(s.words),
             });
 
-            s.cuts.forEach((cut, i) => {
+            for (const [i, cut] of s.cuts.entries()) {
               learner.sit(cut);
-              learner.wait(s.gaps[i % s.gaps.length]!);
-            });
+              learner.wait(checkedFixture(s.gaps[i % s.gaps.length]));
+            }
             learner.sit();
 
-            const end = learner.trace.at(-1)!;
+            const end = checkedFixture(learner.trace.at(-1));
             expect(end.at).toBe("closed");
-            if (end.at !== "closed") throw new Error("missing closed marker");
+            if (end.at !== "closed") {
+              throw new Error("missing closed marker");
+            }
             expect(end.reason).not.toBe("cut");
             expect(closureContradictions(learner.trace)).toEqual([]);
-            expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
-          },
+            expect(
+              violations(learner.trace, learner.attempts, s.rollover)
+            ).toEqual([]);
+          }
         ),
-        { numRuns: 200 },
+        { numRuns: 200 }
       );
     },
-    HISTORY_TIMEOUT_MS,
+    HISTORY_TIMEOUT_MS
   );
 
   it(
@@ -232,24 +273,32 @@ describe("however the history goes", () => {
       fc.assert(
         fc.property(scenario({ maxGap: 3 * DAY }), (s) => {
           const learner = live(s);
-          const end = learner.trace.at(-1)!;
-          if (end.at !== "closed" || end.reason !== "caughtUp") return;
+          const end = checkedFixture(learner.trace.at(-1));
+          if (end.at !== "closed" || end.reason !== "caughtUp") {
+            return;
+          }
           expect(closureContradictions(learner.trace)).toEqual([]);
-          const due = end.nextDueAt!;
+          const due = checkedFixture(end.nextDueAt);
           learner.wait(due - learner.now.getTime());
-          const reopened = learner.sit(1)[0]!;
+          const reopened = checkedFixture(learner.sit(1)[0]);
           expect(reopened.at).toBe("recall");
-          if (reopened.at !== "recall") throw new Error("reopen did not serve due learning");
+          if (reopened.at !== "recall") {
+            throw new Error("reopen did not serve due learning");
+          }
           expect(reopened.shownAt).toBe(due);
           expect(
-            end.remainingLearning.some((c) => c.wordId === reopened.wordId && c.due === due),
+            end.remainingLearning.some(
+              (c) => c.wordId === reopened.wordId && c.due === due
+            )
           ).toBe(true);
-          expect(violations(learner.trace, learner.attempts, s.rollover)).toEqual([]);
+          expect(
+            violations(learner.trace, learner.attempts, s.rollover)
+          ).toEqual([]);
         }),
-        { numRuns: 200 },
+        { numRuns: 200 }
       );
     },
-    HISTORY_TIMEOUT_MS,
+    HISTORY_TIMEOUT_MS
   );
 
   it(
@@ -261,24 +310,24 @@ describe("however the history goes", () => {
       fc.assert(
         fc.property(scenario({ maxGap: HOUR }), (s) => {
           const learner = createLearner({
-            words: catalogue(s.words),
+            behaviour: behaviourFor(s),
             newPerDay: s.newPerDay,
             start: NINE_AM,
-            behaviour: behaviourFor(s),
+            words: catalogue(s.words),
           });
 
           for (const [i, cut] of s.cuts.entries()) {
             learner.sit(cut);
             expect(learner.introducedToday).toBeLessThanOrEqual(s.newPerDay);
-            learner.wait(s.gaps[i % s.gaps.length]!);
+            learner.wait(checkedFixture(s.gaps[i % s.gaps.length]));
           }
           learner.sit(200);
           expect(learner.introducedToday).toBeLessThanOrEqual(s.newPerDay);
         }),
-        { numRuns: 300 },
+        { numRuns: 300 }
       );
     },
-    HISTORY_TIMEOUT_MS,
+    HISTORY_TIMEOUT_MS
   );
 
   it(
@@ -291,16 +340,24 @@ describe("however the history goes", () => {
           const learner = live(s);
           const introduced = new Set<string>();
 
-          for (const step of learner.trace as Step[]) {
-            if (step.at === "closed") continue;
-            if (step.at === "guess") introduced.add(step.word);
-            else expect(introduced.has(step.word), `${step.at} of an unintroduced word`).toBe(true);
+          for (const step of learner.trace) {
+            if (step.at === "closed") {
+              continue;
+            }
+            if (step.at === "guess") {
+              introduced.add(step.word);
+            } else {
+              expect(
+                introduced.has(step.word),
+                `${step.at} of an unintroduced word`
+              ).toBe(true);
+            }
           }
         }),
-        { numRuns: 200 },
+        { numRuns: 200 }
       );
     },
-    HISTORY_TIMEOUT_MS,
+    HISTORY_TIMEOUT_MS
   );
 
   it(
@@ -313,17 +370,19 @@ describe("however the history goes", () => {
         fc.property(scenario({ maxGap: DAY }), (s) => {
           const learner = live(s);
           const answered = learner.trace.filter(
-            (step) => step.at === "guess" || step.at === "recall",
+            (step) => step.at === "guess" || step.at === "recall"
           );
           expect(learner.attempts).toHaveLength(answered.length);
-          expect(attemptMismatches(learner.trace, learner.attempts)).toEqual([]);
+          expect(attemptMismatches(learner.trace, learner.attempts)).toEqual(
+            []
+          );
           expect(learner.commands.map((c) => c.id).length).toBe(
-            new Set(learner.commands.map((c) => c.id)).size,
+            new Set(learner.commands.map((c) => c.id)).size
           );
         }),
-        { numRuns: 200 },
+        { numRuns: 200 }
       );
     },
-    HISTORY_TIMEOUT_MS,
+    HISTORY_TIMEOUT_MS
   );
 });

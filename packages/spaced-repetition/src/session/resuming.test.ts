@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { catalogue, createLearner } from "./harness";
 import {
   exposuresAfterAFirstRecall,
@@ -10,14 +11,19 @@ import {
 
 const START = new Date("2026-08-10T09:00:00");
 
-function learner(words = 6, newPerDay = 6, behaviour = {}) {
-  return createLearner({ words: catalogue(words), newPerDay, start: START, behaviour });
-}
+const learner = (words = 6, newPerDay = 6, behaviour = {}) =>
+  createLearner({
+    behaviour,
+    newPerDay,
+    start: START,
+    words: catalogue(words),
+  });
 
 /** The phases of a sitting, as a readable string for assertions. */
-function shape(steps: readonly { at: string; word?: string }[]): string[] {
-  return steps.filter((s) => s.at !== "closed").map((s) => `${s.at}:${s.word}`);
-}
+const promptSequence = (
+  steps: readonly { at: string; word?: string }[]
+): string[] =>
+  steps.filter((s) => s.at !== "closed").map((s) => `${s.at}:${s.word}`);
 
 describe("a sitting that resumes an earlier one", () => {
   it("does not ask for a word straight after showing it", () => {
@@ -26,8 +32,10 @@ describe("a sitting that resumes an earlier one", () => {
     // immediately asked for — the rating that sets initial difficulty measuring
     // the short-term buffer rather than the word.
     const l = learner();
-    l.sit(6); // three guesses and three exposures, then the tab closes
-    l.sit(); // reopen and finish
+    // three guesses and three exposures, then the tab closes
+    l.sit(6);
+    // reopen and finish
+    l.sit();
 
     expect(exposuresAfterAFirstRecall(l.trace)).toEqual([]);
     expect(repeatsInARow(l.trace)).toEqual([]);
@@ -35,13 +43,14 @@ describe("a sitting that resumes an earlier one", () => {
 
   it("shows every resumed word again before asking for any of them", () => {
     const l = learner(3, 3);
-    l.sit(6); // guess+exposure for all three, then close
+    // guess+exposure for all three, then close
+    l.sit(6);
     const resumed = l.sit();
 
     // Three exposures, then three recalls — not three pairs. What follows is
     // the day's learning cards pulled forward, which is the session refusing to
     // wait rather than anything to do with the batch.
-    expect(shape(resumed).slice(0, 6)).toEqual([
+    expect(promptSequence(resumed).slice(0, 6)).toEqual([
       "exposure:mot0",
       "exposure:mot1",
       "exposure:mot2",
@@ -54,7 +63,9 @@ describe("a sitting that resumes an earlier one", () => {
 
   it("never asks for a word it has not shown in this sitting", () => {
     const l = learner();
-    for (let i = 0; i < 5; i++) l.sit(3);
+    for (let i = 0; i < 5; i += 1) {
+      l.sit(3);
+    }
     l.sit();
 
     expect(recallsWithoutExposure(l.trace)).toEqual([]);
@@ -63,11 +74,13 @@ describe("a sitting that resumes an earlier one", () => {
   it("holds every invariant when the app is closed at every possible point", () => {
     // Rather than guessing which cut is interesting, take them all.
     const failures: string[] = [];
-    for (let cut = 1; cut <= 24; cut++) {
+    for (let cut = 1; cut <= 24; cut += 1) {
       const l = learner();
       l.sit(cut);
       l.sit();
-      for (const v of violations(l.trace, l.attempts)) failures.push(`cut ${cut}: ${v}`);
+      for (const v of violations(l.trace, l.attempts)) {
+        failures.push(`cut ${cut}: ${v}`);
+      }
     }
     expect(failures).toEqual([]);
   });
@@ -77,10 +90,11 @@ describe("a sitting that resumes an earlier one", () => {
     // coming straight back is right. Excluding it would show a word and then
     // never ask for it — and next time, and the time after that.
     const l = learner(1, 1);
-    l.sit(2); // guess, exposure, close
+    // guess, exposure, close
+    l.sit(2);
     const resumed = l.sit();
 
-    expect(shape(resumed)).toEqual(["exposure:mot0", "recall:mot0"]);
+    expect(promptSequence(resumed)).toEqual(["exposure:mot0", "recall:mot0"]);
   });
 });
 
@@ -95,10 +109,10 @@ describe("a word that is never got right", () => {
     // session is over. Anki's answer is a leech threshold — suspend a card after
     // N lapses — which is a product decision rather than a scheduling one.
     const l = createLearner({
-      words: catalogue(3),
+      behaviour: { correct: () => false },
       newPerDay: 3,
       start: START,
-      behaviour: { correct: () => false },
+      words: catalogue(3),
     });
 
     const steps = l.sit(120);
@@ -108,10 +122,10 @@ describe("a word that is never got right", () => {
 
   it("still never repeats a card back to back while doing it", () => {
     const l = createLearner({
-      words: catalogue(3),
+      behaviour: { correct: () => false },
       newPerDay: 3,
       start: START,
-      behaviour: { correct: () => false },
+      words: catalogue(3),
     });
     l.sit(120);
 
@@ -123,17 +137,21 @@ describe("a sitting that starts from nothing", () => {
   it("introduces the whole batch before asking for any of it", () => {
     const l = learner(5, 5);
     const only = l.sit();
-    const upToFirstRecall = shape(only).slice(0, 10);
+    const upToFirstRecall = promptSequence(only).slice(0, 10);
 
     expect(upToFirstRecall.filter((s) => s.startsWith("recall"))).toEqual([]);
-    expect(shape(only)[10]).toMatch(/^recall/);
+    expect(promptSequence(only)[10]).toMatch(/^recall/u);
   });
 
   it("ends rather than padding, and reports what happened", () => {
     const l = learner(3, 3);
     const steps = l.sit();
 
-    expect(steps.at(-1)).toMatchObject({ at: "closed", reason: "done", eligibleWordIds: [] });
+    expect(steps.at(-1)).toMatchObject({
+      at: "closed",
+      eligibleWordIds: [],
+      reason: "done",
+    });
     expect(sittings(l.trace)).toHaveLength(1);
     expect(violations(l.trace, l.attempts)).toEqual([]);
   });

@@ -1,32 +1,48 @@
-import { useEffect, useState } from "react";
 import { requestLink } from "@vocab/authentication/client";
-import { Wordmark } from "../../shell/Wordmark";
+import { useEffect, useState } from "react";
+import * as v from "valibot";
 
-export function SignIn({ pending, sessionError }: { pending: boolean; sessionError: boolean }) {
+import { Wordmark } from "../../shell/wordmark";
+
+export const SignIn = ({
+  pending,
+  sessionError,
+}: {
+  pending: boolean;
+  sessionError: boolean;
+}) => {
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("error"))
+    if (new URLSearchParams(window.location.search).has("error")) {
+      // Read the callback URL after hydration so server and initial client markup match.
+      // oxlint-disable-next-line react/set-state-in-effect
       setError("Link non valido o scaduto. Richiedi un nuovo link.");
+    }
   }, []);
 
-  async function sendLink(event: React.FormEvent<HTMLFormElement>) {
+  const sendLink = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-    const email = new FormData(event.currentTarget).get("email");
-    if (typeof email !== "string" || !email) return;
+    const parsedEmail = v.safeParse(
+      v.pipe(v.string(), v.minLength(1)),
+      new FormData(event.currentTarget).get("email")
+    );
+    if (!parsedEmail.success) {
+      return;
+    }
+    const email = parsedEmail.output;
     setSending(true);
     try {
       await requestLink(email);
       setSentTo(email);
     } catch {
       setError("Invio non riuscito. Controlla la connessione e riprova.");
-    } finally {
-      setSending(false);
     }
-  }
+    setSending(false);
+  };
 
   return (
     <div className="auth">
@@ -55,8 +71,8 @@ export function SignIn({ pending, sessionError }: { pending: boolean; sessionErr
       {sentTo && (
         <>
           <p className="sent">
-            Se l'indirizzo è abilitato, riceverai un link a <strong>{sentTo}</strong>. Aprilo su
-            questo dispositivo.
+            Se l&apos;indirizzo è abilitato, riceverai un link a{" "}
+            <strong>{sentTo}</strong>. Aprilo su questo dispositivo.
           </p>
           <button type="button" onClick={() => setSentTo(null)}>
             Richiedi un altro link
@@ -70,4 +86,4 @@ export function SignIn({ pending, sessionError }: { pending: boolean; sessionErr
       )}
     </div>
   );
-}
+};
