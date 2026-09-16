@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
   cleanup,
   fireEvent,
-  render,
-  renderHook,
+  render as testingRender,
+  renderHook as testingRenderHook,
   screen,
   waitFor,
 } from "@testing-library/react";
@@ -14,9 +15,12 @@ import type {
   Word,
 } from "@vocab/spaced-repetition";
 import { DEFAULT_SETTINGS } from "@vocab/spaced-repetition";
+import type { PropsWithChildren, ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { practiceKey, practiceOptions } from "./queries";
 import { SessionScreen } from "./session-screen";
+import { RetryableReadError } from "./transport";
 import type { PracticeTransport } from "./transport";
 import { usePracticeSession } from "./use-practice-session";
 
@@ -25,10 +29,21 @@ const persistAnswer =
   vi.fn<(command: AnswerCommand, expectedUserId: string) => Promise<void>>();
 
 const transport: PracticeTransport = {
-  loadSettings: () => Promise.resolve(DEFAULT_SETTINGS),
-  loadSnapshot,
+  loadPractice: async () => ({
+    settings: DEFAULT_SETTINGS,
+    snapshot: await loadSnapshot(DEFAULT_SETTINGS.lang),
+  }),
   persistAnswer,
 };
+
+let queryClient: QueryClient;
+const QueryWrapper = ({ children }: PropsWithChildren) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
+const render = (ui: ReactElement) =>
+  testingRender(ui, { wrapper: QueryWrapper });
+const renderHook = <Result,>(useTestHook: () => Result) =>
+  testingRenderHook(useTestHook, { wrapper: QueryWrapper });
 
 const CHIEN: Word = {
   freqRank: 1,
@@ -62,6 +77,7 @@ const becomeVisible = () => {
 
 describe("the session screen", () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     loadSnapshot.mockReset().mockResolvedValue(deck());
     persistAnswer.mockReset().mockResolvedValue();
     window.localStorage.clear();
@@ -70,6 +86,7 @@ describe("the session screen", () => {
     // Not automatic: Testing Library only registers its own cleanup when
     // vitest runs with `globals: true`, and this project does not.
     cleanup();
+    queryClient.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -344,6 +361,121 @@ describe("the session screen", () => {
       prompt: { gloss: "gatto" },
     });
     expect(persistAnswer).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 60_000])(
+    "does not reuse a cached snapshot, including clock skew of %i ms",
+    async (clockSkew) => {
+      queryClient.setQueryData(
+        practiceKey("u1"),
+        { settings: DEFAULT_SETTINGS, snapshot: deck([]) },
+        { updatedAt: Date.now() + clockSkew }
+      );
+      render(<SessionScreen transport={transport} userId="u1" />);
+      await screen.findByText("cane");
+      expect(loadSnapshot).toHaveBeenCalledOnce();
+      expect(screen.queryByText("sessione finita")).toBeNull();
+    }
+  );
+
+  it("cancels a pre-existing read instead of joining a snapshot from before recovery", async () => {
+    const stale = deferred<ReviewSnapshot>();
+    loadSnapshot
+      .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(deck());
+    const olderRead = queryClient
+      .query(practiceOptions("u1", transport))
+      .catch(() => null);
+    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledOnce());
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText("cane");
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      stale.resolve(deck([]));
+      await olderRead;
+    });
+    expect(queryClient.getQueryData(practiceKey("u1"))).toMatchObject({
+      snapshot: { words: [CHIEN] },
+    });
+    expect(screen.getByText("cane")).toBeDefined();
+  });
+
+  it("retries transient read failures but does not automatically retry permanent errors", async () => {
+    loadSnapshot.mockRejectedValueOnce(new RetryableReadError("network down"));
+    const mounted = render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText("cane");
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    mounted.unmount();
+
+    loadSnapshot.mockReset().mockRejectedValue(new Error("Session expired"));
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText(/Session expired/u);
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+  });
+
+  it("stops retrying a transient read after three attempts and permits manual recovery", async () => {
+    loadSnapshot.mockRejectedValue(new RetryableReadError("network down"));
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText(/network down/u);
+    expect(loadSnapshot).toHaveBeenCalledTimes(3);
+    loadSnapshot.mockResolvedValue(deck());
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await screen.findByText("cane");
+    expect(loadSnapshot).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not replace an active session when query data changes or an answer is acknowledged", async () => {
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText("cane");
+    fireEvent.click(screen.getByText("Continua"));
+    await screen.findByText("chien");
+    await waitFor(() => expect(window.localStorage).toHaveLength(0));
+    act(() =>
+      queryClient.setQueryData(practiceKey("u1"), {
+        settings: DEFAULT_SETTINGS,
+        snapshot: deck([]),
+      })
+    );
+    becomeVisible();
+    window.dispatchEvent(new Event("online"));
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect(screen.getByText("chien")).toBeDefined();
+  });
+
+  it("aborts pending reads and removes private cache data when an account unmounts", async () => {
+    const pending = deferred<ReviewSnapshot>();
+    loadSnapshot.mockReturnValueOnce(pending.promise);
+    const read = vi.spyOn(transport, "loadPractice");
+    const mounted = render(<SessionScreen transport={transport} userId="u1" />);
+    await waitFor(() => expect(read).toHaveBeenCalledOnce());
+    const [userId, signal] = read.mock.calls[0] ?? [];
+    expect(userId).toBe("u1");
+    expect(signal?.aborted).toBeFalsy();
+    mounted.unmount();
+    expect(signal?.aborted).toBeTruthy();
+    await act(async () => {
+      pending.resolve(deck());
+      await pending.promise;
+    });
+    expect(queryClient.getQueryState(practiceKey("u1"))).toBeUndefined();
+  });
+
+  it("clears the previous account's cache and does not expose it to the next account", async () => {
+    const mounted = render(
+      <SessionScreen key="u1" transport={transport} userId="u1" />
+    );
+    await screen.findByText("cane");
+    expect(queryClient.getQueryData(practiceKey("u1"))).toBeDefined();
+    loadSnapshot.mockResolvedValue(
+      deck([{ ...CHIEN, gloss: "gatto", id: "w2", text: "chat" }])
+    );
+    mounted.rerender(
+      <SessionScreen key="u2" transport={transport} userId="u2" />
+    );
+    await screen.findByText("gatto");
+    expect(queryClient.getQueryState(practiceKey("u1"))).toBeUndefined();
+    expect(queryClient.getQueryData(practiceKey("u2"))).toBeDefined();
+    expect(screen.queryByText("cane")).toBeNull();
   });
 
   it("reports a write failure it cannot act on", async () => {

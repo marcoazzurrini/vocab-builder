@@ -4,7 +4,7 @@ A private vocabulary learning app. French first, Italian as L1. Built around pro
 
 ## Stack
 
-- React and TanStack Start on Cloudflare Workers.
+- React, TanStack Start/Router, and TanStack Query on Cloudflare Workers.
 - Cloudflare D1, Drizzle ORM, and Better Auth magic links with Resend.
 - Bun workspaces and one lockfile. No separate API deployment or task orchestrator.
 - Bun's built-in test runner for packages; Vitest for the web app.

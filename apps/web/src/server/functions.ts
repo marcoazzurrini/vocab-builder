@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeaders } from "@tanstack/react-start/server";
+import {
+  getRequestHeaders,
+  setResponseHeader,
+} from "@tanstack/react-start/server";
+import type { UserRepository } from "@vocab/database";
 import { AnswerCommand } from "@vocab/spaced-repetition";
 import * as v from "valibot";
 
@@ -14,22 +18,29 @@ const repository = async (expectedUserId?: string) => {
   return database.forUser(user.id);
 };
 
-export const getSettings = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const progress = await repository();
-    return progress.settings();
-  }
-);
+type PracticeRepository = Pick<UserRepository, "settings" | "snapshot">;
 
-export const getSnapshot = createServerFn({ method: "GET" })
+/** Load one account-bound bootstrap through the authenticated repository boundary. */
+export const readPractice = async (
+  expectedUserId: string,
+  resolveRepository: (expectedUserId: string) => Promise<PracticeRepository>
+) => {
+  const progress = await resolveRepository(expectedUserId);
+  const settings = await progress.settings();
+  const snapshot = await progress.snapshot(settings.lang);
+  return { settings, snapshot };
+};
+
+export const getPractice = createServerFn({ method: "GET" })
   .validator(
     v.strictObject({
-      lang: v.pipe(v.string(), v.minLength(2), v.maxLength(16)),
+      expectedUserId: v.pipe(v.string(), v.minLength(1), v.maxLength(128)),
     })
   )
-  .handler(async ({ data }) => {
-    const progress = await repository();
-    return progress.snapshot(data.lang);
+  .handler(({ data }) => {
+    // Personalized responses must never enter a shared HTTP/CDN cache.
+    setResponseHeader("Cache-Control", "private, no-store");
+    return readPractice(data.expectedUserId, repository);
   });
 
 export const recordAnswer = createServerFn({ method: "POST" })

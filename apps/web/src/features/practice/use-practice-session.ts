@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createSession,
   DEFAULT_SETTINGS,
@@ -7,6 +8,7 @@ import type { Effort, Session, Settings } from "@vocab/spaced-repetition";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { createOutbox } from "./outbox";
+import { practiceKey, practiceOptions } from "./queries";
 import { SyncConflict } from "./sync-conflict";
 import { practiceTransport } from "./transport";
 import type { PracticeTransport } from "./transport";
@@ -16,6 +18,7 @@ export const usePracticeSession = (
   userId: string,
   transport: PracticeTransport = practiceTransport
 ) => {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -43,7 +46,14 @@ export const usePracticeSession = (
         setWriteError(error.message);
         setSyncConflict(error instanceof SyncConflict);
       },
-      send: (command) => transport.persistAnswer(command, userId),
+      send: async (command) => {
+        await transport.persistAnswer(command, userId);
+        // Mark the server snapshot stale without fetching or rebuilding an active prompt.
+        await queryClient.invalidateQueries({
+          queryKey: practiceKey(userId),
+          refetchType: "none",
+        });
+      },
       storage: window.localStorage,
       userId,
     })
@@ -61,11 +71,24 @@ export const usePracticeSession = (
         if (cancelled) {
           return;
         }
-        const settings = await transport.loadSettings();
+        // An older request may have started before the writes above were acknowledged.
+        // Cancel it before making a fresh read, even if cached data already exists.
+        await queryClient.cancelQueries({
+          exact: true,
+          queryKey: practiceKey(userId),
+        });
+        // staleTime: 0 alone can reuse future-dated cache entries after a clock change.
+        await queryClient.invalidateQueries({
+          exact: true,
+          queryKey: practiceKey(userId),
+          refetchType: "none",
+        });
         if (cancelled) {
           return;
         }
-        const snapshot = await transport.loadSnapshot(settings.lang);
+        const { settings, snapshot } = await queryClient.query(
+          practiceOptions(userId, transport)
+        );
         if (cancelled) {
           return;
         }
@@ -95,9 +118,20 @@ export const usePracticeSession = (
     void load();
     return () => {
       cancelled = true;
+      void queryClient.cancelQueries({
+        exact: true,
+        queryKey: practiceKey(userId),
+      });
     };
-    // eslint-disable-next-line react/exhaustive-effect-dependencies -- The reload counter intentionally invalidates the snapshot; accounts remount this hook by user ID.
-  }, [reloadCount, queue, transport]);
+    // eslint-disable-next-line react/exhaustive-effect-dependencies -- The reload counter intentionally invalidates the snapshot.
+  }, [reloadCount, queue, transport, queryClient, userId]);
+
+  // This account-keyed mount owns practice reads. Drop private data on logout/account changes.
+  // The durable outbox is separate and must survive unmounting.
+  useEffect(
+    () => () => queryClient.removeQueries({ queryKey: practiceKey(userId) }),
+    [queryClient, userId]
+  );
 
   // Local storage is the only copy until acknowledgement. Warn before leaving with pending work.
   useEffect(() => {
