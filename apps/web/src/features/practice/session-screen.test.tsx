@@ -15,6 +15,7 @@ import type {
   Word,
 } from "@vocab/spaced-repetition";
 import { DEFAULT_SETTINGS } from "@vocab/spaced-repetition";
+import { StrictMode } from "react";
 import type { PropsWithChildren, ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -476,6 +477,140 @@ describe("the session screen", () => {
     expect(queryClient.getQueryState(practiceKey("u1"))).toBeUndefined();
     expect(queryClient.getQueryData(practiceKey("u2"))).toBeDefined();
     expect(screen.queryByText("cane")).toBeNull();
+  });
+
+  it("shows recoverable storage errors without deleting corrupt answers", async () => {
+    const command: AnswerCommand = {
+      expectedReps: 0,
+      id: crypto.randomUUID(),
+      latencyMs: 1,
+      phase: "guess",
+      rating: null,
+      reviewedAt: new Date().toISOString(),
+      typed: "",
+      wordId: CHIEN.id,
+    };
+    const key = `vocab-builder:answer:v1:u1:${command.id}`;
+    localStorage.setItem(key, "{broken");
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText(/Risposte salvate nel browser non valide/u);
+    expect({
+      loads: loadSnapshot.mock.calls,
+      saves: persistAnswer.mock.calls,
+      stored: localStorage.getItem(key),
+    }).toStrictEqual({ loads: [], saves: [], stored: "{broken" });
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Riprova" }).hasAttribute("disabled")
+      ).toBeFalsy()
+    );
+    expect(localStorage.getItem(key)).toBe("{broken");
+
+    localStorage.setItem(key, JSON.stringify(command));
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await screen.findByText("cane");
+    expect(persistAnswer).toHaveBeenCalledExactlyOnceWith(command, "u1");
+    expect(localStorage).toHaveLength(0);
+  });
+
+  it("handles unavailable browser storage through recovery instead of crashing render", async () => {
+    const storage = vi
+      .spyOn(window, "localStorage", "get")
+      .mockImplementation(() => {
+        throw new Error("Storage access denied");
+      });
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText(/Storage access denied/u);
+    expect(loadSnapshot).not.toHaveBeenCalled();
+    storage.mockRestore();
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await screen.findByText("cane");
+  });
+
+  it("publishes detached views and ignores handlers from a previous view", async () => {
+    const { result } = renderHook(() => usePracticeSession("u1", transport));
+    await waitFor(() => expect(result.current.view?.phase).toBe("guess"));
+    const firstView = result.current.view;
+    const submit = result.current.submitGuess;
+    act(() => {
+      submit("");
+      submit("stale duplicate");
+    });
+    expect({
+      before: firstView?.phase,
+      error: result.current.writeError,
+      phase: result.current.view?.phase,
+    }).toStrictEqual({ before: "guess", error: null, phase: "exposure" });
+    await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
+    act(() => submit("stale handler"));
+    expect({
+      error: result.current.writeError,
+      phase: result.current.view?.phase,
+      saves: persistAnswer.mock.calls.length,
+    }).toStrictEqual({ error: null, phase: "exposure", saves: 1 });
+  });
+
+  it("ignores a previously rendered action after a background save fails", async () => {
+    const pending = deferred<boolean>();
+    persistAnswer.mockImplementationOnce(async () => {
+      await pending.promise;
+      throw new Error("offline");
+    });
+    const { result } = renderHook(() => usePracticeSession("u1", transport));
+    await waitFor(() => expect(result.current.view?.phase).toBe("guess"));
+    act(() => result.current.submitGuess(""));
+    const finishExposure = result.current.exposureDone;
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    await waitFor(() => expect(result.current.writeError).toBe("offline"));
+    act(() => finishExposure());
+    expect({
+      error: result.current.writeError,
+      saves: persistAnswer.mock.calls.length,
+      view: result.current.view,
+    }).toStrictEqual({ error: "offline", saves: 1, view: undefined });
+  });
+
+  it("disables recovery while the same durable answer is being retried", async () => {
+    const pending = deferred<undefined>();
+    persistAnswer
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockReturnValueOnce(pending.promise);
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText("cane");
+    fireEvent.click(screen.getByText("Continua"));
+    await screen.findByText(/offline/u);
+    const retry = screen.getByRole("button", { name: "Riprova" });
+    fireEvent.click(retry);
+    expect(retry.hasAttribute("disabled")).toBeTruthy();
+    fireEvent.click(retry);
+    expect(persistAnswer).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    await act(async () => {
+      // eslint-disable-next-line unicorn/no-useless-undefined -- The deferred helper requires its generic value argument.
+      pending.resolve(undefined);
+      await pending.promise;
+    });
+    await screen.findByText("cane");
+    expect(persistAnswer.mock.calls[1]).toStrictEqual(
+      persistAnswer.mock.calls[0]
+    );
+  });
+
+  it("loads and advances under StrictMode without duplicating accepted answers", async () => {
+    render(
+      <StrictMode>
+        <SessionScreen transport={transport} userId="u1" />
+      </StrictMode>
+    );
+    await screen.findByText("cane");
+    fireEvent.click(screen.getByText("Continua"));
+    await screen.findByText("chien");
+    await waitFor(() => expect(localStorage).toHaveLength(0));
+    expect(persistAnswer).toHaveBeenCalledOnce();
   });
 
   it("reports a write failure it cannot act on", async () => {

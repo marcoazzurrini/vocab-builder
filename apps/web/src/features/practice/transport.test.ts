@@ -1,8 +1,102 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { practiceReadFetch, RetryableReadError } from "./transport";
+import {
+  practiceReadFetch,
+  practiceWriteFetch,
+  RetryableReadError,
+} from "./transport";
 
 const request = vi.fn<typeof fetch>();
+
+describe("practice write transport", () => {
+  beforeEach(() => {
+    request.mockReset().mockResolvedValue(new Response("{}"));
+    vi.stubGlobal("fetch", request);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(["headers", "body"] as const)(
+    "times out a write stalled at %s without automatically resending it",
+    async (stage) => {
+      const controller = new AbortController();
+      const timeout = vi
+        .spyOn(AbortSignal, "timeout")
+        .mockReturnValue(controller.signal);
+      if (stage === "headers") {
+        request.mockImplementation(
+          (_input, init) =>
+            // eslint-disable-next-line promise/avoid-new -- Model a fetch that rejects only when its deadline expires.
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener("abort", () =>
+                reject(init.signal?.reason)
+              );
+            })
+        );
+      } else {
+        request.mockResolvedValue(
+          new Response(
+            new ReadableStream({
+              start(stream) {
+                controller.signal.addEventListener("abort", () =>
+                  stream.error(controller.signal.reason)
+                );
+              },
+            })
+          )
+        );
+      }
+      const pending = practiceWriteFetch("https://example.test/answer", {
+        body: "answer",
+        method: "POST",
+      });
+      controller.abort(new DOMException("Timed out", "TimeoutError"));
+      await expect(pending).rejects.toThrow("La risposta è conservata");
+      expect(timeout).toHaveBeenCalledWith(10_000);
+      expect(request).toHaveBeenCalledOnce();
+      expect(request.mock.calls[0]?.[1]).toMatchObject({
+        body: "answer",
+        method: "POST",
+      });
+    }
+  );
+
+  it("preserves cancellation and does not turn write errors into read retries", async () => {
+    const controller = new AbortController();
+    const pending = practiceWriteFetch("https://example.test/answer", {
+      signal: controller.signal,
+    });
+    await pending;
+    const signal = request.mock.calls[0]?.[1]?.signal;
+    controller.abort();
+    expect(signal?.aborted).toBeTruthy();
+    request.mockRejectedValue(controller.signal.reason);
+    await expect(
+      practiceWriteFetch("https://example.test/answer", {
+        signal: controller.signal,
+      })
+    ).rejects.toBe(controller.signal.reason);
+    await expect(
+      practiceWriteFetch("https://example.test/answer")
+    ).rejects.not.toBeInstanceOf(RetryableReadError);
+  });
+
+  it("leaves serialized server errors to Start's decoder", async () => {
+    request.mockResolvedValue(
+      new Response("Server result", {
+        headers: { "x-tss-serialized": "true" },
+        status: 503,
+      })
+    );
+    const result = await practiceWriteFetch("https://example.test/answer");
+    expect(result.status).toBe(503);
+    expect(result.headers.get("x-tss-serialized")).toBe("true");
+    await expect(result.text()).resolves.toBe("Server result");
+  });
+});
 
 describe("practice read transport", () => {
   beforeEach(() => {

@@ -56,6 +56,7 @@ const Recovery = ({
     </p>
     <button
       type="button"
+      disabled={practice.recovering}
       onClick={() => {
         void practice.retry();
       }}
@@ -65,6 +66,7 @@ const Recovery = ({
     {practice.syncConflict && (
       <button
         type="button"
+        disabled={practice.recovering}
         onClick={() => {
           // eslint-disable-next-line no-alert -- Discarding the only durable copy requires explicit user confirmation.
           const confirmed = window.confirm(
