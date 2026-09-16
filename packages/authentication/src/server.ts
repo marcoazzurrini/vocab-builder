@@ -1,7 +1,8 @@
 import type { DatabaseBinding } from "@vocab/database";
 import { createAuthenticationAdapter } from "@vocab/database/authentication";
 import { betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
+import { deleteSessionCookie } from "better-auth/cookies";
 import { magicLink } from "better-auth/plugins/magic-link";
 
 import type { Identity } from "./identity";
@@ -58,6 +59,20 @@ export const createAuthentication = (
     baseURL,
     database: createAuthenticationAdapter(options.database),
     databaseHooks: {
+      session: {
+        create: {
+          before: async (newSession, context) => {
+            const user = await context?.context.internalAdapter.findUserById(
+              newSession.userId
+            );
+            // Recheck at redemption: the allowlist may have changed since delivery.
+            if (!user || !allowedEmails.has(user.email.toLowerCase())) {
+              return false;
+            }
+            return { data: newSession };
+          },
+        },
+      },
       user: {
         create: {
           before: (newUser) => {
@@ -72,6 +87,39 @@ export const createAuthentication = (
           },
         },
       },
+    },
+    hooks: {
+      after: createAuthMiddleware(async (context) => {
+        const current = context.context.session;
+        if (
+          context.path === "/get-session" &&
+          current &&
+          !allowedEmails.has(current.user.email.toLowerCase())
+        ) {
+          await context.context.internalAdapter.deleteSession(
+            current.session.token
+          );
+          deleteSessionCookie(context);
+          throw new APIError("UNAUTHORIZED", {
+            message: "Sign in before accessing your progress.",
+          });
+        }
+      }),
+      before: createAuthMiddleware((context) => {
+        // Only expose the operations this application uses. Additional Better Auth
+        // endpoints require an explicit access-policy review before enabling them.
+        if (
+          ![
+            "/sign-in/magic-link",
+            "/magic-link/verify",
+            "/get-session",
+            "/sign-out",
+          ].includes(context.path)
+        ) {
+          throw new APIError("NOT_FOUND", { message: "Not found." });
+        }
+        return Promise.resolve();
+      }),
     },
     plugins: [
       magicLink({
@@ -115,6 +163,10 @@ export const createAuthentication = (
               "Content-Type": "application/json",
             },
             method: "POST",
+            signal: AbortSignal.timeout(10_000),
+          }).catch(() => {
+            // Provider errors can contain request credentials or the sign-in link.
+            throw new Error("Email delivery failed. Try again later.");
           });
           if (!response.ok) {
             throw new Error(`Email delivery failed (${response.status}).`);

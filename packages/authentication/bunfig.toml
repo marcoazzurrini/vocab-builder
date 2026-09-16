@@ -1,0 +1,4 @@
+[test]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["../database/**"]
+coverageThreshold = { lines = 0.95, functions = 1.0 }

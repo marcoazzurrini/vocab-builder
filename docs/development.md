@@ -142,11 +142,11 @@ Before deploying code that needs a schema change, review and apply it separately
 Runtime secrets remain encrypted Worker settings, not Git files or build variables:
 
 - `BETTER_AUTH_SECRET`: at least 32 cryptographically random characters.
-- `ALLOWED_EMAILS`: comma-separated addresses allowed to use this private app.
+- `ALLOWED_EMAILS`: comma-separated addresses allowed to use this private app. After updated configuration reaches the Worker, removed addresses cannot redeem outstanding links or access progress with existing sessions. Browser and server session reads reject the removed address and delete the presented session. Re-adding an address does not restore a deleted session.
 - `RESEND_API_KEY`: a sending-only credential restricted to the verified domain.
 - `EMAIL_FROM`: `Vocabulary <login@vocab-builder.marcoazzurrini.com>`.
 
-Resend verification records are scoped to `vocab-builder.marcoazzurrini.com`; leave unrelated domain email records alone. Better Auth runs in the app Worker, with users, sessions, verification tokens, and rate-limit state in D1. Magic links expire after ten minutes and are stored hashed. The authentication limiter trusts Cloudflare's `cf-connecting-ip` header. Email credentials stay server-side.
+Resend verification records are scoped to `vocab-builder.marcoazzurrini.com`; leave unrelated domain email records alone. Better Auth runs in the app Worker, with users, sessions, verification tokens, and rate-limit state in D1. Magic links expire after ten minutes and are stored hashed. Resend requests have a ten-second timeout; delivery failures return an error without exposing provider credentials or response bodies. A provider outage can make allowed and disallowed addresses distinguishable by response status. The authentication limiter trusts Cloudflare's `cf-connecting-ip` header. Email credentials stay server-side.
 
 After deployment, verify the deployed commit and test sign-in, one-time link reuse rejection, sign-out, a guess, a recall, reload, and saved history. Keep Supabase and its export until the deployment is verified. Retiring Supabase is a separate action.
 
