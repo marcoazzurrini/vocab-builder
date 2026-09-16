@@ -187,11 +187,17 @@ export const settings = sqliteTable(
     day_rollover_hour: integer("day_rollover_hour").notNull().default(4),
     lang: text("lang").notNull().default("fr"),
     new_per_day: integer("new_per_day").notNull().default(15),
+    // UI preference is independent of the language studied in `lang`.
+    ui_locale: text("ui_locale", { enum: ["en", "it"] }),
     user_id: text("user_id")
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
   },
   (t) => [
+    check(
+      "settings_ui_locale",
+      sql`${t.ui_locale} is null or ${t.ui_locale} in ('en', 'it')`
+    ),
     check("settings_allowance", sql`${t.new_per_day} between 0 and 100`),
     check("settings_rollover", sql`${t.day_rollover_hour} between 0 and 23`),
   ]

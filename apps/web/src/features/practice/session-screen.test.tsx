@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import type { I18n } from "@lingui/core";
+import { I18nProvider } from "@lingui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
@@ -9,6 +11,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { activateLocale, createI18n } from "@vocab/i18n";
 import type {
   ReviewSnapshot,
   AnswerCommand,
@@ -38,8 +41,11 @@ const transport: PracticeTransport = {
 };
 
 let queryClient: QueryClient;
+let i18n: I18n;
 const QueryWrapper = ({ children }: PropsWithChildren) => (
-  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  <I18nProvider i18n={i18n}>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  </I18nProvider>
 );
 const render = (ui: ReactElement) =>
   testingRender(ui, { wrapper: QueryWrapper });
@@ -77,7 +83,8 @@ const becomeVisible = () => {
 };
 
 describe("the session screen", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    i18n = await createI18n("it");
     queryClient = new QueryClient();
     loadSnapshot.mockReset().mockResolvedValue(deck());
     persistAnswer.mockReset().mockResolvedValue();
@@ -99,6 +106,19 @@ describe("the session screen", () => {
     expect(screen.queryByText("chien")).toBeNull();
   });
 
+  it("switches interface language without discarding the current answer or changing study content", async () => {
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText("cane");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "chi" } });
+
+    await act(() => activateLocale(i18n, "en"));
+
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDefined();
+    expect(screen.getByRole<HTMLInputElement>("textbox").value).toBe("chi");
+    expect(screen.getByText("cane")).toBeDefined();
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+  });
+
   it("does not rebuild the session mid-card when the tab comes back", async () => {
     // Rebuilding here would throw away the prompt on screen.
     render(<SessionScreen transport={transport} userId="u1" />);
@@ -113,7 +133,7 @@ describe("the session screen", () => {
     // hours later, with the day's cards waiting behind it.
     loadSnapshot.mockResolvedValue(deck([]));
     render(<SessionScreen transport={transport} userId="u1" />);
-    await screen.findByText("sessione finita");
+    await screen.findByText("sessione completata");
 
     becomeVisible();
     await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
@@ -188,18 +208,18 @@ describe("the session screen", () => {
     });
 
     render(<SessionScreen transport={transport} userId="u1" />);
-    await screen.findByText("scrivi la parola francese");
+    await screen.findByText("scrivi la parola in francese");
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "chien" },
     });
-    fireEvent.click(screen.getByText("Bene"));
+    fireEvent.click(screen.getByText("Normale"));
 
     // Nothing else to do, and the card's next step is minutes away: the
     // honest screen, not a fake end of session.
     await expect(
-      screen.findByText("Tutto fatto, per ora")
+      screen.findByText("Per ora hai finito")
     ).resolves.toBeDefined();
-    expect(screen.queryByText("Bravo")).toBeNull();
+    expect(screen.queryByText("Ottimo lavoro")).toBeNull();
 
     // When the due time passes, the screen rebuilds on its own.
     vi.advanceTimersByTime(60 * 60_000);
@@ -282,7 +302,7 @@ describe("the session screen", () => {
       stored: window.localStorage.length,
       textbox: screen.queryByRole("textbox"),
     }).toStrictEqual({
-      alert: "Salvataggio non riuscito: storage full",
+      alert: "Non è stato possibile salvare le risposte: storage full",
       answer: null,
       calls: [],
       stored: 0,
@@ -375,7 +395,7 @@ describe("the session screen", () => {
       render(<SessionScreen transport={transport} userId="u1" />);
       await screen.findByText("cane");
       expect(loadSnapshot).toHaveBeenCalledOnce();
-      expect(screen.queryByText("sessione finita")).toBeNull();
+      expect(screen.queryByText("sessione completata")).toBeNull();
     }
   );
 

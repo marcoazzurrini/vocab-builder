@@ -19,6 +19,7 @@ export interface AuthenticationOptions {
 
 export interface Authentication {
   handle: (request: Request) => Promise<Response>;
+  getUser: (headers: Headers) => Promise<Identity | null>;
   requireUser: (headers: Headers, expectedUserId?: string) => Promise<Identity>;
 }
 
@@ -185,20 +186,37 @@ export const createAuthentication = (
     secret: options.secret,
     trustedOrigins: [new URL(baseURL).origin],
   });
+  const getUser = async (headers: Headers): Promise<Identity | null> => {
+    try {
+      const current = await auth.api.getSession({ headers });
+      if (!current) {
+        return null;
+      }
+      const { id, email, name } = current.user;
+      return { email, id, name };
+    } catch (error) {
+      // Revoked access is an anonymous page visit, not a rendering failure.
+      // Database and configuration failures must still surface.
+      if (error instanceof APIError && error.status === "UNAUTHORIZED") {
+        return null;
+      }
+      throw error;
+    }
+  };
   return {
+    getUser,
     handle: (request) => auth.handler(request),
     async requireUser(headers, expectedUserId) {
-      const current = await auth.api.getSession({ headers });
+      const current = await getUser(headers);
       if (!current) {
         throw new Error("Sign in before accessing your progress.");
       }
-      if (expectedUserId !== undefined && current.user.id !== expectedUserId) {
+      if (expectedUserId !== undefined && current.id !== expectedUserId) {
         throw new Error(
           "Sign back in to the account that recorded these answers."
         );
       }
-      const { id, email, name } = current.user;
-      return { email, id, name };
+      return current;
     },
   };
 };

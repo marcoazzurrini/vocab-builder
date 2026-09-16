@@ -167,6 +167,50 @@ const expectSavedAnswer = async (
 };
 
 describe("repository isolation and failure contracts", () => {
+  it("defaults UI language to automatic and isolates saved preferences by account", async () => {
+    const a = await learner();
+    const b = await learner();
+    expect(await store.forUser(a.id).uiLocale()).toBeNull();
+    await store.forUser(a.id).setUiLocale("it");
+    expect(await store.forUser(a.id).uiLocale()).toBe("it");
+    expect(await store.forUser(b.id).uiLocale()).toBeNull();
+    await store.forUser(a.id).setUiLocale("en");
+    expect(await store.forUser(a.id).uiLocale()).toBe("en");
+    await store.forUser(a.id).setUiLocale(null);
+    expect(await store.forUser(a.id).uiLocale()).toBeNull();
+  });
+
+  it("changes UI language without changing learning settings or progress", async () => {
+    const a = await learner();
+    await fixture.db.insert(settings).values({
+      day_rollover_hour: 7,
+      lang: "fr",
+      new_per_day: 5,
+      user_id: a.id,
+    });
+    await store.forUser(a.id).recordAnswer(a.guess);
+    const progress = await savedProgress(a.id);
+    await store.forUser(a.id).setUiLocale("en");
+    expect(await store.forUser(a.id).settings()).toEqual({
+      dayRolloverHour: 7,
+      lang: "fr",
+      newPerDay: 5,
+    });
+    expect(await savedProgress(a.id)).toEqual(progress);
+  });
+
+  it("rejects unsupported UI languages through the database constraint", async () => {
+    const a = await learner();
+    await store.forUser(a.id).setUiLocale("it");
+    await expect(
+      fixture.binding
+        .prepare("UPDATE settings SET ui_locale = ? WHERE user_id = ?")
+        .bind("fr", a.id)
+        .run()
+    ).rejects.toThrow("CHECK constraint failed");
+    expect(await store.forUser(a.id).uiLocale()).toBe("it");
+  });
+
   it("returns independent defaults and never persists mutations to returned settings", async () => {
     const a = await learner();
     const b = await learner();

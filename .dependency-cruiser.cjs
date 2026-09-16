@@ -76,10 +76,11 @@ module.exports = {
     },
     {
       comment:
-        "TanStack transforms server/functions.ts into the browser's HTTP transport.",
+        "TanStack transforms server/functions.ts into the browser's HTTP transport. The Start entry registers server-only request middleware.",
       from: {
         path: "^apps/web/src/",
-        pathNot: "^apps/web/src/(server|routes/api)/|\\.test\\.[cm]?[jt]sx?$",
+        pathNot:
+          "^apps/web/src/(server|routes/api)/|^apps/web/src/start\\.ts$|\\.test\\.[cm]?[jt]sx?$",
       },
       name: "web-client-cannot-import-server-implementation",
       severity: "error",

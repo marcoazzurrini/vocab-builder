@@ -1,3 +1,5 @@
+import { Trans, useLingui } from "@lingui/react/macro";
+
 import { Wordmark } from "./wordmark";
 
 /* Only French exists today; the map is here so the day a second language
@@ -16,10 +18,11 @@ export const Sidebar = ({
   onClose: () => void;
   onSignOut: () => void;
 }) => {
+  const { t } = useLingui();
   const name = email ? (email.split("@")[0] ?? email) : "…";
 
   return (
-    <aside className={open ? "sidebar open" : "sidebar"} aria-label="Menu">
+    <aside className={open ? "sidebar open" : "sidebar"} aria-label={t`Menu`}>
       <div className="wordmark">
         <Wordmark />
       </div>
@@ -27,21 +30,32 @@ export const Sidebar = ({
       {/* The session is the only page there is; the rest is the roadmap,
           visible so the shell does not have to be rethought per page. */}
       <button type="button" className="nav-item active" onClick={onClose}>
-        Sessione
+        <Trans>Session</Trans>
       </button>
       <button type="button" className="nav-item" disabled>
-        Parole <span className="presto">presto</span>
+        <Trans>Words</Trans>{" "}
+        <span className="presto">
+          <Trans>coming soon</Trans>
+        </span>
       </button>
       <button type="button" className="nav-item" disabled>
-        Progressi <span className="presto">presto</span>
+        <Trans>Progress</Trans>{" "}
+        <span className="presto">
+          <Trans>coming soon</Trans>
+        </span>
       </button>
       <button type="button" className="nav-item" disabled>
-        Impostazioni <span className="presto">presto</span>
+        <Trans>Settings</Trans>{" "}
+        <span className="presto">
+          <Trans>coming soon</Trans>
+        </span>
       </button>
 
       <div className="sidebar-footer">
         <div className="lang">
-          <span className="label">Lingua</span>
+          <span className="label">
+            <Trans>Learning language</Trans>
+          </span>
           <span className="value">{LANGUAGE_NAME["fr"]}</span>
         </div>
         <div className="user">
@@ -50,7 +64,7 @@ export const Sidebar = ({
           </span>
           <span className="name">{name}</span>
           <button type="button" className="esci" onClick={onSignOut}>
-            Esci
+            <Trans>Sign out</Trans>
           </button>
         </div>
       </div>

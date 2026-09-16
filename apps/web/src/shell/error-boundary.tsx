@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 
@@ -46,14 +47,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="stage">
-        <p className="eyebrow wrong">qualcosa è andato storto</p>
+        <p className="eyebrow wrong">
+          <Trans>something went wrong</Trans>
+        </p>
         <p className="message">
-          Le risposte già date sono salvate. Ricarica per riprendere da dove
-          eri.
+          <Trans>
+            Your answers have been saved. Reload to pick up where you left off.
+          </Trans>
         </p>
         <div className="actions">
           <button type="button" onClick={() => window.location.reload()}>
-            Ricarica
+            <Trans>Reload</Trans>
           </button>
         </div>
         <p className="note">{error.message}</p>

@@ -10,6 +10,7 @@ Bun handles dependency installation, workspace commands, and administrative scri
 - `packages/spaced-repetition` owns session flow, grading, scheduling, answer validation, and deck reconstruction. Its public entrypoints hide FSRS machinery.
 - `packages/database` owns D1 access, user-scoped repositories, Drizzle schema, migrations, catalogue seed/import, and the authentication storage adapter.
 - `packages/authentication` owns Better Auth configuration, access policy, email delivery, session checks, and separate server/client facades.
+- `packages/i18n` owns English and Italian UI catalogs, locale negotiation, and the Lingui runtime. See [the translation workflow](../packages/i18n/README.md).
 - Each workspace declares its dependencies and explicit TypeScript source exports. Vite bundles those exports without library build steps. No relative imports between workspaces or imports of another package's internal source are allowed.
 - Root configuration covers formatting, linting, Git hooks, and strict TypeScript defaults. `.dependency-cruiser.cjs` defines repository-wide import rules. `bun run boundaries` runs them during lint, CI, and the pre-push hook. See [architecture](architecture.md) for the public contracts and dependency graph.
 
@@ -96,7 +97,7 @@ bun run db:test
 bun run format
 ```
 
-`ci` builds the application, checks formatting and linting, generates Cloudflare types, runs strict TypeScript in all workspaces, and runs every workspace's tests. `bun run test` dispatches to Bun's built-in runner in `authentication`, `database`, and `spaced-repetition`, and to Vitest in `apps/web`. `bun run test:watch` starts the corresponding watch command in each workspace in parallel, so dependent packages do not wait for another package's watcher to exit. Do not substitute bare `bun test` at the repository root: it would also discover the web app's Vitest tests.
+`ci` builds the application, checks formatting and linting, generates Cloudflare types, runs strict TypeScript in all workspaces, and runs every workspace's tests. `bun run test` dispatches to Bun's built-in runner in `authentication`, `database`, `i18n`, and `spaced-repetition`, and to Vitest in `apps/web`. `bun run test:watch` starts the corresponding watch command in each workspace in parallel, so dependent packages do not wait for another package's watcher to exit. Do not substitute bare `bun test` at the repository root: it would also discover the web app's Vitest tests.
 
 Package tests import from `bun:test` and need no separate test configuration file. The database and authentication test commands allow 30 seconds per test or hook for local D1 startup. Run `bun run --filter @vocab/authentication test` to target a single package, or `bun run db:test` for both database and authentication tests.
 
@@ -137,7 +138,7 @@ The build command installs dependencies from the root `bun.lock` and rejects loc
 
 For a local checked release, run `bun run deploy`. `deploy:only` skips checks and is intended for Cloudflare after the build command succeeds. Neither command applies remote migrations or seeds the database.
 
-Before deploying code that needs a schema change, review and apply it separately with `bun run db:migrate:remote`. Keep `BETTER_AUTH_URL` equal to the exact HTTPS origin and `AUTH_EMAIL_MODE=resend`. Verify Wrangler uses the configured account and existing D1 binding. Never replace database IDs as part of directory cleanup.
+Before deploying code that needs a schema change, review and apply it separately with `bun run db:migrate:remote`. The interface-language feature requires `0003_ui_locale.sql` before deploying its application code. Keep `BETTER_AUTH_URL` equal to the exact HTTPS origin and `AUTH_EMAIL_MODE=resend`. Verify Wrangler uses the configured account and existing D1 binding. Never replace database IDs as part of directory cleanup.
 
 Runtime secrets remain encrypted Worker settings, not Git files or build variables:
 

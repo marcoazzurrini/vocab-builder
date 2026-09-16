@@ -1,15 +1,29 @@
+import { Trans, Plural, useLingui } from "@lingui/react/macro";
 import type { Effort } from "@vocab/spaced-repetition";
 import { useEffect, useRef, useState } from "react";
 
 import { speak, warmUpVoices } from "./speak";
+import type { SpeechFailure } from "./speak";
 import type { PracticeTransport } from "./transport";
 import { usePracticeSession } from "./use-practice-session";
 
-const EFFORT_LABEL: Record<Effort, string> = {
-  easy: "Facile",
-  good: "Bene",
-  hard: "Difficile",
-};
+const SessionStats = ({
+  introduced,
+  correct,
+  recalls,
+}: {
+  introduced: number;
+  correct: number;
+  recalls: number;
+}) => (
+  <p className="stats">
+    <Plural value={introduced} one="# new word" other="# new words" />
+    {" · "}
+    <Trans>
+      {correct}/{recalls} correct answers
+    </Trans>
+  </p>
+);
 
 const Prompt = ({
   image,
@@ -30,10 +44,13 @@ const Prompt = ({
 const NextDueNote = ({ due }: { due: number }) => {
   // eslint-disable-next-line react/hook-use-state -- Capture time when this due notice mounts; its keyed remount refreshes the estimate without impure renders.
   const [now] = useState(Date.now);
+  const minutes = Math.max(1, Math.ceil((due - now) / 60_000));
   return (
     <p className="note">
-      Prossima carta tra ~{Math.max(1, Math.ceil((due - now) / 60_000))} min —
-      questa pagina riparte da sola.
+      <Trans>
+        Next word in about {minutes} min. Your session will resume
+        automatically.
+      </Trans>
     </p>
   );
 };
@@ -42,46 +59,51 @@ const Recovery = ({
   practice,
 }: {
   practice: ReturnType<typeof usePracticeSession>;
-}) => (
-  <div>
-    <p role="alert" className="note wrong">
-      {practice.writeError
-        ? "Salvataggio non riuscito"
-        : "Caricamento non riuscito"}
-      : {practice.writeError ?? practice.loadError}
-    </p>
-    <p className="note">
-      Riprova prima di continuare. Non cancellare i dati del browser: potrebbero
-      contenere risposte da salvare.
-    </p>
-    <button
-      type="button"
-      disabled={practice.recovering}
-      onClick={() => {
-        void practice.retry();
-      }}
-    >
-      Riprova
-    </button>
-    {practice.syncConflict && (
+}) => {
+  const { t } = useLingui();
+  return (
+    <div>
+      <p role="alert" className="note wrong">
+        {practice.writeError
+          ? t`Could not save your answers`
+          : t`Could not load your session`}
+        : {practice.writeError ?? practice.loadError}
+      </p>
+      <p className="note">
+        <Trans>
+          Try again before continuing. Do not clear your browser data: it may
+          contain answers that have not been saved yet.
+        </Trans>
+      </p>
       <button
         type="button"
         disabled={practice.recovering}
         onClick={() => {
-          // eslint-disable-next-line no-alert -- Discarding the only durable copy requires explicit user confirmation.
-          const confirmed = window.confirm(
-            "Scartare tutte le risposte non sincronizzate su questo dispositivo? Questa azione non può essere annullata. I progressi già salvati rimangono invariati."
-          );
-          if (confirmed) {
-            practice.discard();
-          }
+          void practice.retry();
         }}
       >
-        Scarta risposte in attesa e ricarica
+        <Trans>Try again</Trans>
       </button>
-    )}
-  </div>
-);
+      {practice.syncConflict && (
+        <button
+          type="button"
+          disabled={practice.recovering}
+          onClick={() => {
+            // eslint-disable-next-line no-alert -- Discarding the only durable copy requires explicit user confirmation.
+            const confirmed = window.confirm(
+              t`Delete all unsynced answers on this device? This cannot be undone. Progress already saved will not change.`
+            );
+            if (confirmed) {
+              practice.discard();
+            }
+          }}
+        >
+          <Trans>Delete unsynced answers and reload</Trans>
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const SessionScreen = ({
   userId,
@@ -90,9 +112,15 @@ export const SessionScreen = ({
   userId: string;
   transport?: PracticeTransport;
 }) => {
+  const { t } = useLingui();
+  const effortLabel: Record<Effort, string> = {
+    easy: t`Easy`,
+    good: t`Good`,
+    hard: t`Hard`,
+  };
   const practice = usePracticeSession(userId, transport);
   const { view, loadError, writeError } = practice;
-  const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioError, setAudioError] = useState<SpeechFailure | null>(null);
   const [typed, setTyped] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const phase = view?.phase;
@@ -129,7 +157,11 @@ export const SessionScreen = ({
     return <Recovery practice={practice} />;
   }
   if (!view) {
-    return <p className="note">Carico…</p>;
+    return (
+      <p className="note">
+        <Trans>Loading…</Trans>
+      </p>
+    );
   }
 
   return (
@@ -143,7 +175,9 @@ export const SessionScreen = ({
             act(() => practice.submitGuess(typed));
           }}
         >
-          <p className="eyebrow">parola nuova · prova a indovinare</p>
+          <p className="eyebrow">
+            <Trans>new word · take a guess</Trans>
+          </p>
           <Prompt
             image={view.prompt.image}
             gloss={view.prompt.gloss}
@@ -153,7 +187,7 @@ export const SessionScreen = ({
             ref={inputRef}
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
-            placeholder="come si dice in francese?"
+            placeholder={t`how do you say it in French?`}
             autoComplete="off"
             autoCapitalize="off"
             autoCorrect="off"
@@ -161,14 +195,18 @@ export const SessionScreen = ({
           />
           {/* Empty is a valid answer — a shrug is a legitimate pretest (§3). */}
           <div className="actions">
-            <button type="submit">Continua</button>
+            <button type="submit">
+              <Trans>Continue</Trans>
+            </button>
           </div>
         </form>
       )}
 
       {view.phase === "exposure" && (
         <>
-          <p className="eyebrow">ascolta e ripeti ad alta voce</p>
+          <p className="eyebrow">
+            <Trans>listen and repeat aloud</Trans>
+          </p>
           {view.prompt.image && <p className="image">{view.prompt.image}</p>}
           <p className="answer">{view.answer}</p>
           <p className="gloss">{view.prompt.gloss}</p>
@@ -178,13 +216,13 @@ export const SessionScreen = ({
               className="audio"
               onClick={() => speak(view.answer, setAudioError)}
             >
-              Riascolta
+              <Trans>Listen again</Trans>
             </button>
             <button
               type="button"
               onClick={() => act(() => practice.exposureDone())}
             >
-              L&apos;ho detta
+              <Trans>I&apos;ve said it aloud</Trans>
             </button>
           </div>
         </>
@@ -199,7 +237,9 @@ export const SessionScreen = ({
             act(() => practice.submitRecall(typed, "good"));
           }}
         >
-          <p className="eyebrow">scrivi la parola francese</p>
+          <p className="eyebrow">
+            <Trans>type the French word</Trans>
+          </p>
           <Prompt
             image={view.prompt.image}
             gloss={view.prompt.gloss}
@@ -228,30 +268,36 @@ export const SessionScreen = ({
                     : () => act(() => practice.submitRecall(typed, effort))
                 }
               >
-                {EFFORT_LABEL[effort]}
+                {effortLabel[effort]}
               </button>
             ))}
           </div>
           <p className="kbd-hint">
-            <kbd>Invio</kbd> = Bene
+            <Trans>
+              <kbd>Enter</kbd> = Good
+            </Trans>
           </p>
         </form>
       )}
 
       {view.phase === "feedback" && (
         <>
-          <p className="eyebrow wrong">non ancora</p>
+          <p className="eyebrow wrong">
+            <Trans>not quite</Trans>
+          </p>
           <p className="answer">{view.expected}</p>
           {/* No diff highlighting — finding the difference is the point (§2). */}
           <p className="typed">
-            hai scritto: <b>{view.typed || "—"}</b>
+            <Trans>
+              you wrote: <b>{view.typed || "—"}</b>
+            </Trans>
           </p>
           <div className="actions">
             <button
               type="button"
               onClick={() => act(() => practice.dismissFeedback())}
             >
-              Continua
+              <Trans>Continue</Trans>
             </button>
           </div>
         </>
@@ -259,13 +305,14 @@ export const SessionScreen = ({
 
       {view.phase === "caughtUp" && (
         <>
-          <p className="eyebrow">sei in pari</p>
-          {/* Italian, so the sans voice — .answer is reserved for French. */}
-          <p className="status">Tutto fatto, per ora</p>
-          <p className="stats">
-            {view.stats.introduced} parole nuove · {view.stats.correct}/
-            {view.stats.recalls} richiami corretti
+          <p className="eyebrow">
+            <Trans>you&apos;re all caught up</Trans>
           </p>
+          {/* Interface text uses the sans voice; .answer is reserved for French. */}
+          <p className="status">
+            <Trans>All done, for now</Trans>
+          </p>
+          <SessionStats {...view.stats} />
           <NextDueNote
             key={view.nextDueAt.getTime()}
             due={view.nextDueAt.getTime()}
@@ -275,16 +322,23 @@ export const SessionScreen = ({
 
       {view.phase === "done" && (
         <>
-          <p className="eyebrow">sessione finita</p>
-          <p className="status">Bravo</p>
-          <p className="stats">
-            {view.stats.introduced} parole nuove · {view.stats.correct}/
-            {view.stats.recalls} richiami corretti
+          <p className="eyebrow">
+            <Trans>session complete</Trans>
           </p>
+          <p className="status">
+            <Trans>Well done</Trans>
+          </p>
+          <SessionStats {...view.stats} />
         </>
       )}
 
-      {audioError && <p className="note">{audioError}</p>}
+      {audioError && (
+        <p className="note">
+          {audioError.kind === "unsupported"
+            ? t`This browser does not support reading words aloud.`
+            : t`Could not play the audio (${audioError.reason}).`}
+        </p>
+      )}
     </div>
   );
 };

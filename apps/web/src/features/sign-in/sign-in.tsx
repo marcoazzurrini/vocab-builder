@@ -1,3 +1,4 @@
+import { Trans, useLingui } from "@lingui/react/macro";
 import { requestLink } from "@vocab/authentication/client";
 import { useEffect, useState } from "react";
 import * as v from "valibot";
@@ -11,15 +12,16 @@ export const SignIn = ({
   pending: boolean;
   sessionError: boolean;
 }) => {
+  const { t } = useLingui();
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<"expired" | "send" | null>(null);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("error")) {
       // Read the callback URL after hydration so server and initial client markup match.
       // oxlint-disable-next-line react/set-state-in-effect
-      setError("Link non valido o scaduto. Richiedi un nuovo link.");
+      setError("expired");
     }
   }, []);
 
@@ -39,7 +41,7 @@ export const SignIn = ({
       await requestLink(email);
       setSentTo(email);
     } catch {
-      setError("Invio non riuscito. Controlla la connessione e riprova.");
+      setError("send");
     }
     setSending(false);
   };
@@ -49,21 +51,27 @@ export const SignIn = ({
       <h1 className="wordmark">
         <Wordmark />
       </h1>
-      {pending && <p className="sent">Carico…</p>}
+      {pending && (
+        <p className="sent">
+          <Trans>Loading…</Trans>
+        </p>
+      )}
       {!pending && !sentTo && (
         <form onSubmit={sendLink}>
-          <label htmlFor="email">Accedi con un link via email</label>
+          <label htmlFor="email">
+            <Trans>Sign in with an email link</Trans>
+          </label>
           <input
             id="email"
             name="email"
             type="email"
             required
             autoComplete="email"
-            placeholder="tu@esempio.it"
+            placeholder={t`you@example.com`}
           />
           <div className="actions">
             <button type="submit" disabled={sending}>
-              {sending ? "Invio…" : "Invia link"}
+              {sending ? t`Sending…` : t`Send link`}
             </button>
           </div>
         </form>
@@ -71,17 +79,24 @@ export const SignIn = ({
       {sentTo && (
         <>
           <p className="sent">
-            Se l&apos;indirizzo è abilitato, riceverai un link a{" "}
-            <strong>{sentTo}</strong>. Aprilo su questo dispositivo.
+            <Trans>
+              If this email address has access, you&apos;ll receive a link at{" "}
+              <strong>{sentTo}</strong>. Open it on this device.
+            </Trans>
           </p>
           <button type="button" onClick={() => setSentTo(null)}>
-            Richiedi un altro link
+            <Trans>Request another link</Trans>
           </button>
         </>
       )}
       {(error || sessionError) && (
         <p role="alert" className="note wrong">
-          {error ?? "Impossibile verificare l'accesso. Riprova."}
+          {error &&
+            {
+              expired: t`This link is invalid or has expired. Request a new one.`,
+              send: t`Could not send the link. Check your connection and try again.`,
+            }[error]}
+          {!error && t`Could not check whether you're signed in. Try again.`}
         </p>
       )}
     </div>

@@ -14,6 +14,7 @@ apps/web
 packages/spaced-repetition  Learning rules, with no framework or database dependency
 packages/database          Persistence, migrations, catalogue tooling
 packages/authentication    Access policy and server/client authentication facades
+packages/i18n              UI catalogs, locale policy, and Lingui runtime
 ```
 
 These web directories live under `apps/web/src/`. UI components and styling remain app-local. There is deliberately no UI package in this refactor.
@@ -22,10 +23,10 @@ Administrative scripts stay with their owner: `apps/web/scripts/` prepares the w
 
 Production workspace dependencies flow in one direction:
 
-- Web consumes authentication, database, and spaced repetition.
+- Web consumes authentication, database, spaced repetition, and i18n.
 - Authentication uses database's authentication storage adapter.
 - Database uses spaced repetition to validate and schedule answers.
-- Spaced repetition does not import another workspace.
+- Spaced repetition and i18n do not import another workspace.
 - No package imports web.
 
 All packages export TypeScript source. Vite bundles only the entrypoints required by each target. Internal relative imports are fine inside a workspace; relative imports between workspaces and imports of unexported source are not.
@@ -66,6 +67,8 @@ Study days use device-local calendar boundaries `[start, nextStart)`, not 24-hou
 
 ```ts
 interface UserRepository {
+  uiLocale(): Promise<"en" | "it" | null>;
+  setUiLocale(locale: "en" | "it" | null): Promise<void>;
   settings(): Promise<Settings>;
   snapshot(language: string): Promise<ReviewSnapshot>;
   recordAnswer(answer: AnswerCommand): Promise<void>;
@@ -84,14 +87,23 @@ Schema generation, seeds, and catalogue import belong here. The deployable app r
 
 ## Authentication
 
-`@vocab/authentication/server` exposes `createAuthentication(options)` with two operations:
+`@vocab/authentication/server` exposes `createAuthentication(options)` with these operations:
 
 - `handle(request)` serves authentication HTTP routes.
 - `requireUser(headers, expectedUserId?)` returns an application identity or rejects.
+- `getUser(headers)` returns an allowed application identity or `null`, for request personalization that also supports guests.
 
 The module hides Better Auth configuration, allowlists, origin checks, rate limits, magic-link hashing and expiry, email delivery, and account checks. The app supplies configuration explicitly; the package never imports `cloudflare:workers`. Cookies, table names, session lifetime, and token behavior remain unchanged.
 
 `@vocab/authentication/client` exposes `useSession`, `requestLink`, and `signOut`. It returns application identities and errors, not a Better Auth client. Its graph must not reach database or server configuration. Sign-in copy and layout belong to the consuming application.
+
+## Interface localization
+
+`@vocab/i18n` owns English and Italian catalogs and their runtime loading. Its `/locales` entrypoint exposes locale validation and browser-language negotiation without importing catalogs. The database independently constrains `settings.ui_locale` to supported persisted values; it does not depend on Lingui or the i18n package. A nullable preference means automatic selection, separate from `Settings.lang`, the learning language.
+
+Start request middleware resolves the account preference (or an existing guest cookie), negotiates `Accept-Language`, and creates a request-local Lingui instance for page rendering only. Server functions and API requests skip language setup. Explicit CSRF middleware preserves Start's server-function protection. The router composes Lingui with the existing Query provider and SSR hooks. Hydration transfers the locale and document identity and awaits the catalog chunk before rendering. Server instances are never global, and personalized HTML is private and not cacheable.
+
+There is no language selector or public preference endpoint. The app reloads the document when the resolved session identity differs from the identity that rendered it, including logout and account changes in another tab. The new request resolves language again and starts with a fresh query cache. The transferred identity does not authorize data access; protected operations still verify the session and expected account independently. See [the localization guide](../packages/i18n/README.md) for translation commands, selection precedence, and deployment requirements.
 
 ## Browser session synchronization
 

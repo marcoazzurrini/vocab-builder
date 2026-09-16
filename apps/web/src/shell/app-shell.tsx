@@ -1,3 +1,4 @@
+import { useLingui } from "@lingui/react/macro";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -14,6 +15,7 @@ export const AppShell = ({
   onSignOut: () => void;
   children: ReactNode;
 }) => {
+  const { t } = useLingui();
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     if (!menuOpen) {
@@ -49,7 +51,7 @@ export const AppShell = ({
             type="button"
             className="menu-btn"
             onClick={() => setMenuOpen(true)}
-            aria-label="Apri menu"
+            aria-label={t`Open menu`}
           >
             <svg
               width="20"

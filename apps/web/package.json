@@ -17,12 +17,15 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@lingui/core": "^6.7.0",
+    "@lingui/react": "^6.7.0",
     "@tanstack/react-query": "^5.102.8",
     "@tanstack/react-router": "^1.170.35",
     "@tanstack/react-router-ssr-query": "^1.167.2",
     "@tanstack/react-start": "^1.168.52",
     "@vocab/authentication": "workspace:*",
     "@vocab/database": "workspace:*",
+    "@vocab/i18n": "workspace:*",
     "@vocab/spaced-repetition": "workspace:*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -30,6 +33,9 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.8",
+    "@lingui/babel-plugin-lingui-macro": "^6.7.0",
+    "@lingui/vite-plugin": "^6.7.0",
+    "@rolldown/plugin-babel": "^0.2.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.3",

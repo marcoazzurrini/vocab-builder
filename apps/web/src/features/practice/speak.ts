@@ -7,12 +7,16 @@
  * try/catch, which meant the one principle present on every single card could
  * stop working without anything saying so.
  */
+export type SpeechFailure =
+  | { kind: "unsupported" }
+  | { kind: "failed"; reason: string };
+
 export const speak = (
   text: string,
-  onUnavailable?: (reason: string) => void
+  onUnavailable?: (reason: SpeechFailure) => void
 ): void => {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-    onUnavailable?.("Questo browser non supporta la sintesi vocale.");
+    onUnavailable?.({ kind: "unsupported" });
     return;
   }
 
@@ -30,7 +34,7 @@ export const speak = (
   }
 
   utterance.addEventListener("error", (event) =>
-    onUnavailable?.(`Audio non riuscito (${event.error}).`)
+    onUnavailable?.({ kind: "failed", reason: event.error })
   );
 
   window.speechSynthesis.cancel();

@@ -46,6 +46,7 @@ apps/web/                    TanStack routes, Worker wiring, UI, browser recover
 packages/spaced-repetition/  Learning sessions, grading, and scheduling
 packages/database/           Scoped persistence, schema, migrations, seed and import
 packages/authentication/     Sign-in policy, sessions, email delivery, client facade
+packages/i18n/               Italian/English catalogs, locale policy, Lingui runtime
 docs/                        Architecture, learning rationale, development
 .github/                     CI
 ```
@@ -72,9 +73,10 @@ Workspaces export TypeScript source, so the app bundles their production entrypo
 - [Module interfaces and dependency rules](docs/architecture.md)
 - [Learning design and product direction](docs/learning-design.md)
 - [Local development, database workflow, and production deployment](docs/development.md)
+- [Interface languages and translation workflow](packages/i18n/README.md)
 
 The live catalogue import and initial Cloudflare deployment are complete. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker.
 
 ## Conventions
 
-UI copy is Italian; target vocabulary is French; code and documentation are English. Learning changes cite the principle that motivates them. Keep SQL migrations reviewed and append-only. Keep the app mobile-first, but not mobile-only.
+UI copy supports Italian and English through Lingui, with English source messages and idiomatic Italian translations. Existing account preferences or browser settings determine the language; there is currently no language selector. Target vocabulary remains French with Italian glosses, independent of the interface language. Code and documentation are English. Learning changes cite the principle that motivates them. Keep SQL migrations reviewed and append-only. Keep the app mobile-first, but not mobile-only.

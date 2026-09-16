@@ -1,3 +1,5 @@
+import type { I18n } from "@lingui/core";
+import { useLingui } from "@lingui/react";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
@@ -9,20 +11,25 @@ import {
 import "../tokens.css";
 import "../index.css";
 
-export const Root = () => (
-  <html lang="it">
-    <head>
-      <HeadContent />
-    </head>
-    <body>
-      <Outlet />
-      <Scripts />
-    </body>
-  </html>
-);
+export const Root = () => {
+  const { i18n } = useLingui();
+  return (
+    <html lang={i18n.locale}>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <Outlet />
+        <Scripts />
+      </body>
+    </html>
+  );
+};
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
+  i18n: I18n;
+  documentIdentity: { userId: string | null };
 }>()({
   component: Root,
   head: () => ({

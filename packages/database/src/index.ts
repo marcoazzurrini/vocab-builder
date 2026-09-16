@@ -6,12 +6,21 @@ import type {
 
 import { connect } from "./connection";
 import type { DatabaseBinding } from "./connection";
-import { readSettings, readDeck, saveAnswer } from "./repository";
+import {
+  readSettings,
+  readDeck,
+  saveAnswer,
+  readUiLocale,
+  saveUiLocale,
+} from "./repository";
+import type { UiLocale } from "./repository";
 
 export type { DatabaseBinding } from "./connection";
 export { SaveConflict } from "./repository";
 
 export interface UserRepository {
+  uiLocale: () => Promise<UiLocale>;
+  setUiLocale: (locale: UiLocale) => Promise<void>;
   settings: () => Promise<Settings>;
   snapshot: (language: string) => Promise<ReviewSnapshot>;
   recordAnswer: (answer: AnswerCommand) => Promise<void>;
@@ -27,8 +36,10 @@ export const createDatabase = (binding: DatabaseBinding) => {
       }
       return {
         recordAnswer: (answer) => saveAnswer(db, userId, answer),
+        setUiLocale: (locale) => saveUiLocale(db, userId, locale),
         settings: () => readSettings(db, userId),
         snapshot: (language) => readDeck(db, userId, language),
+        uiLocale: () => readUiLocale(db, userId),
       };
     },
   };

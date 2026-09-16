@@ -306,7 +306,15 @@ describe("populated D1 migration upgrade", () => {
         "INSERT INTO cards (user_id,word_id,fsrs_state,revision) VALUES ('learner','known','{\"reps\":1,\"due\":\"2026-09-11T09:01:00.000Z\"}',1)",
       ].map((sql) => binding.prepare(sql))
     );
-    before = await snapshot(binding);
+    // The new nullable preference is the only intentional shape change.
+    const original = await snapshot(binding);
+    before = original.map(({ rows, table }) => ({
+      rows:
+        table === "settings"
+          ? rows.map((row) => ({ ...row, ui_locale: null }))
+          : rows,
+      table,
+    }));
     const files = await migrationFiles();
     for (const file of files.filter(
       (name) => name !== "0000_initial_schema.sql"

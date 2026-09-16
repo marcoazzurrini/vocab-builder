@@ -12,6 +12,7 @@ export default defineConfig({
     "**/.tanstack/**",
     "**/exports/**",
     "packages/database/migrations/**",
+    "packages/i18n/src/locales/**/*.js",
     "packages/database/tests/fixtures/legacy-catalogue/**",
   ],
   overrides: [

@@ -221,6 +221,13 @@ describe("sessions and access policy on D1", () => {
       await expect(makeAuth().requireUser(headers)).rejects.toThrow(/Sign in/u);
     }
   );
+  it("treats revoked access as anonymous for page rendering without authorizing progress", async () => {
+    const { headers } = await signIn();
+    const restricted = makeAuth({ allowedEmails: "other@example.com" });
+    await expect(restricted.getUser(headers)).resolves.toBeNull();
+    expect(await count("session")).toBe(0);
+    await expect(restricted.requireUser(headers)).rejects.toThrow(/Sign in/u);
+  });
   it.each(["server", "browser"])(
     "denies removed users through %s session reads and deletes the session",
     async (reader) => {

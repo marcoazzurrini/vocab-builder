@@ -11,6 +11,33 @@ import * as v from "valibot";
 import type { Database } from "./connection";
 import * as schema from "./schema";
 
+export type UiLocale = (typeof schema.settings.$inferSelect)["ui_locale"];
+
+export const readUiLocale = async (
+  db: Database,
+  userId: string
+): Promise<UiLocale> => {
+  const [row] = await db
+    .select({ uiLocale: schema.settings.ui_locale })
+    .from(schema.settings)
+    .where(eq(schema.settings.user_id, userId));
+  return row?.uiLocale ?? null;
+};
+
+export const saveUiLocale = async (
+  db: Database,
+  userId: string,
+  uiLocale: UiLocale
+): Promise<void> => {
+  await db
+    .insert(schema.settings)
+    .values({ ui_locale: uiLocale, user_id: userId })
+    .onConflictDoUpdate({
+      set: { ui_locale: uiLocale },
+      target: schema.settings.user_id,
+    });
+};
+
 export const readSettings = async (db: Database, userId: string) => {
   const [row] = await db
     .select()

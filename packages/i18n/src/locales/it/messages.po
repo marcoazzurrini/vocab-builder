@@ -1,0 +1,220 @@
+msgid ""
+msgstr ""
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: it\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "{correct}/{recalls} correct answers"
+msgstr "{correct}/{recalls} risposte corrette"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "{introduced, plural, one {# new word} other {# new words}}"
+msgstr "{introduced, plural, one {# parola nuova} other {# parole nuove}}"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "<0>Enter</0> = Good"
+msgstr "<0>Invio</0> = Normale"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "All done, for now"
+msgstr "Per ora hai finito"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "coming soon"
+msgstr "in arrivo"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Continue"
+msgstr "Continua"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Could not check whether you're signed in. Try again."
+msgstr "Non è stato possibile verificare se hai già effettuato l’accesso. Riprova."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Could not load your session"
+msgstr "Non è stato possibile caricare la sessione"
+
+#. placeholder {0}: audioError.reason
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Could not play the audio ({0})."
+msgstr "Impossibile riprodurre l’audio ({0})."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Could not save your answers"
+msgstr "Non è stato possibile salvare le risposte"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Could not send the link. Check your connection and try again."
+msgstr "Non è stato possibile inviare il link. Controlla la connessione e riprova."
+
+#: ../../apps/web/src/app.tsx
+msgid "Could not sign out. Try again."
+msgstr "Non è stato possibile uscire dall’account. Riprova."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Delete all unsynced answers on this device? This cannot be undone. Progress already saved will not change."
+msgstr "Vuoi eliminare tutte le risposte non ancora sincronizzate su questo dispositivo? Non potrai recuperarle. I progressi già salvati resteranno invariati."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Delete unsynced answers and reload"
+msgstr "Elimina le risposte non sincronizzate e ricarica"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Easy"
+msgstr "Facile"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Good"
+msgstr "Normale"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Hard"
+msgstr "Difficile"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "how do you say it in French?"
+msgstr "come si dice in francese?"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "I've said it aloud"
+msgstr "Ho ripetuto la parola"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "If this email address has access, you'll receive a link at <0>{sentTo}</0>. Open it on this device."
+msgstr "Se questo indirizzo email è autorizzato ad accedere, riceverai un link a <0>{sentTo}</0>. Aprilo su questo dispositivo."
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Learning language"
+msgstr "Lingua studiata"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Listen again"
+msgstr "Riascolta"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "listen and repeat aloud"
+msgstr "ascolta e ripeti ad alta voce"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Loading…"
+msgstr "Caricamento…"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Menu"
+msgstr "Menu"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "new word · take a guess"
+msgstr "parola nuova · prova a indovinare"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Next word in about {minutes} min. Your session will resume automatically."
+msgstr "La prossima parola sarà pronta tra circa {minutes} min. La sessione riprenderà da sola."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "not quite"
+msgstr "non proprio"
+
+#: ../../apps/web/src/shell/app-shell.tsx
+msgid "Open menu"
+msgstr "Apri menu"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Progress"
+msgstr "Progressi"
+
+#: ../../apps/web/src/shell/error-boundary.tsx
+msgid "Reload"
+msgstr "Ricarica la pagina"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Request another link"
+msgstr "Richiedi un altro link"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Send link"
+msgstr "Invia link"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Sending…"
+msgstr "Invio in corso…"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Session"
+msgstr "Sessione"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "session complete"
+msgstr "sessione completata"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Settings"
+msgstr "Impostazioni"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "Sign in with an email link"
+msgstr "Accedi con un link via email"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Sign out"
+msgstr "Esci"
+
+#: ../../apps/web/src/shell/error-boundary.tsx
+msgid "something went wrong"
+msgstr "qualcosa è andato storto"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "This browser does not support reading words aloud."
+msgstr "Questo browser non supporta la lettura ad alta voce."
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "This link is invalid or has expired. Request a new one."
+msgstr "Questo link non è valido oppure è scaduto. Richiedine un altro."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Try again"
+msgstr "Riprova"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Try again before continuing. Do not clear your browser data: it may contain answers that have not been saved yet."
+msgstr "Riprova prima di continuare. Non cancellare i dati del browser: potrebbero esserci risposte ancora da salvare."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "type the French word"
+msgstr "scrivi la parola in francese"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Well done"
+msgstr "Ottimo lavoro"
+
+#: ../../apps/web/src/shell/sidebar.tsx
+msgid "Words"
+msgstr "Parole"
+
+#. placeholder {0}: view.typed || "—"
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "you wrote: <0>{0}</0>"
+msgstr "hai scritto: <0>{0}</0>"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "you're all caught up"
+msgstr "sei in pari"
+
+#: ../../apps/web/src/features/sign-in/sign-in.tsx
+msgid "you@example.com"
+msgstr "nome@esempio.it"
+
+#: ../../apps/web/src/shell/error-boundary.tsx
+msgid "Your answers have been saved. Reload to pick up where you left off."
+msgstr "Le tue risposte sono salvate. Ricarica la pagina per riprendere da dove hai lasciato."

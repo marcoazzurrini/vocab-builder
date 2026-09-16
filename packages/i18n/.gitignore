@@ -1,0 +1,2 @@
+# Vite compiles PO catalogs directly. CLI compilation is only a validation step.
+src/locales/*/messages.js
