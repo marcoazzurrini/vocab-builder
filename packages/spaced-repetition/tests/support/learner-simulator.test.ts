@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import * as v from "valibot";
 
-import { catalogue, createLearner, studyBounds } from "./harness";
-import { attemptMismatches, violations } from "./invariants";
+import { catalogue, createLearner, studyBounds } from "./learner-simulator";
+import { attemptMismatches, violations } from "./trace-invariants";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {
@@ -28,8 +28,8 @@ describe("public generated-history harness", () => {
         "--eval",
         `
         import assert from "node:assert/strict";
-        import { catalogue, createLearner } from ${JSON.stringify(new URL("harness.ts", import.meta.url).href)};
-        import { violations } from ${JSON.stringify(new URL("invariants.ts", import.meta.url).href)};
+        import { catalogue, createLearner } from ${JSON.stringify(new URL("learner-simulator.ts", import.meta.url).href)};
+        import { violations } from ${JSON.stringify(new URL("trace-invariants.ts", import.meta.url).href)};
         const cycle = (values) => { let i = 0; return () => values[i++ % values.length]; };
         const learner = createLearner({
           behaviour: {

@@ -1,6 +1,20 @@
+import type { Card as FsrsCard, Grade } from "ts-fsrs";
 import * as v from "valibot";
 
-import type { Attempt } from "../session/types";
+/** Internal answer facts used to construct a durable command; storage is external. */
+export interface Attempt {
+  /** Attempts are keyed by what they are about, not by the cache row. */
+  wordId: string;
+  phase: "guess" | "recall";
+  typed: string;
+  correct: boolean;
+  /** Null for guesses: a pretest is logged but never rated. */
+  rating: Grade | null;
+  latencyMs: number;
+  /** The card's FSRS state *before* this attempt, so history can be replayed. */
+  stateBefore: FsrsCard;
+  reviewedAt: Date;
+}
 
 const fields = {
   id: v.pipe(v.string(), v.uuid()),

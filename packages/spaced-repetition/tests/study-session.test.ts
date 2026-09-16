@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Rating, State, createEmptyCard } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 
-import { createSession } from "./index";
-import type { Session } from "./index";
-import type { Attempt, Card, Word } from "./types";
+import type { Attempt } from "../src/answer-command";
+import type { Word } from "../src/restore-progress";
+import type { Card } from "../src/review-scheduling";
+import { startSession } from "../src/study-session";
+import type { Session } from "../src/study-session";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {
@@ -60,7 +62,7 @@ const makeSession = (
   newPerDay = 10,
   cards: Card[] = []
 ): Session =>
-  createSession({
+  startSession({
     accept: ({ attempt, card }) => {
       attempts.push(attempt);
       if (card) {
@@ -316,7 +318,7 @@ describe("session", () => {
     });
 
     it("counts words already introduced earlier today", () => {
-      const s = createSession({
+      const s = startSession({
         cards: [],
         clock: () => new Date(clockMs),
         introducedToday: 3,
@@ -385,7 +387,7 @@ describe("session", () => {
     it("does not spend allowance again on a resumed word", () => {
       // Its guess already counts in introducedToday, so resuming must not take
       // a second slot on top of that.
-      const s = createSession({
+      const s = startSession({
         accept: ({ attempt, card }) => {
           attempts.push(attempt);
           if (card) {

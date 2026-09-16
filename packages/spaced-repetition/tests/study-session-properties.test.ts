@@ -2,14 +2,14 @@ import { describe, expect, it } from "bun:test";
 
 import * as fc from "fast-check";
 
-import { catalogue, createLearner } from "./harness";
-import type { Behaviour, Learner } from "./harness";
+import type { Effort } from "../src/answer-grading";
+import { catalogue, createLearner } from "./support/learner-simulator";
+import type { Behaviour, Learner } from "./support/learner-simulator";
 import {
   attemptMismatches,
   closureContradictions,
   violations,
-} from "./invariants";
-import type { Effort } from "./types";
+} from "./support/trace-invariants";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {

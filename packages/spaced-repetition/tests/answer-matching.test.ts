@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import * as fc from "fast-check";
 
-import { matches, normalise } from "./matching";
+import { matches, normalise } from "../src/answer-matching";
 
 // One rule: orthography is graded, typography is not.
 describe("answer matching", () => {

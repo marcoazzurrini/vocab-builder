@@ -64,10 +64,15 @@ module.exports = {
       },
     },
     {
-      from: { pathNot: "\\.test\\.[cm]?[jt]sx?$|/src/testing\\.ts$" },
+      from: {
+        pathNot:
+          "\\.test\\.[cm]?[jt]sx?$|/src/testing\\.ts$|^packages/[^/]+/tests/",
+      },
       name: "test-infrastructure-stays-in-tests",
       severity: "error",
-      to: { path: "^packages/[^/]+/src/testing\\.ts$|\\.test\\.[cm]?[jt]sx?$" },
+      to: {
+        path: "^packages/[^/]+/(src/testing\\.ts$|tests/)|\\.test\\.[cm]?[jt]sx?$",
+      },
     },
     {
       comment:
@@ -79,7 +84,7 @@ module.exports = {
       name: "web-client-cannot-import-server-implementation",
       severity: "error",
       to: {
-        path: "^apps/web/src/server/|^packages/database/|^packages/(authentication|spaced-repetition)/src/server\\.ts$|^cloudflare:",
+        path: "^apps/web/src/server/|^packages/database/|^packages/authentication/src/server\\.ts$|^packages/spaced-repetition/src/evaluate-answer\\.ts$|^cloudflare:",
         pathNot: "^apps/web/src/server/functions\\.ts$",
       },
     },
@@ -92,7 +97,7 @@ module.exports = {
       name: "public-client-entrypoints-stay-browser-safe",
       severity: "error",
       to: {
-        path: "^packages/database/|^packages/(authentication|spaced-repetition)/src/server\\.ts$|^cloudflare:",
+        path: "^packages/database/|^packages/authentication/src/server\\.ts$|^packages/spaced-repetition/src/evaluate-answer\\.ts$|^cloudflare:",
         reachable: true,
       },
     },

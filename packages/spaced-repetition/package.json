@@ -5,7 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server.ts"
+    "./server": "./src/evaluate-answer.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

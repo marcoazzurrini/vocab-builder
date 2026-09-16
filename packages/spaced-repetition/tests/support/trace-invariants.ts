@@ -1,17 +1,16 @@
 /**
  * The session's promises, written as checks over a trace. Test-only.
  *
- * These are not extra rules invented for the tests — each one is a claim the
- * README already makes, and two of them are bugs that shipped. Stating them here
- * means the next violation is a failing test rather than a session that asks for
- * a word it never showed.
+ * Each check enforces a promise in docs/learning-design.md independently of the
+ * production selection rules. Negative-control tests corrupt traces to prove
+ * that the checks detect violations.
  */
 
 import { State } from "ts-fsrs";
 
-import { studyBounds } from "./harness";
-import type { Step } from "./harness";
-import type { Attempt } from "./types";
+import type { Attempt } from "../../src/answer-command";
+import { studyBounds } from "./learner-simulator";
+import type { Step } from "./learner-simulator";
 
 /** A step that actually put something on screen. */
 export type PromptStep = Exclude<Step, { at: "closed" }>;

@@ -2,10 +2,16 @@
 import { State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 
-import { createSession } from "../index";
-import type { AnswerCommand, ReviewSnapshot, SessionView } from "../index";
-import { evaluateAnswer } from "../server";
-import type { Attempt, Effort, Word } from "./types";
+import type { Attempt } from "../../src/answer-command";
+import type { Effort } from "../../src/answer-grading";
+import { evaluateAnswer } from "../../src/evaluate-answer";
+import { createSession } from "../../src/index";
+import type {
+  AnswerCommand,
+  ReviewSnapshot,
+  SessionView,
+} from "../../src/index";
+import type { Word } from "../../src/restore-progress";
 
 /** Independent facts at selection time, not the production queue's decision. */
 export interface Eligibility {

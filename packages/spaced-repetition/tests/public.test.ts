@@ -1,14 +1,17 @@
 import { describe, expect, it } from "bun:test";
 
-import { createSession, DEFAULT_SETTINGS } from "./index";
+import { createSession, DEFAULT_SETTINGS } from "@vocab/spaced-repetition";
 import type {
   AnswerCommand,
   ReviewSnapshot,
   Session,
   SessionOptions,
   SessionView,
-} from "./index";
-import { evaluateAnswer, RevisionConflict } from "./server";
+} from "@vocab/spaced-repetition";
+import {
+  evaluateAnswer,
+  RevisionConflict,
+} from "@vocab/spaced-repetition/server";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {

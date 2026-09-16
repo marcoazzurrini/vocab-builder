@@ -1,8 +1,13 @@
 import { Rating } from "ts-fsrs";
 import type { Card as FsrsCard, Grade } from "ts-fsrs";
 
-import { matches } from "./matching";
-import type { Effort } from "./types";
+import { matches } from "./answer-matching";
+
+/**
+ * What the user says about how easily the answer came. Never "again" — that is
+ * decided by the typed string, not claimed by the user.
+ */
+export type Effort = "hard" | "good" | "easy";
 
 const EFFORT_TO_RATING: Record<Effort, Grade> = {
   easy: Rating.Easy,

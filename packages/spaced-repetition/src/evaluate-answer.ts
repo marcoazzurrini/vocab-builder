@@ -1,11 +1,14 @@
 import { createEmptyCard } from "ts-fsrs";
 import * as v from "valibot";
 
-import { AnswerCommand } from "./lib/commands";
-import { reviveFsrsCard } from "./lib/deck";
-import { transition, RevisionConflict } from "./session/transition";
+import { AnswerCommand } from "./answer-command";
+import {
+  reviveFsrsCard,
+  transition,
+  RevisionConflict,
+} from "./review-scheduling";
 
-export { RevisionConflict } from "./session/transition";
+export { RevisionConflict } from "./review-scheduling";
 
 export interface AnswerTransition {
   correct: boolean;

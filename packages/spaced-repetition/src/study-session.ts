@@ -1,36 +1,56 @@
-import { createEmptyCard, fsrs } from "ts-fsrs";
+import { createEmptyCard } from "ts-fsrs";
 import type { FSRS } from "ts-fsrs";
 
-import { validateAnswerText } from "../lib/commands";
-import { effortsFor, gradeRecall } from "./grading";
-import { pickNext } from "./queue";
-import { transition } from "./transition";
-import type {
-  Attempt,
-  Card,
-  Effort,
-  Prompt,
-  SessionStats,
-  SessionView,
-  Word,
-} from "./types";
+import { validateAnswerText } from "./answer-command";
+import type { Attempt } from "./answer-command";
+import { effortsFor, gradeRecall } from "./answer-grading";
+import type { Effort } from "./answer-grading";
+import type { Word } from "./restore-progress";
+import { createScheduler, transition } from "./review-scheduling";
+import type { Card } from "./review-scheduling";
+import { pickNext } from "./select-next-step";
 
-export type {
-  Attempt,
-  Card,
-  Effort,
-  Prompt,
-  SessionStats,
-  SessionView,
-  Word,
-} from "./types";
+/** Everything needed to pose the question, and nothing that answers it. */
+export interface Prompt {
+  gloss: string;
+  hint: string | null;
+  image: string | null;
+  kind: "word" | "chunk";
+}
+
+export interface SessionStats {
+  introduced: number;
+  recalls: number;
+  correct: number;
+  wrong: number;
+}
+
+/**
+ * The entire surface the UI sees. A discriminated union rather than a phase
+ * plus a bag of optional fields, so asking for the answer during the guess
+ * phase is not a bug to guard against — it does not typecheck.
+ */
+export type SessionView =
+  | { phase: "guess"; prompt: Prompt }
+  | { phase: "exposure"; prompt: Prompt; answer: string }
+  /** `efforts` is the list of buttons to draw. The UI holds no grading policy. */
+  | { phase: "recall"; prompt: Prompt; efforts: Effort[] }
+  /** Only ever reached by a wrong answer, so there is no `correct` flag. */
+  | { phase: "feedback"; expected: string; typed: string }
+  /**
+   * Nothing due right now, but a card is still coming today. The honest pause
+   * Anki calls its congratulations screen: the user is told when, and the UI
+   * rebuilds the session at that moment. `done` remains final for the day.
+   */
+  | { phase: "caughtUp"; nextDueAt: Date; stats: SessionStats }
+  | { phase: "done"; stats: SessionStats };
 
 /** An answer and its derived card are accepted together, never as separate notifications. */
 export interface AnswerChange {
   attempt: Attempt;
   card: Card | null;
 }
-export interface SessionOptions {
+export interface SessionEngineOptions {
   words: Word[];
   cards: Card[];
   newPerDay: number;
@@ -107,9 +127,9 @@ const current = (
  * and acceptance must all succeed before a single assignment publishes that state.
  * A rejected action therefore cannot spend allowance, rate a card, or change phase.
  */
-export const createSession = (options: SessionOptions): Session => {
+export const startSession = (options: SessionEngineOptions): Session => {
   const clock = options.clock ?? (() => new Date());
-  const scheduler = options.scheduler ?? fsrs({ enable_short_term: true });
+  const scheduler = options.scheduler ?? createScheduler();
   const words = structuredClone(options.words);
   const wordById = new Map(words.map((word) => [word.id, word]));
   let processing = false;

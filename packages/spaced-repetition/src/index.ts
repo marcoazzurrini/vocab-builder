@@ -1,18 +1,32 @@
 import * as v from "valibot";
 
-import { commandFor } from "./lib/commands";
-import type { AnswerCommand } from "./lib/commands";
-import { buildDeck, DEFAULT_SETTINGS } from "./lib/deck";
-import type { ReviewSnapshot, Settings } from "./lib/deck";
-import { createSession as startSession } from "./session";
-import type { Session } from "./session";
+import { commandFor } from "./answer-command";
+import type { AnswerCommand } from "./answer-command";
+import { restoreProgress } from "./restore-progress";
+import type { ReviewSnapshot } from "./restore-progress";
+import { startSession } from "./study-session";
+import type { Session } from "./study-session";
 
-export { AnswerCommand } from "./lib/commands";
-export { DEFAULT_SETTINGS } from "./lib/deck";
-export { dayStart as studyDayStart } from "./lib/day";
-export type { ReviewSnapshot, Settings } from "./lib/deck";
-export type { Effort, SessionView, Word } from "./session/types";
-export type { Session } from "./session";
+export { AnswerCommand } from "./answer-command";
+export { dayStart as studyDayStart } from "./study-day";
+export type { ReviewSnapshot } from "./restore-progress";
+export type { Effort } from "./answer-grading";
+export type { SessionView } from "./study-session";
+export type { Word } from "./restore-progress";
+export type { Session } from "./study-session";
+
+export interface Settings {
+  lang: string;
+  newPerDay: number;
+  dayRolloverHour: number;
+}
+
+/** Default learning preferences when the caller supplies no settings. */
+export const DEFAULT_SETTINGS: Settings = {
+  dayRolloverHour: 4,
+  lang: "fr",
+  newPerDay: 15,
+};
 
 export interface SessionOptions {
   snapshot: ReviewSnapshot;
@@ -46,7 +60,7 @@ export const createSession = ({
     );
   }
   const parsedSettings = v.parse(SessionSettings, settings);
-  const deck = buildDeck(
+  const progress = restoreProgress(
     snapshot.words,
     snapshot.cards,
     snapshot.guesses,
@@ -54,7 +68,7 @@ export const createSession = ({
     parsedSettings.dayRolloverHour
   );
   return startSession({
-    ...deck,
+    ...progress,
     accept: ({ attempt }) => {
       // Validate even without a sink. Rejection must precede publishing session state.
       const command = commandFor(attempt);

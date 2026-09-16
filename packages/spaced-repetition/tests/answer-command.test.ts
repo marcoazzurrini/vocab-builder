@@ -3,8 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { createEmptyCard, fsrs, Rating } from "ts-fsrs";
 import * as v from "valibot";
 
-import type { Attempt } from "../session/types";
-import { AnswerCommand, commandFor } from "./commands";
+import type { Attempt } from "../src/answer-command";
+import { AnswerCommand, commandFor } from "../src/answer-command";
 
 const NOW = new Date("2026-08-10T09:00:00.123Z");
 const ID = "e581fc23-29bd-48a2-a842-071f9eb9f406";

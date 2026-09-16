@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { catalogue, createLearner } from "./harness";
+import { catalogue, createLearner } from "./support/learner-simulator";
 import {
   exposuresAfterAFirstRecall,
   recallsWithoutExposure,
   repeatsInARow,
   sittings,
   violations,
-} from "./invariants";
+} from "./support/trace-invariants";
 
 const START = new Date("2026-08-10T09:00:00");
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { dayEnd, dayStart, studyDay } from "./day";
+import { dayEnd, dayStart, studyDay } from "../src/study-day";
 
 describe("the study day", () => {
   it("is the calendar day when the rollover is midnight", () => {
@@ -229,7 +229,7 @@ describe("device-local calendar boundaries", () => {
           "--eval",
           `
           import assert from "node:assert/strict";
-          import { studyDay, dayStart, dayEnd } from ${JSON.stringify(new URL("day.ts", import.meta.url).href)};
+          import { studyDay, dayStart, dayEnd } from ${JSON.stringify(new URL("../src/study-day.ts", import.meta.url).href)};
           const cases = ${JSON.stringify(cases)};
           for (const { hour, boundaries } of cases) {
             for (let i = 0; i < boundaries.length - 1; i++) {

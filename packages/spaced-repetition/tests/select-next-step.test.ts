@@ -2,9 +2,10 @@ import { describe, expect, it } from "bun:test";
 
 import { createEmptyCard, State } from "ts-fsrs";
 
-import { pickNext, stageOf } from "./queue";
-import type { Queue, Slot } from "./queue";
-import type { Card, Word } from "./types";
+import type { Word } from "../src/restore-progress";
+import type { Card } from "../src/review-scheduling";
+import { pickNext, stageOf } from "../src/select-next-step";
+import type { Queue, Slot } from "../src/select-next-step";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {
@@ -626,7 +627,7 @@ describe("queue edge cases", () => {
           `
           import assert from "node:assert/strict";
           import { createEmptyCard, State } from ${JSON.stringify(import.meta.resolve("ts-fsrs"))};
-          import { pickNext } from ${JSON.stringify(new URL("queue.ts", import.meta.url).href)};
+          import { pickNext } from ${JSON.stringify(new URL("../src/select-next-step.ts", import.meta.url).href)};
           const now = new Date(new Date(${JSON.stringify(start)}).getTime() + 3600000);
           const nextStart = new Date(${JSON.stringify(nextStart)}).getTime();
           for (const state of [State.Learning, State.Relearning, State.New, State.Review]) {

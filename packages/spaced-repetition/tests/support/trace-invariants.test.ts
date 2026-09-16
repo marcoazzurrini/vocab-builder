@@ -2,8 +2,9 @@ import { describe, expect, it } from "bun:test";
 
 import { State } from "ts-fsrs";
 
-import { catalogue, createLearner } from "./harness";
-import type { Step } from "./harness";
+import type { Attempt } from "../../src/answer-command";
+import { catalogue, createLearner } from "./learner-simulator";
+import type { Step } from "./learner-simulator";
 import {
   attemptMismatches,
   closureContradictions,
@@ -15,8 +16,7 @@ import {
   reviewsDraggedFromTheFuture,
   sittings,
   violations,
-} from "./invariants";
-import type { Attempt } from "./types";
+} from "./trace-invariants";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {

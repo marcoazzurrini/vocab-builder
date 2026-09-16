@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 
 import { createEmptyCard, fsrs, Rating } from "ts-fsrs";
 
-import type { AnswerCommand } from "./index";
-import { evaluateAnswer, RevisionConflict } from "./server";
-import { RevisionConflict as SharedRevisionConflict } from "./session/transition";
+import { evaluateAnswer, RevisionConflict } from "../src/evaluate-answer";
+import type { AnswerCommand } from "../src/index";
+import { RevisionConflict as SharedRevisionConflict } from "../src/review-scheduling";
 
 const checkedFixture = <T>(value: T | null | undefined): T => {
   if (value === null || value === undefined) {

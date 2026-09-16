@@ -1,7 +1,8 @@
 import { State } from "ts-fsrs";
 
-import { studyDay } from "../lib/day";
-import type { Card, Word } from "./types";
+import type { Word } from "./restore-progress";
+import type { Card } from "./review-scheduling";
+import { studyDay } from "./study-day";
 
 /**
  * Where a card is in its life.
@@ -290,7 +291,7 @@ const dueEvenIfJustShown: Rule = (q) => {
  *
  * Precedence is this array. It used to be the order of the branches inside one
  * function, interleaved with the derivations they depended on, which is why the
- * README's numbered list and the code could disagree without anyone noticing.
+ * learning design's numbered list and the code could disagree without anyone noticing.
  */
 export const RULE: readonly Rule[] = [
   dueLearning,

@@ -42,6 +42,18 @@ Callers do not build decks, instantiate FSRS, derive ratings, calculate revision
 
 `@vocab/spaced-repetition/server` exposes `evaluateAnswer` and `RevisionConflict`. It validates an answer against the authoritative spelling and current schedule, then produces the next schedule and audit details. Browser session transitions and server evaluation use the same private grading and scheduling primitives. Neither owns storage or network behavior.
 
+Private modules are named by responsibility rather than runtime environment or their former location in the web app:
+
+- `src/index.ts` owns the public factory, settings validation, defaults, and exports.
+- `src/study-session.ts` owns the active session, legal phases, and atomic transitions. Its internal `startSession` consumes reconstructed progress; public `createSession` accepts a serializable snapshot.
+- `src/select-next-step.ts` owns selection precedence and returns the next action, including waiting or completion, rather than a card requiring interpretation by the caller.
+- `src/restore-progress.ts` reconstructs cards and the daily introduction count from snapshots.
+- `src/review-scheduling.ts` owns schedule validation/date revival, scheduler configuration, and the scheduling transition shared by session and server evaluation.
+- `src/evaluate-answer.ts` implements the authoritative answer boundary. The existing `/server` package export maps directly to this file, so consumers do not change their imports.
+- `src/answer-command.ts`, `src/answer-grading.ts`, `src/answer-matching.ts`, and `src/study-day.ts` own command construction, effort/rating policy, answer equivalence, and calendar boundaries respectively.
+
+Types live beside their owning behavior, not in a catch-all type module. Package tests live in `tests/`, separate from runtime code in `src/`. `tests/support/learner-simulator.ts` and `tests/support/trace-invariants.ts` are test-only infrastructure, with their own tests alongside them; dependency rules reject imports into package `tests/` directories from production modules. This is an internal reorganization, not an expansion of the package API.
+
 An action computes a detached candidate state, including queue selection. The full command must validate and `acceptAnswer` must return before a single assignment publishes that state. If either rejects, phase, schedule, allowance, and statistics remain unchanged. The acceptance callback is synchronous and returns `undefined`: write to the durable local outbox, or throw without accepting the command. Network synchronization happens separately. Do not pass an async function or perform optional notifications inside this acceptance contract. Reentrant actions reject. An omitted sink is useful for ephemeral sessions; command validation still runs.
 
 Internal phase-specific state ties the active card, feedback, or waiting date to the phase that needs it. A guess command has no rating and revision zero; a recall command carries a rating and expected revision. Existing valid command JSON keeps its field names, values, and IDs so pending answers remain replayable. Property order is not part of command identity: saved requests are parsed with the current schema before comparison, including requests written by earlier builds.
@@ -103,7 +115,7 @@ The outbox preserves existing user-scoped localStorage keys and answer payloads.
 
 `bun run boundaries` runs dependency-cruiser using the root `.dependency-cruiser.cjs`. That file declares architecture rules; the library owns parsing, dependency resolution, graph analysis, and reporting. There is no custom checker or separate tooling test suite.
 
-The rules reject undeclared external dependencies, unresolved or unexported package paths, relative cross-workspace imports, reverse dependencies, implementation-library imports from web, and production imports of test helpers. Browser features can import TanStack server functions, not Worker service wiring or server-only package entrypoints. Public client entrypoints also cannot reach server implementation indirectly through shared helpers. Workspace dependency direction is enforced by explicit rules; each workspace must still declare its dependencies in `package.json`.
+The rules reject undeclared external dependencies, unresolved or unexported package paths, relative cross-workspace imports, reverse dependencies, implementation-library imports from web, and production imports of test helpers, including package `tests/` directories. Browser features can import TanStack server functions, not Worker service wiring or server-only package entrypoints. Public client entrypoints also cannot reach server implementation indirectly through shared helpers. Workspace dependency direction is enforced by explicit rules; each workspace must still declare its dependencies in `package.json`.
 
 This check runs during lint, CI, and the Lefthook pre-push hook. It complements TypeScript and the TanStack client/server build rather than replacing them.
 
