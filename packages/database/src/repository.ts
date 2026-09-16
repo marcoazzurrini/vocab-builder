@@ -22,7 +22,7 @@ export const readSettings = async (db: Database, userId: string) => {
         lang: row.lang,
         newPerDay: row.new_per_day,
       }
-    : DEFAULT_SETTINGS;
+    : { ...DEFAULT_SETTINGS };
 };
 
 export const readDeck = async (
