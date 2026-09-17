@@ -29,7 +29,19 @@ msgstr "<0>Enter</0> = Good"
 msgid "All done, for now"
 msgstr "All done, for now"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Cancel"
+msgstr "Cancel"
+
+#: ../../apps/web/src/components/ui/sheet.tsx
+msgid "Close"
+msgstr "Close"
+
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+msgid "Close menu"
+msgstr "Close menu"
+
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "coming soon"
 msgstr "coming soon"
 
@@ -94,7 +106,7 @@ msgstr "I've said it aloud"
 msgid "If this email address has access, you'll receive a link at <0>{sentTo}</0>. Open it on this device."
 msgstr "If this email address has access, you'll receive a link at <0>{sentTo}</0>. Open it on this device."
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Learning language"
 msgstr "Learning language"
 
@@ -106,12 +118,14 @@ msgstr "Listen again"
 msgid "listen and repeat aloud"
 msgstr "listen and repeat aloud"
 
+#: ../../apps/web/src/components/ui/spinner.tsx
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Loading…"
 msgstr "Loading…"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Menu"
 msgstr "Menu"
 
@@ -127,15 +141,15 @@ msgstr "Next word in about {minutes} min. Your session will resume automatically
 msgid "not quite"
 msgstr "not quite"
 
-#: ../../apps/web/src/shell/app-shell.tsx
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 msgid "Open menu"
 msgstr "Open menu"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Progress"
 msgstr "Progress"
 
-#: ../../apps/web/src/shell/error-boundary.tsx
+#: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "Reload"
 msgstr "Reload"
 
@@ -151,7 +165,7 @@ msgstr "Send link"
 msgid "Sending…"
 msgstr "Sending…"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Session"
 msgstr "Session"
 
@@ -159,7 +173,7 @@ msgstr "Session"
 msgid "session complete"
 msgstr "session complete"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Settings"
 msgstr "Settings"
 
@@ -167,11 +181,15 @@ msgstr "Settings"
 msgid "Sign in with an email link"
 msgstr "Sign in with an email link"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Sign out"
 msgstr "Sign out"
 
-#: ../../apps/web/src/shell/error-boundary.tsx
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+msgid "Skip to content"
+msgstr "Skip to content"
+
+#: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "something went wrong"
 msgstr "something went wrong"
 
@@ -199,7 +217,7 @@ msgstr "type the French word"
 msgid "Well done"
 msgstr "Well done"
 
-#: ../../apps/web/src/shell/sidebar.tsx
+#: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Words"
 msgstr "Words"
 
@@ -216,6 +234,6 @@ msgstr "you're all caught up"
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: ../../apps/web/src/shell/error-boundary.tsx
+#: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "Your answers have been saved. Reload to pick up where you left off."
 msgstr "Your answers have been saved. Reload to pick up where you left off."

@@ -5,6 +5,7 @@ A private vocabulary learning app. French first, Italian as L1. Built around pro
 ## Stack
 
 - React, TanStack Start/Router, and TanStack Query on Cloudflare Workers.
+- App-local shadcn components with Base UI and Tailwind CSS.
 - Cloudflare D1, Drizzle ORM, and Better Auth magic links with Resend.
 - Bun workspaces and one lockfile. No separate API deployment or task orchestrator.
 - Bun's built-in test runner for packages; Vitest for the web app.
@@ -71,6 +72,7 @@ Workspaces export TypeScript source, so the app bundles their production entrypo
 ## Documentation
 
 - [Module interfaces and dependency rules](docs/architecture.md)
+- [Web UI foundations, composition, and component maintenance](apps/web/DESIGN.md)
 - [Learning design and product direction](docs/learning-design.md)
 - [Local development, database workflow, and production deployment](docs/development.md)
 - [Interface languages and translation workflow](packages/i18n/README.md)

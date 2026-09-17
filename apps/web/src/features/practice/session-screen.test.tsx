@@ -10,7 +10,9 @@ import {
   renderHook as testingRenderHook,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { activateLocale, createI18n } from "@vocab/i18n";
 import type {
   ReviewSnapshot,
@@ -22,8 +24,11 @@ import { StrictMode } from "react";
 import type { PropsWithChildren, ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AppShell } from "@/components/patterns/app-shell";
+
 import { practiceKey, practiceOptions } from "./queries";
 import { SessionScreen } from "./session-screen";
+import { SyncConflict } from "./sync-conflict";
 import { RetryableReadError } from "./transport";
 import type { PracticeTransport } from "./transport";
 import { usePracticeSession } from "./use-practice-session";
@@ -208,7 +213,9 @@ describe("the session screen", () => {
     });
 
     render(<SessionScreen transport={transport} userId="u1" />);
-    await screen.findByText("scrivi la parola in francese");
+    await screen.findByRole("textbox", {
+      name: "scrivi la parola in francese",
+    });
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "chien" },
     });
@@ -282,6 +289,46 @@ describe("the session screen", () => {
     await waitFor(() => expect(persistAnswer).toHaveBeenCalledTimes(2));
     expect(persistAnswer.mock.calls[1]).toStrictEqual(first);
     await waitFor(() => expect(window.localStorage).toHaveLength(0));
+  });
+
+  it("preserves unsynced answers unless deletion is explicitly confirmed", async () => {
+    const user = userEvent.setup();
+    persistAnswer.mockRejectedValueOnce(new SyncConflict());
+    render(
+      <AppShell email="learner@example.com" onSignOut={vi.fn<() => void>()}>
+        <SessionScreen transport={transport} userId="u1" />
+      </AppShell>
+    );
+    await screen.findByText("cane");
+    await user.click(screen.getByRole("button", { name: "Continua" }));
+    const deleteLabel = "Elimina le risposte non sincronizzate e ricarica";
+    const trigger = await screen.findByRole("button", { name: deleteLabel });
+    expect(window.localStorage).toHaveLength(1);
+
+    await user.click(trigger);
+    let dialog = await screen.findByRole("alertdialog", { name: deleteLabel });
+    // A closed navigation Sheet must not suppress the recovery dialog's backdrop.
+    expect({
+      hasBackdrop:
+        document.querySelector('[data-slot="alert-dialog-overlay"]') !== null,
+      hasWarning:
+        within(dialog).queryByText(/Non potrai recuperarle/u) !== null,
+    }).toStrictEqual({ hasBackdrop: true, hasWarning: true });
+    const cancel = within(dialog).getByRole("button", { name: "Annulla" });
+    await waitFor(() => expect(document.activeElement).toBe(cancel));
+    await user.click(cancel);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(window.localStorage).toHaveLength(1);
+    expect(loadSnapshot).toHaveBeenCalledOnce();
+
+    await user.click(trigger);
+    dialog = await screen.findByRole("alertdialog", { name: deleteLabel });
+    await user.click(within(dialog).getByRole("button", { name: deleteLabel }));
+    await waitFor(() => expect(window.localStorage).toHaveLength(0));
+    await screen.findByRole("textbox", {
+      name: "scrivi la parola in francese",
+    });
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
   });
 
   it("recovers from a rejected local write without sending or losing the unanswered prompt", async () => {

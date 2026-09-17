@@ -3,9 +3,12 @@ import { useRouteContext } from "@tanstack/react-router";
 import { signOut, useSession } from "@vocab/authentication/client";
 import { useState } from "react";
 
+import { AppShell } from "@/components/patterns/app-shell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+import { ErrorBoundary } from "./features/practice/error-boundary";
 import { SessionScreen } from "./features/practice/session-screen";
 import { SignIn } from "./features/sign-in/sign-in";
-import { AppShell } from "./shell/app-shell";
 import { useSessionDocument } from "./use-session-document";
 
 const App = () => {
@@ -35,11 +38,15 @@ const App = () => {
       }}
     >
       {error && (
-        <p role="alert" className="note wrong">
-          <Trans>Could not sign out. Try again.</Trans>
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>
+            <Trans>Could not sign out. Try again.</Trans>
+          </AlertDescription>
+        </Alert>
       )}
-      <SessionScreen key={user.id} userId={user.id} />
+      <ErrorBoundary>
+        <SessionScreen key={user.id} userId={user.id} />
+      </ErrorBoundary>
     </AppShell>
   );
 };

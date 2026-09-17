@@ -2,6 +2,9 @@ import { Trans } from "@lingui/react/macro";
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+
 /**
  * The last line before a blank page.
  *
@@ -46,21 +49,26 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     return (
-      <div className="stage">
-        <p className="eyebrow wrong">
-          <Trans>something went wrong</Trans>
-        </p>
-        <p className="message">
-          <Trans>
-            Your answers have been saved. Reload to pick up where you left off.
-          </Trans>
-        </p>
-        <div className="actions">
-          <button type="button" onClick={() => window.location.reload()}>
+      <div className="flex flex-col gap-4">
+        <Alert variant="destructive">
+          <AlertTitle>
+            <Trans>something went wrong</Trans>
+          </AlertTitle>
+          <AlertDescription>
+            <Trans>
+              Your answers have been saved. Reload to pick up where you left
+              off.
+            </Trans>
+          </AlertDescription>
+        </Alert>
+        <div>
+          <Button type="button" onClick={() => window.location.reload()}>
             <Trans>Reload</Trans>
-          </button>
+          </Button>
         </div>
-        <p className="note">{error.message}</p>
+        <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
+          {error.message}
+        </p>
       </div>
     );
   }

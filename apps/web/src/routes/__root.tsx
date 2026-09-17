@@ -8,8 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 
-import "../tokens.css";
-import "../index.css";
+import "../styles/globals.css";
 
 export const Root = () => {
   const { i18n } = useLingui();
@@ -49,12 +48,12 @@ export const Route = createRootRouteWithContext<{
         name: "viewport",
       },
       {
-        content: "#f4f4f1",
+        content: "#ffffff",
         media: "(prefers-color-scheme: light)",
         name: "theme-color",
       },
       {
-        content: "#16171b",
+        content: "#0a0a0a",
         media: "(prefers-color-scheme: dark)",
         name: "theme-color",
       },

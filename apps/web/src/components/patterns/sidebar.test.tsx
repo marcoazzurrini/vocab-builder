@@ -21,7 +21,6 @@ describe("localized sidebar", () => {
         <I18nProvider i18n={i18n}>
           <Sidebar
             email="learner@example.com"
-            open
             onClose={vi.fn<() => void>()}
             onSignOut={onSignOut}
           />

@@ -15,6 +15,9 @@ export default defineConfig({
     lingui({ ...linguiOptions, failOnCompileError: true, failOnMissing: true }),
     babel({ presets: [linguiTransformerBabelPreset({}, linguiOptions)] }),
   ],
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("src", import.meta.url)) },
+  },
   test: {
     environment: "node",
     hookTimeout: 30_000,

@@ -1,6 +1,28 @@
+const path = require("node:path");
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
+    {
+      comment:
+        "Standard UI components must not depend on patterns or product features.",
+      from: { path: "^apps/web/src/components/ui/" },
+      name: "web-ui-stays-independent",
+      severity: "error",
+      to: {
+        path: "^apps/web/src/(components/patterns|features|shell|server)/|^packages/(authentication|database|spaced-repetition)/",
+      },
+    },
+    {
+      comment:
+        "Reusable UI patterns compose primitives, not product features or services.",
+      from: { path: "^apps/web/src/components/patterns/" },
+      name: "web-patterns-cannot-import-features",
+      severity: "error",
+      to: {
+        path: "^apps/web/src/(features|shell|server)/|^packages/(authentication|database|spaced-repetition)/",
+      },
+    },
     {
       comment:
         "Resolve package exports instead of allowing imports into private source.",
@@ -114,6 +136,8 @@ module.exports = {
       // Exclude our build output, not dependencies' dist/ entrypoints.
       path: "^(apps|packages)/[^/]+/(\\.generated|\\.wrangler|\\.tanstack|\\.cache|dist|build)/|(^|/)routeTree\\.gen(?:\\.ts)?$",
     },
+    // Cruiser resolves aliases from the repository root when baseUrl is absent.
+    tsConfig: { fileName: path.resolve(__dirname, "tsconfig.depcruise.json") },
     // Include type-only imports in the architecture rules.
     tsPreCompilationDeps: true,
   },

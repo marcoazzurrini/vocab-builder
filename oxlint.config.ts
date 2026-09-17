@@ -16,6 +16,21 @@ export default defineConfig({
     "packages/database/tests/fixtures/legacy-catalogue/**",
   ],
   overrides: [
+    {
+      // Preserve upstream shadcn declarations and variant exports without weakening behavior checks.
+      files: ["apps/web/src/components/ui/**/*.tsx"],
+      rules: {
+        "eslint/func-style": "off",
+        "react/function-component-definition": "off",
+        "react/only-export-components": [
+          "error",
+          {
+            allowConstantExport: true,
+            allowExportNames: ["buttonVariants", "badgeVariants"],
+          },
+        ],
+      },
+    },
     ...(vitest.overrides ?? []).map((override) => ({
       ...override,
       files: override.files.map((pattern) => `apps/web/${pattern}`),
