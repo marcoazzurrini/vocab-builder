@@ -8,6 +8,7 @@ export default defineConfig({
     "**/.generated/**",
     "**/.tanstack/**",
     "**/exports/**",
+    "**/.pi/tasks/**",
     "packages/database/migrations/**",
     "packages/database/tests/fixtures/legacy-catalogue/**",
   ],
