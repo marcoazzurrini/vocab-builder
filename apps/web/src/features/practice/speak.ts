@@ -33,9 +33,13 @@ export const speak = (
     utterance.voice = french;
   }
 
-  utterance.addEventListener("error", (event) =>
-    onUnavailable?.({ kind: "failed", reason: event.error })
-  );
+  utterance.addEventListener("error", (event) => {
+    // Replacing an utterance deliberately interrupts or cancels the previous one.
+    // These events do not mean that pronunciation is unavailable.
+    if (event.error !== "interrupted" && event.error !== "canceled") {
+      onUnavailable?.({ kind: "failed", reason: event.error });
+    }
+  });
 
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
