@@ -1,0 +1,276 @@
+[
+  {
+    "lemma": "espace",
+    "cue": "spazio (estensione disponibile)",
+    "meaning": "An available area or extent.",
+    "note": null
+  },
+  {
+    "lemma": "unité",
+    "cue": "unità (singolo elemento di un insieme)",
+    "meaning": "A single unit within a larger whole.",
+    "note": null
+  },
+  {
+    "lemma": "vacance",
+    "cue": "posto vacante (assenza di un titolare)",
+    "meaning": "A vacancy in a position or office.",
+    "note": "Al plurale il sostantivo indica comunemente le vacanze. Qui si chiede il singolare nel senso di posto vacante."
+  },
+  {
+    "lemma": "entraîner",
+    "cue": "allenare una squadra (infinito)",
+    "meaning": "To train or coach a team.",
+    "note": null
+  },
+  {
+    "lemma": "nerveux",
+    "cue": "nervoso (aggettivo maschile singolare)",
+    "meaning": "Nervous or anxious.",
+    "note": null
+  },
+  {
+    "lemma": "intention",
+    "cue": "intenzione (proposito)",
+    "meaning": "An intention or purpose.",
+    "note": null
+  },
+  {
+    "lemma": "blessure",
+    "cue": "ferita (lesione)",
+    "meaning": "A wound or injury.",
+    "note": null
+  },
+  {
+    "lemma": "plaindre",
+    "cue": "compatire qualcuno (infinito)",
+    "meaning": "To pity someone.",
+    "note": null
+  },
+  { "lemma": "vent", "cue": "vento", "meaning": "Wind.", "note": null },
+  {
+    "lemma": "représenter",
+    "cue": "rappresentare qualcuno (infinito)",
+    "meaning": "To represent someone.",
+    "note": null
+  },
+  {
+    "lemma": "gâcher",
+    "cue": "sprecare un'occasione (infinito)",
+    "meaning": "To spoil or waste an opportunity.",
+    "note": null
+  },
+  {
+    "lemma": "costume",
+    "cue": "abito completo da uomo",
+    "meaning": "A man's suit.",
+    "note": null
+  },
+  {
+    "lemma": "contacter",
+    "cue": "contattare (infinito)",
+    "meaning": "To contact someone.",
+    "note": null
+  },
+  {
+    "lemma": "placer",
+    "cue": "collocare in un posto preciso (infinito)",
+    "meaning": "To position or place something.",
+    "note": null
+  },
+  {
+    "lemma": "bouteille",
+    "cue": "bottiglia",
+    "meaning": "A bottle.",
+    "note": null
+  },
+  {
+    "lemma": "sexy",
+    "cue": "sessualmente attraente (aggettivo informale)",
+    "meaning": "Sexually attractive.",
+    "note": null
+  },
+  {
+    "lemma": "conseiller",
+    "cue": "consigliare qualcuno (infinito)",
+    "meaning": "To advise someone.",
+    "note": null
+  },
+  {
+    "lemma": "stop",
+    "cue": "segnale stradale che impone l'arresto completo",
+    "meaning": "A road sign requiring a complete stop.",
+    "note": null
+  },
+  {
+    "lemma": "vu",
+    "cue": "visto (aggettivo maschile singolare)",
+    "meaning": "Seen; masculine singular adjectival use.",
+    "note": null
+  },
+  {
+    "lemma": "finalement",
+    "cue": "alla fine (come esito conclusivo)",
+    "meaning": "Finally, as the outcome of events.",
+    "note": null
+  },
+  {
+    "lemma": "rouler",
+    "cue": "rotolare (infinito)",
+    "meaning": "To roll.",
+    "note": null
+  },
+  {
+    "lemma": "série",
+    "cue": "serie (successione di elementi)",
+    "meaning": "A series or sequence.",
+    "note": null
+  },
+  {
+    "lemma": "dépendre",
+    "cue": "dipendere da qualcuno (infinito)",
+    "meaning": "To depend on someone.",
+    "note": null
+  },
+  { "lemma": "crise", "cue": "crisi", "meaning": "A crisis.", "note": null },
+  {
+    "lemma": "différence",
+    "cue": "differenza",
+    "meaning": "A difference.",
+    "note": null
+  },
+  {
+    "lemma": "changement",
+    "cue": "cambiamento",
+    "meaning": "A change.",
+    "note": null
+  },
+  {
+    "lemma": "danse",
+    "cue": "danza (sostantivo)",
+    "meaning": "Dance as a noun.",
+    "note": null
+  },
+  {
+    "lemma": "perte",
+    "cue": "perdita (sostantivo)",
+    "meaning": "A loss.",
+    "note": null
+  },
+  {
+    "lemma": "marche",
+    "cue": "camminata (sostantivo)",
+    "meaning": "Walking as an activity.",
+    "note": null
+  },
+  {
+    "lemma": "joueur",
+    "cue": "giocatore (persona, maschile)",
+    "meaning": "A male player.",
+    "note": null
+  },
+  { "lemma": "naissance", "cue": "nascita", "meaning": "Birth.", "note": null },
+  { "lemma": "vente", "cue": "vendita", "meaning": "A sale.", "note": null },
+  {
+    "lemma": "visiter",
+    "cue": "visitare un luogo (infinito)",
+    "meaning": "To visit a place.",
+    "note": null
+  },
+  {
+    "lemma": "facilement",
+    "cue": "facilmente",
+    "meaning": "Easily.",
+    "note": null
+  },
+  {
+    "lemma": "malheureux",
+    "cue": "infelice (aggettivo maschile singolare)",
+    "meaning": "Unhappy.",
+    "note": null
+  },
+  {
+    "lemma": "normalement",
+    "cue": "normalmente",
+    "meaning": "Normally.",
+    "note": null
+  },
+  {
+    "lemma": "chanteur",
+    "cue": "cantante (uomo)",
+    "meaning": "A male singer.",
+    "note": null
+  },
+  {
+    "lemma": "voie",
+    "cue": "corsia stradale (sostantivo femminile)",
+    "meaning": "A lane of a road.",
+    "note": "Une voie de circulation: una corsia di marcia."
+  },
+  {
+    "lemma": "transformer",
+    "cue": "trasformare (infinito)",
+    "meaning": "To transform or change the form of something.",
+    "note": null
+  },
+  {
+    "lemma": "préféré",
+    "cue": "preferito (aggettivo maschile singolare)",
+    "meaning": "Preferred or favourite.",
+    "note": null
+  },
+  {
+    "lemma": "fatiguer",
+    "cue": "stancare (infinito)",
+    "meaning": "To make someone tired.",
+    "note": null
+  },
+  {
+    "lemma": "entendu",
+    "cue": "inteso, concordato (aggettivo maschile singolare)",
+    "meaning": "Understood or agreed upon.",
+    "note": "C'est entendu: siamo d'accordo."
+  },
+  {
+    "lemma": "ouvert",
+    "cue": "aperto (aggettivo maschile singolare)",
+    "meaning": "Open rather than closed.",
+    "note": null
+  },
+  {
+    "lemma": "blessé",
+    "cue": "ferito (aggettivo maschile singolare)",
+    "meaning": "Injured or wounded.",
+    "note": null
+  },
+  {
+    "lemma": "dit",
+    "cue": "suddetto (aggettivo maschile singolare)",
+    "meaning": "Said or aforementioned, referring to something already mentioned.",
+    "note": null
+  },
+  {
+    "lemma": "fatigué",
+    "cue": "stanco (aggettivo maschile singolare)",
+    "meaning": "Tired or fatigued.",
+    "note": null
+  },
+  {
+    "lemma": "fermé",
+    "cue": "chiuso (aggettivo maschile singolare)",
+    "meaning": "Closed rather than open.",
+    "note": null
+  },
+  {
+    "lemma": "intéressé",
+    "cue": "interessato (aggettivo maschile singolare)",
+    "meaning": "Interested in something.",
+    "note": null
+  },
+  {
+    "lemma": "pris",
+    "cue": "preso, già impegnato (aggettivo maschile singolare)",
+    "meaning": "Taken or already engaged.",
+    "note": "Je suis pris: sono già impegnato."
+  }
+]

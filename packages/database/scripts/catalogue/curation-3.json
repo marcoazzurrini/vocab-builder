@@ -1,0 +1,1502 @@
+[
+  {
+    "lemma": "vivant",
+    "meaning": "Still alive.",
+    "cue": "vivo (non morto)",
+    "note": null
+  },
+  {
+    "lemma": "pareil",
+    "meaning": "The same as something else.",
+    "cue": "uguale (a un altro)",
+    "note": null
+  },
+  {
+    "lemma": "remercier",
+    "meaning": "To express thanks to someone.",
+    "cue": "ringraziare",
+    "note": null
+  },
+  {
+    "lemma": "empêcher",
+    "meaning": "To prevent an action from happening.",
+    "cue": "impedire",
+    "note": null
+  },
+  {
+    "lemma": "mériter",
+    "meaning": "To deserve something.",
+    "cue": "meritare",
+    "note": null
+  },
+  {
+    "lemma": "cadeau",
+    "meaning": "Something given as a gift.",
+    "cue": "regalo",
+    "note": null
+  },
+  {
+    "lemma": "début",
+    "meaning": "The beginning of something.",
+    "cue": "inizio",
+    "note": null
+  },
+  {
+    "lemma": "médecin",
+    "meaning": "A professional who diagnoses and treats illness.",
+    "cue": "medico",
+    "note": null
+  },
+  {
+    "lemma": "jurer",
+    "meaning": "To make a solemn promise.",
+    "cue": "giurare",
+    "note": null
+  },
+  {
+    "lemma": "libre",
+    "meaning": "Not imprisoned or confined.",
+    "cue": "libero (non prigioniero)",
+    "note": null
+  },
+  {
+    "lemma": "stupide",
+    "meaning": "Lacking intelligence or good judgment.",
+    "cue": "stolto",
+    "note": null
+  },
+  {
+    "lemma": "récupérer",
+    "meaning": "To get something back.",
+    "cue": "recuperare (qualcosa)",
+    "note": null
+  },
+  {
+    "lemma": "souvent",
+    "meaning": "On many occasions.",
+    "cue": "spesso",
+    "note": null
+  },
+  {
+    "lemma": "exister",
+    "meaning": "To have real existence.",
+    "cue": "esistere",
+    "note": null
+  },
+  {
+    "lemma": "inviter",
+    "meaning": "To ask someone to attend or visit.",
+    "cue": "invitare",
+    "note": null
+  },
+  {
+    "lemma": "dos",
+    "meaning": "The rear part of the human torso.",
+    "cue": "schiena",
+    "note": null
+  },
+  {
+    "lemma": "baiser",
+    "meaning": "To have sex with someone, in vulgar speech.",
+    "cue": "scopare (avere rapporti sessuali, volgare)",
+    "note": "Come verbo, oggi è generalmente volgare; per «baciare» si usa normalmente «embrasser»."
+  },
+  {
+    "lemma": "pardonner",
+    "meaning": "To forgive someone for a wrong.",
+    "cue": "perdonare",
+    "note": null
+  },
+  {
+    "lemma": "sale",
+    "meaning": "Covered in dirt.",
+    "cue": "sporco",
+    "note": null
+  },
+  {
+    "lemma": "rouge",
+    "meaning": "Having the color of blood.",
+    "cue": "rosso",
+    "note": null
+  },
+  {
+    "lemma": "taire",
+    "meaning": "To deliberately leave something unsaid.",
+    "cue": "tacere (un'informazione)",
+    "note": "Uso transitivo: non rivelare qualcosa. «Se taire» significa invece smettere di parlare."
+  },
+  {
+    "lemma": "accident",
+    "meaning": "An unintended event that causes harm.",
+    "cue": "incidente",
+    "note": null
+  },
+  {
+    "lemma": "probablement",
+    "meaning": "With a good chance of being true.",
+    "cue": "probabilmente",
+    "note": null
+  },
+  {
+    "lemma": "cheveu",
+    "meaning": "A single hair growing on the head.",
+    "cue": "capello (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "relation",
+    "meaning": "A connection between people.",
+    "cue": "rapporto (tra persone)",
+    "note": null
+  },
+  {
+    "lemma": "chaud",
+    "meaning": "Having a high temperature.",
+    "cue": "caldo (aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "pousser",
+    "meaning": "To move something by applying pressure.",
+    "cue": "spingere",
+    "note": null
+  },
+  {
+    "lemma": "pote",
+    "meaning": "A friend, in informal speech.",
+    "cue": "amico (colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "dossier",
+    "meaning": "A collection of documents about one subject.",
+    "cue": "fascicolo di documenti",
+    "note": null
+  },
+  {
+    "lemma": "américain",
+    "meaning": "Relating to the United States.",
+    "cue": "statunitense (aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "scène",
+    "meaning": "The stage on which performers appear.",
+    "cue": "palcoscenico",
+    "note": null
+  },
+  {
+    "lemma": "ligne",
+    "meaning": "A long narrow mark drawn on a surface.",
+    "cue": "linea (tracciata)",
+    "note": null
+  },
+  {
+    "lemma": "incroyable",
+    "meaning": "So extraordinary that it is hard to believe.",
+    "cue": "incredibile",
+    "note": null
+  },
+  {
+    "lemma": "situation",
+    "meaning": "The circumstances someone is in.",
+    "cue": "situazione",
+    "note": null
+  },
+  {
+    "lemma": "système",
+    "meaning": "A set of connected parts working together.",
+    "cue": "sistema",
+    "note": null
+  },
+  {
+    "lemma": "recherche",
+    "meaning": "The act of trying to find something.",
+    "cue": "ricerca (di qualcosa)",
+    "note": null
+  },
+  {
+    "lemma": "avion",
+    "meaning": "A powered flying vehicle with fixed wings.",
+    "cue": "aereo (velivolo)",
+    "note": null
+  },
+  {
+    "lemma": "voix",
+    "meaning": "The sound produced when a person speaks.",
+    "cue": "voce",
+    "note": null
+  },
+  {
+    "lemma": "âge",
+    "meaning": "The length of time someone has lived.",
+    "cue": "età",
+    "note": null
+  },
+  {
+    "lemma": "garde",
+    "meaning": "A person assigned to protect a place or someone.",
+    "cue": "guardia (persona)",
+    "note": null
+  },
+  {
+    "lemma": "créer",
+    "meaning": "To bring something new into existence.",
+    "cue": "creare",
+    "note": null
+  },
+  {
+    "lemma": "prix",
+    "meaning": "The amount of money something costs.",
+    "cue": "prezzo",
+    "note": null
+  },
+  {
+    "lemma": "bateau",
+    "meaning": "A vessel used for travel on water.",
+    "cue": "barca",
+    "note": null
+  },
+  {
+    "lemma": "bonsoir",
+    "meaning": "A greeting used in the evening.",
+    "cue": "buonasera (saluto)",
+    "note": "Qui è usato come formula di saluto; la fonte lo classifica come nome."
+  },
+  {
+    "lemma": "amoureux",
+    "meaning": "Feeling romantic love for someone.",
+    "cue": "innamorato",
+    "note": null
+  },
+  {
+    "lemma": "rejoindre",
+    "meaning": "To reach someone and join them.",
+    "cue": "raggiungere (una persona)",
+    "note": null
+  },
+  {
+    "lemma": "reconnaître",
+    "meaning": "To identify someone or something already known.",
+    "cue": "riconoscere",
+    "note": null
+  },
+  {
+    "lemma": "bout",
+    "meaning": "The end of an object.",
+    "cue": "estremità (di un oggetto)",
+    "note": null
+  },
+  {
+    "lemma": "lumière",
+    "meaning": "The illumination that makes things visible.",
+    "cue": "luce",
+    "note": null
+  },
+  {
+    "lemma": "puis",
+    "meaning": "After that, in a sequence.",
+    "cue": "poi (in sequenza)",
+    "note": null
+  },
+  {
+    "lemma": "présent",
+    "meaning": "The time that is happening now.",
+    "cue": "momento attuale",
+    "note": null
+  },
+  {
+    "lemma": "cool",
+    "meaning": "Relaxed and easygoing, in informal speech.",
+    "cue": "rilassato (colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "attaquer",
+    "meaning": "To act violently against someone.",
+    "cue": "attaccare (aggredire)",
+    "note": null
+  },
+  {
+    "lemma": "simplement",
+    "meaning": "In a straightforward, uncomplicated way.",
+    "cue": "semplicemente (senza complicazioni)",
+    "note": null
+  },
+  {
+    "lemma": "prévenir",
+    "meaning": "To warn someone in advance.",
+    "cue": "avvertire (in anticipo)",
+    "note": "In questo senso significa avvisare qualcuno, non impedire un evento."
+  },
+  {
+    "lemma": "salaud",
+    "meaning": "A contemptible man, as an offensive insult.",
+    "cue": "stronzo (insulto a un uomo)",
+    "note": null
+  },
+  {
+    "lemma": "prouver",
+    "meaning": "To establish that something is true using evidence.",
+    "cue": "dimostrare (con prove)",
+    "note": null
+  },
+  {
+    "lemma": "patient",
+    "meaning": "A person receiving medical care.",
+    "cue": "paziente (persona in cura)",
+    "note": null
+  },
+  {
+    "lemma": "est",
+    "meaning": "The compass direction where the sun rises.",
+    "cue": "oriente (punto cardinale)",
+    "note": "Qui è il nome del punto cardinale, non una forma del verbo «être»."
+  },
+  {
+    "lemma": "conseil",
+    "meaning": "A suggestion about what someone should do.",
+    "cue": "consiglio (suggerimento)",
+    "note": null
+  },
+  {
+    "lemma": "voyage",
+    "meaning": "A journey to another place.",
+    "cue": "viaggio",
+    "note": null
+  },
+  {
+    "lemma": "réaliser",
+    "meaning": "To carry out a plan and make it happen.",
+    "cue": "realizzare (un progetto)",
+    "note": null
+  },
+  {
+    "lemma": "spécial",
+    "meaning": "Different from what is usual.",
+    "cue": "particolare (fuori dall'ordinario)",
+    "note": null
+  },
+  {
+    "lemma": "embrasser",
+    "meaning": "To touch someone with the lips as a sign of affection.",
+    "cue": "baciare",
+    "note": "Di solito significa baciare, non semplicemente abbracciare."
+  },
+  {
+    "lemma": "arranger",
+    "meaning": "To put a troublesome situation right.",
+    "cue": "sistemare (una situazione)",
+    "note": null
+  },
+  {
+    "lemma": "sauter",
+    "meaning": "To push off the ground into the air.",
+    "cue": "saltare",
+    "note": null
+  },
+  {
+    "lemma": "danser",
+    "meaning": "To move the body rhythmically to music.",
+    "cue": "ballare",
+    "note": null
+  },
+  {
+    "lemma": "loi",
+    "meaning": "A binding rule established by public authority.",
+    "cue": "legge",
+    "note": null
+  },
+  {
+    "lemma": "habitude",
+    "meaning": "A behavior repeated regularly.",
+    "cue": "abitudine",
+    "note": null
+  },
+  {
+    "lemma": "ressentir",
+    "meaning": "To experience an emotion or sensation.",
+    "cue": "provare (un'emozione)",
+    "note": null
+  },
+  {
+    "lemma": "traiter",
+    "meaning": "To give medical treatment for an illness.",
+    "cue": "curare (una malattia)",
+    "note": null
+  },
+  {
+    "lemma": "craindre",
+    "meaning": "To feel fear about something.",
+    "cue": "temere",
+    "note": null
+  },
+  {
+    "lemma": "rendez-vous",
+    "meaning": "An arrangement to meet at an agreed time.",
+    "cue": "appuntamento",
+    "note": null
+  },
+  {
+    "lemma": "liste",
+    "meaning": "A series of items written one after another.",
+    "cue": "elenco",
+    "note": null
+  },
+  {
+    "lemma": "froid",
+    "meaning": "Having a low temperature.",
+    "cue": "freddo (aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "ferme",
+    "meaning": "An agricultural property with its buildings.",
+    "cue": "fattoria",
+    "note": null
+  },
+  {
+    "lemma": "cheval",
+    "meaning": "A large hoofed animal used for riding.",
+    "cue": "cavallo",
+    "note": null
+  },
+  {
+    "lemma": "mener",
+    "meaning": "To lead someone to a destination.",
+    "cue": "condurre (qualcuno in un luogo)",
+    "note": null
+  },
+  {
+    "lemma": "magnifique",
+    "meaning": "Extremely beautiful or impressive.",
+    "cue": "magnifico",
+    "note": null
+  },
+  {
+    "lemma": "anniversaire",
+    "meaning": "The yearly celebration of someone's birth.",
+    "cue": "compleanno",
+    "note": "Per indicare un'altra ricorrenza si precisa spesso l'evento, per esempio «anniversaire de mariage»."
+  },
+  {
+    "lemma": "dix",
+    "meaning": "The number ten.",
+    "cue": "dieci",
+    "note": null
+  },
+  {
+    "lemma": "hôtel",
+    "meaning": "An establishment providing paid lodging.",
+    "cue": "albergo",
+    "note": null
+  },
+  {
+    "lemma": "ailleurs",
+    "meaning": "In another place.",
+    "cue": "altrove",
+    "note": null
+  },
+  {
+    "lemma": "oncle",
+    "meaning": "A parent's brother.",
+    "cue": "zio",
+    "note": null
+  },
+  {
+    "lemma": "neuf",
+    "meaning": "The number nine.",
+    "cue": "numero nove",
+    "note": "Qui indica il numero; come aggettivo può significare nuovo, mai usato."
+  },
+  {
+    "lemma": "tueur",
+    "meaning": "A person who kills people.",
+    "cue": "uccisore",
+    "note": null
+  },
+  {
+    "lemma": "table",
+    "meaning": "A piece of furniture with a raised flat surface.",
+    "cue": "tavolo",
+    "note": null
+  },
+  {
+    "lemma": "complètement",
+    "meaning": "To the fullest extent.",
+    "cue": "completamente",
+    "note": null
+  },
+  {
+    "lemma": "doute",
+    "meaning": "Uncertainty about whether something is true.",
+    "cue": "dubbio",
+    "note": null
+  },
+  {
+    "lemma": "sympa",
+    "meaning": "Pleasant and friendly, in informal speech.",
+    "cue": "simpatico (colloquiale, forma breve)",
+    "note": "Forma abbreviata di «sympathique»."
+  },
+  {
+    "lemma": "signer",
+    "meaning": "To write one's signature on a document.",
+    "cue": "firmare",
+    "note": null
+  },
+  {
+    "lemma": "approcher",
+    "meaning": "To bring something closer.",
+    "cue": "avvicinare (un oggetto)",
+    "note": null
+  },
+  {
+    "lemma": "con",
+    "meaning": "A stupid person, as a vulgar insult.",
+    "cue": "idiota (volgare)",
+    "note": null
+  },
+  {
+    "lemma": "éviter",
+    "meaning": "To keep away from someone or something.",
+    "cue": "evitare",
+    "note": null
+  },
+  {
+    "lemma": "discuter",
+    "meaning": "To talk about a subject with someone.",
+    "cue": "parlare di un argomento",
+    "note": null
+  },
+  {
+    "lemma": "épouser",
+    "meaning": "To marry someone.",
+    "cue": "sposare (qualcuno)",
+    "note": null
+  },
+  {
+    "lemma": "salope",
+    "meaning": "A woman disparaged with a vulgar insult.",
+    "cue": "stronza (insulto a una donna)",
+    "note": "Insulto volgare rivolto a una donna; non implica necessariamente prostituzione."
+  },
+  {
+    "lemma": "lancer",
+    "meaning": "To throw an object through the air.",
+    "cue": "lanciare",
+    "note": null
+  },
+  {
+    "lemma": "fier",
+    "meaning": "Feeling pride in oneself or someone else.",
+    "cue": "orgoglioso",
+    "note": null
+  },
+  {
+    "lemma": "ficher",
+    "meaning": "To record someone's details in an official file.",
+    "cue": "schedare (una persona)",
+    "note": null
+  },
+  {
+    "lemma": "dangereux",
+    "meaning": "Likely to cause harm.",
+    "cue": "pericoloso",
+    "note": null
+  },
+  {
+    "lemma": "inspecteur",
+    "meaning": "An official who investigates or inspects.",
+    "cue": "ispettore",
+    "note": null
+  },
+  {
+    "lemma": "espèce",
+    "meaning": "A biological group of similar organisms that can reproduce together.",
+    "cue": "specie (biologica)",
+    "note": null
+  },
+  {
+    "lemma": "public",
+    "meaning": "The people watching or listening to a performance.",
+    "cue": "insieme degli spettatori",
+    "note": null
+  },
+  {
+    "lemma": "bordel",
+    "meaning": "A very disorderly mess, in vulgar speech.",
+    "cue": "casino (disordine, volgare)",
+    "note": "In questo uso colloquiale indica confusione o disordine, non un luogo di prostituzione."
+  },
+  {
+    "lemma": "chanson",
+    "meaning": "A piece of music intended to be sung.",
+    "cue": "canzone",
+    "note": null
+  },
+  {
+    "lemma": "impression",
+    "meaning": "A feeling or judgment formed without full knowledge.",
+    "cue": "sensazione iniziale",
+    "note": null
+  },
+  {
+    "lemma": "virer",
+    "meaning": "To dismiss someone from a job, informally.",
+    "cue": "licenziare (colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "personnel",
+    "meaning": "Belonging to a particular individual.",
+    "cue": "personale (aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "autour",
+    "meaning": "In the surrounding area.",
+    "cue": "intorno",
+    "note": null
+  },
+  {
+    "lemma": "censé",
+    "meaning": "Supposed or expected to do something.",
+    "cue": "che dovrebbe (fare qualcosa)",
+    "note": "Seguito da un infinito; da non confondere con «sensé», cioè assennato."
+  },
+  {
+    "lemma": "règle",
+    "meaning": "A prescribed instruction governing behavior.",
+    "cue": "regola",
+    "note": null
+  },
+  {
+    "lemma": "témoin",
+    "meaning": "Someone who sees an event happen.",
+    "cue": "testimone",
+    "note": null
+  },
+  {
+    "lemma": "absolument",
+    "meaning": "Without any reservation or qualification.",
+    "cue": "assolutamente",
+    "note": null
+  },
+  {
+    "lemma": "journal",
+    "meaning": "A regularly issued publication reporting news.",
+    "cue": "giornale",
+    "note": null
+  },
+  {
+    "lemma": "prévoir",
+    "meaning": "To anticipate something before it happens.",
+    "cue": "prevedere",
+    "note": null
+  },
+  {
+    "lemma": "dégager",
+    "meaning": "To clear a place of obstructions.",
+    "cue": "sgomberare (un passaggio)",
+    "note": null
+  },
+  {
+    "lemma": "mission",
+    "meaning": "A specific task someone is assigned to carry out.",
+    "cue": "incarico da svolgere",
+    "note": null
+  },
+  {
+    "lemma": "souhaiter",
+    "meaning": "To wish for something to happen.",
+    "cue": "auspicare",
+    "note": null
+  },
+  {
+    "lemma": "surveiller",
+    "meaning": "To watch someone or something closely.",
+    "cue": "sorvegliare",
+    "note": null
+  },
+  {
+    "lemma": "colère",
+    "meaning": "A strong feeling of anger.",
+    "cue": "rabbia",
+    "note": null
+  },
+  {
+    "lemma": "risquer",
+    "meaning": "To expose something to possible loss or harm.",
+    "cue": "rischiare",
+    "note": null
+  },
+  {
+    "lemma": "décision",
+    "meaning": "A choice made after consideration.",
+    "cue": "scelta deliberata",
+    "note": null
+  },
+  {
+    "lemma": "signifier",
+    "meaning": "To have a particular meaning.",
+    "cue": "significare",
+    "note": null
+  },
+  {
+    "lemma": "ennemi",
+    "meaning": "Someone who is hostile to another person.",
+    "cue": "nemico",
+    "note": null
+  },
+  {
+    "lemma": "soin",
+    "meaning": "Careful attention given to doing something.",
+    "cue": "cura (attenzione nel fare)",
+    "note": null
+  },
+  {
+    "lemma": "paix",
+    "meaning": "A state without war.",
+    "cue": "pace",
+    "note": null
+  },
+  {
+    "lemma": "proche",
+    "meaning": "Not far away in space.",
+    "cue": "vicino (aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "retirer",
+    "meaning": "To remove something from where it is.",
+    "cue": "togliere (da un posto)",
+    "note": null
+  },
+  {
+    "lemma": "exact",
+    "meaning": "Precisely correct.",
+    "cue": "esatto",
+    "note": null
+  },
+  {
+    "lemma": "faim",
+    "meaning": "The physical need to eat.",
+    "cue": "fame",
+    "note": null
+  },
+  {
+    "lemma": "papier",
+    "meaning": "Thin sheet material used for writing or printing.",
+    "cue": "carta (materiale)",
+    "note": null
+  },
+  {
+    "lemma": "manière",
+    "meaning": "A way of doing something.",
+    "cue": "maniera",
+    "note": null
+  },
+  {
+    "lemma": "coin",
+    "meaning": "The angle where two sides meet.",
+    "cue": "angolo",
+    "note": null
+  },
+  {
+    "lemma": "bois",
+    "meaning": "The hard material forming a tree's trunk and branches.",
+    "cue": "legno",
+    "note": null
+  },
+  {
+    "lemma": "arrière",
+    "meaning": "The back part of something.",
+    "cue": "parte posteriore",
+    "note": null
+  },
+  {
+    "lemma": "camp",
+    "meaning": "A place where people stay in temporary shelters.",
+    "cue": "insediamento di tende",
+    "note": null
+  },
+  {
+    "lemma": "paraître",
+    "meaning": "To seem a certain way.",
+    "cue": "sembrare",
+    "note": null
+  },
+  {
+    "lemma": "armée",
+    "meaning": "A country's organized land fighting force.",
+    "cue": "esercito",
+    "note": null
+  },
+  {
+    "lemma": "dedans",
+    "meaning": "Inside a place or object.",
+    "cue": "dentro (avverbio)",
+    "note": null
+  },
+  {
+    "lemma": "club",
+    "meaning": "An association of people with a shared interest.",
+    "cue": "circolo di soci",
+    "note": null
+  },
+  {
+    "lemma": "vol",
+    "meaning": "The act of travelling through the air.",
+    "cue": "tragitto aereo",
+    "note": "Qui indica il volo, non il furto."
+  },
+  {
+    "lemma": "boîte",
+    "meaning": "A rigid container used to hold things.",
+    "cue": "scatola",
+    "note": null
+  },
+  {
+    "lemma": "information",
+    "meaning": "A fact communicated to someone.",
+    "cue": "informazione",
+    "note": null
+  },
+  {
+    "lemma": "professeur",
+    "meaning": "A person who teaches a subject.",
+    "cue": "professore",
+    "note": null
+  },
+  {
+    "lemma": "jambe",
+    "meaning": "A lower limb used for standing and walking.",
+    "cue": "gamba",
+    "note": null
+  },
+  {
+    "lemma": "fond",
+    "meaning": "The lowest interior part of a container.",
+    "cue": "parte più bassa di un recipiente",
+    "note": null
+  },
+  {
+    "lemma": "gauche",
+    "meaning": "The side opposite the right.",
+    "cue": "sinistra (lato)",
+    "note": null
+  },
+  {
+    "lemma": "vaisseau",
+    "meaning": "A tube that carries blood through the body.",
+    "cue": "vaso sanguigno",
+    "note": null
+  },
+  {
+    "lemma": "tenter",
+    "meaning": "To make an attempt to do something.",
+    "cue": "tentare",
+    "note": null
+  },
+  {
+    "lemma": "régler",
+    "meaning": "To settle a bill by paying it.",
+    "cue": "saldare (un conto)",
+    "note": null
+  },
+  {
+    "lemma": "soldat",
+    "meaning": "A member of an army.",
+    "cue": "militare dell'esercito",
+    "note": null
+  },
+  {
+    "lemma": "tranquille",
+    "meaning": "Free from disturbance or agitation.",
+    "cue": "calmo",
+    "note": null
+  },
+  {
+    "lemma": "âme",
+    "meaning": "The spiritual part of a person.",
+    "cue": "anima",
+    "note": null
+  },
+  {
+    "lemma": "gosse",
+    "meaning": "A child, in informal speech.",
+    "cue": "bambino (colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "déjeuner",
+    "meaning": "The midday meal in standard French usage in France.",
+    "cue": "pranzo (in Francia)",
+    "note": "In alcune varietà regionali del francese indica invece la colazione."
+  },
+  {
+    "lemma": "diriger",
+    "meaning": "To be in charge of an organization.",
+    "cue": "essere a capo (di un'organizzazione)",
+    "note": null
+  },
+  {
+    "lemma": "compris",
+    "meaning": "Included in a stated total or price.",
+    "cue": "incluso (nel prezzo)",
+    "note": "Qui significa incluso, non capito."
+  },
+  {
+    "lemma": "échapper",
+    "meaning": "To escape from a danger.",
+    "cue": "sfuggire (a un pericolo)",
+    "note": null
+  },
+  {
+    "lemma": "cerveau",
+    "meaning": "The organ in the head that controls thought and bodily activity.",
+    "cue": "cervello",
+    "note": null
+  },
+  {
+    "lemma": "partager",
+    "meaning": "To divide something among people.",
+    "cue": "dividere (tra più persone)",
+    "note": null
+  },
+  {
+    "lemma": "ravir",
+    "meaning": "To give someone great pleasure.",
+    "cue": "deliziare (rendere felice)",
+    "note": "Qui esprime grande piacere; «ravi» significa molto contento, non rapito fisicamente."
+  },
+  {
+    "lemma": "vue",
+    "meaning": "The ability to see.",
+    "cue": "vista (senso)",
+    "note": null
+  },
+  {
+    "lemma": "moitié",
+    "meaning": "One of two equal parts.",
+    "cue": "metà",
+    "note": null
+  },
+  {
+    "lemma": "cour",
+    "meaning": "An open area enclosed by buildings or walls.",
+    "cue": "cortile",
+    "note": null
+  },
+  {
+    "lemma": "étrange",
+    "meaning": "Unusual in a puzzling way.",
+    "cue": "strano",
+    "note": null
+  },
+  {
+    "lemma": "avancer",
+    "meaning": "To move forward.",
+    "cue": "avanzare",
+    "note": null
+  },
+  {
+    "lemma": "marché",
+    "meaning": "A place where people buy and sell goods.",
+    "cue": "mercato",
+    "note": null
+  },
+  {
+    "lemma": "brûler",
+    "meaning": "To be consumed or damaged by fire.",
+    "cue": "bruciare",
+    "note": null
+  },
+  {
+    "lemma": "visite",
+    "meaning": "An occasion of going to see someone.",
+    "cue": "visita (a qualcuno)",
+    "note": null
+  },
+  {
+    "lemma": "poste",
+    "meaning": "A job held in an organization.",
+    "cue": "impiego (posizione lavorativa)",
+    "note": null
+  },
+  {
+    "lemma": "crier",
+    "meaning": "To speak or call out very loudly.",
+    "cue": "gridare",
+    "note": null
+  },
+  {
+    "lemma": "intérêt",
+    "meaning": "Attention or curiosity directed toward something.",
+    "cue": "interesse (curiosità)",
+    "note": null
+  },
+  {
+    "lemma": "ciel",
+    "meaning": "The space above the earth seen from the ground.",
+    "cue": "volta celeste (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "souffrir",
+    "meaning": "To experience physical or emotional pain.",
+    "cue": "soffrire",
+    "note": null
+  },
+  {
+    "lemma": "sentiment",
+    "meaning": "An emotional state experienced by someone.",
+    "cue": "stato d'animo",
+    "note": null
+  },
+  {
+    "lemma": "drogue",
+    "meaning": "A substance taken for its intoxicating effects.",
+    "cue": "droga",
+    "note": null
+  },
+  {
+    "lemma": "couvrir",
+    "meaning": "To place something over a surface.",
+    "cue": "coprire",
+    "note": null
+  },
+  {
+    "lemma": "mur",
+    "meaning": "A vertical structure enclosing or dividing a space.",
+    "cue": "parete (in mattoni)",
+    "note": null
+  },
+  {
+    "lemma": "trou",
+    "meaning": "An opening or hollow in something.",
+    "cue": "buco",
+    "note": null
+  },
+  {
+    "lemma": "forme",
+    "meaning": "The visible shape of something.",
+    "cue": "sagoma",
+    "note": null
+  },
+  {
+    "lemma": "responsable",
+    "meaning": "Accountable for an action or outcome.",
+    "cue": "responsabile (aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "capable",
+    "meaning": "Having the ability to do something.",
+    "cue": "capace",
+    "note": null
+  },
+  {
+    "lemma": "obliger",
+    "meaning": "To force someone to do something.",
+    "cue": "obbligare",
+    "note": null
+  },
+  {
+    "lemma": "contrôle",
+    "meaning": "An inspection to check that something is in order.",
+    "cue": "controllo (verifica)",
+    "note": null
+  },
+  {
+    "lemma": "rêver",
+    "meaning": "To experience imagined events while asleep.",
+    "cue": "sognare",
+    "note": null
+  },
+  {
+    "lemma": "danger",
+    "meaning": "The possibility of harm.",
+    "cue": "pericolo",
+    "note": null
+  },
+  {
+    "lemma": "bar",
+    "meaning": "An establishment serving drinks for consumption on the premises.",
+    "cue": "locale dove si servono bevande",
+    "note": null
+  },
+  {
+    "lemma": "dame",
+    "meaning": "A woman referred to politely.",
+    "cue": "signora",
+    "note": null
+  },
+  {
+    "lemma": "bleu",
+    "meaning": "Having the color of a clear daytime sky.",
+    "cue": "blu",
+    "note": null
+  },
+  {
+    "lemma": "remarquer",
+    "meaning": "To become aware of a detail.",
+    "cue": "notare",
+    "note": null
+  },
+  {
+    "lemma": "triste",
+    "meaning": "Feeling sorrow or unhappiness.",
+    "cue": "addolorato",
+    "note": null
+  },
+  {
+    "lemma": "traverser",
+    "meaning": "To go from one side of something to the other.",
+    "cue": "attraversare",
+    "note": null
+  },
+  {
+    "lemma": "entier",
+    "meaning": "Complete, with no part missing.",
+    "cue": "intero",
+    "note": null
+  },
+  {
+    "lemma": "doucement",
+    "meaning": "Gently, without harshness or force.",
+    "cue": "delicatamente",
+    "note": null
+  },
+  {
+    "lemma": "mignon",
+    "meaning": "Attractive in a small or endearing way.",
+    "cue": "carino (tenero)",
+    "note": null
+  },
+  {
+    "lemma": "charger",
+    "meaning": "To put a load onto a vehicle.",
+    "cue": "caricare (un veicolo)",
+    "note": null
+  },
+  {
+    "lemma": "blague",
+    "meaning": "Something said to make people laugh.",
+    "cue": "battuta (per far ridere)",
+    "note": null
+  },
+  {
+    "lemma": "animal",
+    "meaning": "A living creature such as a dog or bird.",
+    "cue": "bestia (termine generico)",
+    "note": null
+  },
+  {
+    "lemma": "dépêcher",
+    "meaning": "To send someone somewhere urgently.",
+    "cue": "inviare subito (un emissario)",
+    "note": "Uso transitivo. La forma riflessiva «se dépêcher» significa sbrigarsi."
+  },
+  {
+    "lemma": "appartenir",
+    "meaning": "To be owned by someone.",
+    "cue": "appartenere",
+    "note": null
+  },
+  {
+    "lemma": "répéter",
+    "meaning": "To say something again.",
+    "cue": "ripetere",
+    "note": null
+  },
+  {
+    "lemma": "parole",
+    "meaning": "A promise that someone is expected to keep.",
+    "cue": "parola data",
+    "note": "In questo senso equivale a una promessa, come in «tenir sa parole»."
+  },
+  {
+    "lemma": "parier",
+    "meaning": "To stake money on an uncertain outcome.",
+    "cue": "scommettere",
+    "note": null
+  },
+  {
+    "lemma": "opération",
+    "meaning": "A surgical procedure.",
+    "cue": "intervento chirurgico",
+    "note": null
+  },
+  {
+    "lemma": "compagnie",
+    "meaning": "A commercial business organization.",
+    "cue": "società commerciale",
+    "note": null
+  },
+  {
+    "lemma": "classe",
+    "meaning": "A group of pupils taught together.",
+    "cue": "gruppo di alunni",
+    "note": null
+  },
+  {
+    "lemma": "test",
+    "meaning": "A procedure used to assess ability or performance.",
+    "cue": "prova di valutazione",
+    "note": null
+  },
+  {
+    "lemma": "douter",
+    "meaning": "To be uncertain that something is true.",
+    "cue": "dubitare",
+    "note": null
+  },
+  {
+    "lemma": "bord",
+    "meaning": "The outer edge of an object.",
+    "cue": "margine (di un oggetto)",
+    "note": null
+  },
+  {
+    "lemma": "reposer",
+    "meaning": "To put an object back down.",
+    "cue": "posare di nuovo (un oggetto)",
+    "note": "Qui è transitivo. Per riposarsi si usa «se reposer»."
+  },
+  {
+    "lemma": "contact",
+    "meaning": "Communication maintained between people.",
+    "cue": "contatto (tra persone)",
+    "note": null
+  },
+  {
+    "lemma": "plaisanter",
+    "meaning": "To speak jokingly rather than seriously.",
+    "cue": "scherzare",
+    "note": null
+  },
+  {
+    "lemma": "merveilleux",
+    "meaning": "Exceptionally pleasing or admirable.",
+    "cue": "meraviglioso",
+    "note": null
+  },
+  {
+    "lemma": "but",
+    "meaning": "An objective someone aims to achieve.",
+    "cue": "scopo",
+    "note": null
+  },
+  {
+    "lemma": "second",
+    "meaning": "Coming immediately after the first.",
+    "cue": "che viene dopo il primo",
+    "note": null
+  },
+  {
+    "lemma": "réunion",
+    "meaning": "A gathering of people to discuss something.",
+    "cue": "riunione",
+    "note": null
+  },
+  {
+    "lemma": "signe",
+    "meaning": "An indication that something exists or is happening.",
+    "cue": "segno (indizio)",
+    "note": null
+  },
+  {
+    "lemma": "deviner",
+    "meaning": "To find an answer by guessing.",
+    "cue": "indovinare",
+    "note": null
+  },
+  {
+    "lemma": "travers",
+    "meaning": "A minor flaw in someone's character.",
+    "cue": "difetto del carattere",
+    "note": "Qui è un nome autonomo, non la locuzione «à travers»."
+  },
+  {
+    "lemma": "projet",
+    "meaning": "A plan for something to be carried out.",
+    "cue": "progetto",
+    "note": null
+  },
+  {
+    "lemma": "soleil",
+    "meaning": "The star that gives the earth light and warmth.",
+    "cue": "sole",
+    "note": null
+  },
+  {
+    "lemma": "coupable",
+    "meaning": "Responsible for committing an offense.",
+    "cue": "colpevole",
+    "note": null
+  },
+  {
+    "lemma": "libérer",
+    "meaning": "To set someone free from confinement.",
+    "cue": "liberare",
+    "note": null
+  },
+  {
+    "lemma": "chat",
+    "meaning": "A small domestic feline.",
+    "cue": "gatto",
+    "note": null
+  },
+  {
+    "lemma": "pute",
+    "meaning": "A prostitute, referred to in vulgar language.",
+    "cue": "puttana (prostituta, volgare)",
+    "note": null
+  },
+  {
+    "lemma": "mer",
+    "meaning": "A large body of salt water.",
+    "cue": "mare",
+    "note": null
+  },
+  {
+    "lemma": "rater",
+    "meaning": "To fail to catch a departing means of transport.",
+    "cue": "perdere (il treno)",
+    "note": null
+  },
+  {
+    "lemma": "gueule",
+    "meaning": "A person's mouth, in coarse language.",
+    "cue": "bocca (volgare, di una persona)",
+    "note": "Riferito a persone è rozzo; riferito ad animali indica normalmente la bocca o le fauci."
+  },
+  {
+    "lemma": "engager",
+    "meaning": "To hire someone for a job.",
+    "cue": "assumere (un lavoratore)",
+    "note": null
+  },
+  {
+    "lemma": "appartement",
+    "meaning": "A self-contained home within a larger building.",
+    "cue": "appartamento",
+    "note": null
+  },
+  {
+    "lemma": "surprise",
+    "meaning": "A feeling caused by something unexpected.",
+    "cue": "sorpresa (emozione)",
+    "note": null
+  },
+  {
+    "lemma": "derrière",
+    "meaning": "At the back, relative to something else.",
+    "cue": "dietro (avverbio)",
+    "note": null
+  },
+  {
+    "lemma": "excuse",
+    "meaning": "A reason offered to justify a fault or absence.",
+    "cue": "scusa (giustificazione)",
+    "note": null
+  },
+  {
+    "lemma": "respirer",
+    "meaning": "To draw air into the lungs and release it.",
+    "cue": "respirare",
+    "note": null
+  },
+  {
+    "lemma": "naître",
+    "meaning": "To come into the world through birth.",
+    "cue": "nascere",
+    "note": null
+  },
+  {
+    "lemma": "debout",
+    "meaning": "In an upright position on one's feet.",
+    "cue": "in piedi",
+    "note": null
+  },
+  {
+    "lemma": "survivre",
+    "meaning": "To remain alive after a dangerous event.",
+    "cue": "sopravvivere",
+    "note": null
+  },
+  {
+    "lemma": "bière",
+    "meaning": "An alcoholic drink made from fermented grain.",
+    "cue": "birra",
+    "note": null
+  },
+  {
+    "lemma": "doigt",
+    "meaning": "One of the digits of a hand.",
+    "cue": "dito della mano",
+    "note": null
+  },
+  {
+    "lemma": "horrible",
+    "meaning": "Extremely unpleasant or frightening.",
+    "cue": "orribile",
+    "note": null
+  },
+  {
+    "lemma": "intelligent",
+    "meaning": "Quick to understand and learn.",
+    "cue": "perspicace (capacità mentale)",
+    "note": null
+  },
+  {
+    "lemma": "doux",
+    "meaning": "Soft and pleasant to the touch.",
+    "cue": "morbido al tatto",
+    "note": null
+  },
+  {
+    "lemma": "riche",
+    "meaning": "Having substantial money or possessions.",
+    "cue": "ricco",
+    "note": null
+  },
+  {
+    "lemma": "télé",
+    "meaning": "Television, in informal speech.",
+    "cue": "TV (forma colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "santé",
+    "meaning": "The condition of a person's body and mind.",
+    "cue": "salute",
+    "note": null
+  },
+  {
+    "lemma": "contrôler",
+    "meaning": "To check that something is correct or compliant.",
+    "cue": "controllare la regolarità di qualcosa",
+    "note": null
+  },
+  {
+    "lemma": "pourtant",
+    "meaning": "Despite what has just been said.",
+    "cue": "eppure",
+    "note": null
+  },
+  {
+    "lemma": "sourire",
+    "meaning": "To form a smile with one's mouth.",
+    "cue": "sorridere",
+    "note": null
+  },
+  {
+    "lemma": "parfait",
+    "meaning": "Without any fault or defect.",
+    "cue": "perfetto",
+    "note": null
+  }
+]

@@ -1,0 +1,1502 @@
+[
+  {
+    "lemma": "être",
+    "meaning": "To be present in a place.",
+    "cue": "essere in un luogo (infinito)",
+    "note": null
+  },
+  {
+    "lemma": "avoir",
+    "meaning": "To possess something.",
+    "cue": "avere qualcosa (possesso, infinito)",
+    "note": null
+  },
+  {
+    "lemma": "aller",
+    "meaning": "To move toward a destination.",
+    "cue": "andare",
+    "note": null
+  },
+  {
+    "lemma": "faire",
+    "meaning": "To perform an action.",
+    "cue": "fare",
+    "note": null
+  },
+  {
+    "lemma": "pouvoir",
+    "meaning": "To be able to do something.",
+    "cue": "potere (essere capace di)",
+    "note": null
+  },
+  {
+    "lemma": "dire",
+    "meaning": "To express something in words.",
+    "cue": "esprimere a parole",
+    "note": null
+  },
+  {
+    "lemma": "vouloir",
+    "meaning": "To want something.",
+    "cue": "volere",
+    "note": null
+  },
+  {
+    "lemma": "savoir",
+    "meaning": "To know a fact.",
+    "cue": "sapere un fatto",
+    "note": null
+  },
+  {
+    "lemma": "bien",
+    "meaning": "In a satisfactory manner.",
+    "cue": "bene (avverbio)",
+    "note": null
+  },
+  {
+    "lemma": "non",
+    "meaning": "A negative answer.",
+    "cue": "no (risposta negativa)",
+    "note": null
+  },
+  {
+    "lemma": "devoir",
+    "meaning": "To be obliged to do something.",
+    "cue": "dovere (essere obbligato a)",
+    "note": null
+  },
+  {
+    "lemma": "tout",
+    "meaning": "The whole of something.",
+    "cue": "tutto (aggettivo maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "plus",
+    "meaning": "To a greater extent or amount.",
+    "cue": "più (quantità maggiore)",
+    "note": null
+  },
+  {
+    "lemma": "voir",
+    "meaning": "To perceive with the eyes.",
+    "cue": "vedere",
+    "note": null
+  },
+  {
+    "lemma": "oui",
+    "meaning": "An affirmative answer.",
+    "cue": "sì (risposta affermativa neutra)",
+    "note": null
+  },
+  {
+    "lemma": "si",
+    "meaning": "An affirmative answer contradicting a negative statement.",
+    "cue": "sì invece (risposta a una negazione)",
+    "note": "Si usa per contraddire una domanda o un'affermazione negativa."
+  },
+  {
+    "lemma": "venir",
+    "meaning": "To move toward the speaker or a reference point.",
+    "cue": "raggiungere chi parla (infinito)",
+    "note": null
+  },
+  {
+    "lemma": "ici",
+    "meaning": "At this place.",
+    "cue": "qui",
+    "note": null
+  },
+  {
+    "lemma": "là",
+    "meaning": "At that place.",
+    "cue": "lì",
+    "note": null
+  },
+  {
+    "lemma": "chose",
+    "meaning": "An unspecified thing.",
+    "cue": "cosa (oggetto non specificato)",
+    "note": null
+  },
+  {
+    "lemma": "penser",
+    "meaning": "To form thoughts in the mind.",
+    "cue": "pensare",
+    "note": null
+  },
+  {
+    "lemma": "parler",
+    "meaning": "To communicate through speech.",
+    "cue": "parlare",
+    "note": null
+  },
+  {
+    "lemma": "prendre",
+    "meaning": "To take hold of something.",
+    "cue": "prendere",
+    "note": null
+  },
+  {
+    "lemma": "alors",
+    "meaning": "At that time.",
+    "cue": "allora (in quel momento)",
+    "note": null
+  },
+  {
+    "lemma": "croire",
+    "meaning": "To accept something as true.",
+    "cue": "credere",
+    "note": null
+  },
+  {
+    "lemma": "aimer",
+    "meaning": "To feel love for someone.",
+    "cue": "amare",
+    "note": null
+  },
+  {
+    "lemma": "juste",
+    "meaning": "Fair and morally right.",
+    "cue": "giusto (equo)",
+    "note": null
+  },
+  {
+    "lemma": "passer",
+    "meaning": "To go through a place.",
+    "cue": "passare attraverso un luogo",
+    "note": null
+  },
+  {
+    "lemma": "trouver",
+    "meaning": "To discover what one is looking for.",
+    "cue": "trovare",
+    "note": null
+  },
+  {
+    "lemma": "très",
+    "meaning": "To a high degree.",
+    "cue": "molto (davanti a un aggettivo)",
+    "note": null
+  },
+  {
+    "lemma": "jamais",
+    "meaning": "At no time.",
+    "cue": "mai",
+    "note": null
+  },
+  {
+    "lemma": "laisser",
+    "meaning": "To leave something where it is.",
+    "cue": "lasciare qualcosa dov'è",
+    "note": null
+  },
+  {
+    "lemma": "vraiment",
+    "meaning": "In reality, not merely in appearance.",
+    "cue": "davvero",
+    "note": null
+  },
+  {
+    "lemma": "aussi",
+    "meaning": "In addition.",
+    "cue": "anche",
+    "note": null
+  },
+  {
+    "lemma": "pourquoi",
+    "meaning": "For what reason.",
+    "cue": "perché? (domanda sul motivo)",
+    "note": null
+  },
+  {
+    "lemma": "même",
+    "meaning": "Even, emphasizing an unexpected case.",
+    "cue": "persino",
+    "note": null
+  },
+  {
+    "lemma": "attendre",
+    "meaning": "To stay until someone or something arrives.",
+    "cue": "aspettare",
+    "note": null
+  },
+  {
+    "lemma": "homme",
+    "meaning": "An adult male human.",
+    "cue": "uomo adulto",
+    "note": null
+  },
+  {
+    "lemma": "deux",
+    "meaning": "The number two.",
+    "cue": "due",
+    "note": null
+  },
+  {
+    "lemma": "arriver",
+    "meaning": "To reach a destination.",
+    "cue": "arrivare",
+    "note": null
+  },
+  {
+    "lemma": "maintenant",
+    "meaning": "At the present time.",
+    "cue": "adesso",
+    "note": null
+  },
+  {
+    "lemma": "falloir",
+    "meaning": "To be necessary.",
+    "cue": "essere necessario (verbo impersonale)",
+    "note": "Si usa con il soggetto impersonale il, per esempio il faut."
+  },
+  {
+    "lemma": "bon",
+    "meaning": "Of good quality.",
+    "cue": "buono (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "appeler",
+    "meaning": "To telephone someone.",
+    "cue": "chiamare qualcuno al telefono",
+    "note": null
+  },
+  {
+    "lemma": "donner",
+    "meaning": "To give something to someone.",
+    "cue": "dare",
+    "note": null
+  },
+  {
+    "lemma": "temps",
+    "meaning": "Time as the passage of events.",
+    "cue": "tempo (che scorre)",
+    "note": null
+  },
+  {
+    "lemma": "peu",
+    "meaning": "A small amount.",
+    "cue": "una piccola quantità (sostantivo)",
+    "note": "Uso sostantivato, come in le peu qui reste: il poco che resta."
+  },
+  {
+    "lemma": "regarder",
+    "meaning": "To direct one's eyes toward something.",
+    "cue": "guardare",
+    "note": null
+  },
+  {
+    "lemma": "petit",
+    "meaning": "Small in size.",
+    "cue": "piccolo (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "toujours",
+    "meaning": "At all times.",
+    "cue": "sempre",
+    "note": null
+  },
+  {
+    "lemma": "besoin",
+    "meaning": "A need for something necessary.",
+    "cue": "bisogno (sostantivo)",
+    "note": null
+  },
+  {
+    "lemma": "encore",
+    "meaning": "Still, indicating that a situation continues.",
+    "cue": "ancora (situazione che continua)",
+    "note": null
+  },
+  {
+    "lemma": "partir",
+    "meaning": "To leave a place.",
+    "cue": "andarsene (infinito semplice)",
+    "note": null
+  },
+  {
+    "lemma": "père",
+    "meaning": "A male parent.",
+    "cue": "padre",
+    "note": null
+  },
+  {
+    "lemma": "sûr",
+    "meaning": "Certain of something.",
+    "cue": "sicuro (convinto, maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "vie",
+    "meaning": "The state of being alive.",
+    "cue": "vita",
+    "note": null
+  },
+  {
+    "lemma": "arrêter",
+    "meaning": "To bring something to a stop.",
+    "cue": "fermare",
+    "note": null
+  },
+  {
+    "lemma": "accord",
+    "meaning": "Agreement between people.",
+    "cue": "intesa fra persone",
+    "note": null
+  },
+  {
+    "lemma": "tuer",
+    "meaning": "To cause a living being to die.",
+    "cue": "uccidere",
+    "note": null
+  },
+  {
+    "lemma": "peut-être",
+    "meaning": "Possibly, but not certainly.",
+    "cue": "forse",
+    "note": null
+  },
+  {
+    "lemma": "fois",
+    "meaning": "An occasion on which something happens.",
+    "cue": "volta (occorrenza)",
+    "note": null
+  },
+  {
+    "lemma": "mettre",
+    "meaning": "To put something in a place.",
+    "cue": "mettere",
+    "note": null
+  },
+  {
+    "lemma": "comment",
+    "meaning": "In what way.",
+    "cue": "come? (domanda sul modo)",
+    "note": null
+  },
+  {
+    "lemma": "sortir",
+    "meaning": "To go out of a place.",
+    "cue": "uscire",
+    "note": null
+  },
+  {
+    "lemma": "demander",
+    "meaning": "To ask for something.",
+    "cue": "chiedere",
+    "note": null
+  },
+  {
+    "lemma": "rester",
+    "meaning": "To stay in a place.",
+    "cue": "restare",
+    "note": null
+  },
+  {
+    "lemma": "jour",
+    "meaning": "A day as a unit of time.",
+    "cue": "giorno (unità di tempo)",
+    "note": null
+  },
+  {
+    "lemma": "seul",
+    "meaning": "Without anyone else present.",
+    "cue": "solo (senza compagnia, maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "monde",
+    "meaning": "The world in which people live.",
+    "cue": "mondo",
+    "note": null
+  },
+  {
+    "lemma": "vrai",
+    "meaning": "In accordance with reality.",
+    "cue": "vero (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "ami",
+    "meaning": "A male friend.",
+    "cue": "persona cara con cui si ha un legame di affetto (uomo)",
+    "note": null
+  },
+  {
+    "lemma": "connaître",
+    "meaning": "To be acquainted with someone.",
+    "cue": "conoscere una persona",
+    "note": null
+  },
+  {
+    "lemma": "essayer",
+    "meaning": "To attempt to do something.",
+    "cue": "provare a fare qualcosa",
+    "note": null
+  },
+  {
+    "lemma": "mourir",
+    "meaning": "To cease to live.",
+    "cue": "morire",
+    "note": null
+  },
+  {
+    "lemma": "comprendre",
+    "meaning": "To grasp the meaning of something.",
+    "cue": "capire",
+    "note": null
+  },
+  {
+    "lemma": "trop",
+    "meaning": "To an excessive degree.",
+    "cue": "eccessivamente",
+    "note": null
+  },
+  {
+    "lemma": "autre",
+    "meaning": "Different from the one already mentioned.",
+    "cue": "altro (aggettivo singolare)",
+    "note": null
+  },
+  {
+    "lemma": "ouais",
+    "meaning": "An informal affirmative answer.",
+    "cue": "sì (molto colloquiale)",
+    "note": "Equivale a un sì informale; si evita nei contesti formali."
+  },
+  {
+    "lemma": "an",
+    "meaning": "A year counted as a unit of time.",
+    "cue": "periodo di dodici mesi (unità di età)",
+    "note": "Si usa normalmente per contare gli anni, anche nell'età."
+  },
+  {
+    "lemma": "aider",
+    "meaning": "To give someone assistance.",
+    "cue": "aiutare",
+    "note": null
+  },
+  {
+    "lemma": "dieu",
+    "meaning": "A male deity.",
+    "cue": "dio (divinità maschile)",
+    "note": null
+  },
+  {
+    "lemma": "entendre",
+    "meaning": "To perceive a sound.",
+    "cue": "udire",
+    "note": null
+  },
+  {
+    "lemma": "ok",
+    "meaning": "Acceptable or satisfactory.",
+    "cue": "accettabile (informale, invariabile)",
+    "note": null
+  },
+  {
+    "lemma": "maman",
+    "meaning": "An affectionate word for one's mother.",
+    "cue": "mamma",
+    "note": null
+  },
+  {
+    "lemma": "papa",
+    "meaning": "An affectionate word for one's father.",
+    "cue": "papà",
+    "note": null
+  },
+  {
+    "lemma": "nouveau",
+    "meaning": "New rather than previously existing.",
+    "cue": "nuovo (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "mal",
+    "meaning": "In an unsatisfactory manner.",
+    "cue": "in modo insoddisfacente (avverbio)",
+    "note": null
+  },
+  {
+    "lemma": "beaucoup",
+    "meaning": "To a large extent or in a large amount.",
+    "cue": "molto (quantità, con un verbo)",
+    "note": null
+  },
+  {
+    "lemma": "déjà",
+    "meaning": "Already, before the present or expected time.",
+    "cue": "già",
+    "note": null
+  },
+  {
+    "lemma": "grand",
+    "meaning": "Tall in height.",
+    "cue": "alto di statura (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "femme",
+    "meaning": "An adult female human.",
+    "cue": "donna adulta",
+    "note": null
+  },
+  {
+    "lemma": "monsieur",
+    "meaning": "A polite title used to address a man.",
+    "cue": "signore (titolo di cortesia)",
+    "note": null
+  },
+  {
+    "lemma": "chercher",
+    "meaning": "To try to find something.",
+    "cue": "cercare",
+    "note": null
+  },
+  {
+    "lemma": "mieux",
+    "meaning": "In a better manner.",
+    "cue": "meglio (avverbio)",
+    "note": null
+  },
+  {
+    "lemma": "enfant",
+    "meaning": "A young human who is not yet an adult.",
+    "cue": "bambino (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "gens",
+    "meaning": "People considered collectively.",
+    "cue": "gente (sostantivo plurale in francese)",
+    "note": "In francese è plurale, anche se l'italiano gente è singolare."
+  },
+  {
+    "lemma": "heure",
+    "meaning": "A period of sixty minutes.",
+    "cue": "ora (sessanta minuti)",
+    "note": null
+  },
+  {
+    "lemma": "maison",
+    "meaning": "A building where people live.",
+    "cue": "casa (edificio)",
+    "note": null
+  },
+  {
+    "lemma": "fait",
+    "meaning": "Something that is known to be true.",
+    "cue": "fatto (dato reale)",
+    "note": null
+  },
+  {
+    "lemma": "dernier",
+    "meaning": "Last in a sequence.",
+    "cue": "ultimo (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "problème",
+    "meaning": "A difficulty requiring a solution.",
+    "cue": "problema",
+    "note": null
+  },
+  {
+    "lemma": "revenir",
+    "meaning": "To come back to a place.",
+    "cue": "tornare qui",
+    "note": "Indica il ritorno verso chi parla o verso un luogo preso come riferimento."
+  },
+  {
+    "lemma": "écouter",
+    "meaning": "To pay attention to a sound.",
+    "cue": "ascoltare",
+    "note": null
+  },
+  {
+    "lemma": "fille",
+    "meaning": "A female child in relation to her parents.",
+    "cue": "figlia",
+    "note": null
+  },
+  {
+    "lemma": "soir",
+    "meaning": "The evening part of the day.",
+    "cue": "sera",
+    "note": null
+  },
+  {
+    "lemma": "nom",
+    "meaning": "A word by which a person or thing is identified.",
+    "cue": "appellativo che identifica una persona o una cosa",
+    "note": null
+  },
+  {
+    "lemma": "premier",
+    "meaning": "First in a sequence.",
+    "cue": "primo (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "perdre",
+    "meaning": "To lose something one had.",
+    "cue": "perdere",
+    "note": null
+  },
+  {
+    "lemma": "finir",
+    "meaning": "To bring something to an end.",
+    "cue": "terminare",
+    "note": null
+  },
+  {
+    "lemma": "sentir",
+    "meaning": "To perceive an odor.",
+    "cue": "percepire un odore",
+    "note": null
+  },
+  {
+    "lemma": "raison",
+    "meaning": "A reason that explains something.",
+    "cue": "ragione (motivo)",
+    "note": null
+  },
+  {
+    "lemma": "jouer",
+    "meaning": "To take part in a game.",
+    "cue": "giocare",
+    "note": null
+  },
+  {
+    "lemma": "nuit",
+    "meaning": "The dark period between sunset and sunrise.",
+    "cue": "notte",
+    "note": null
+  },
+  {
+    "lemma": "travailler",
+    "meaning": "To do work.",
+    "cue": "lavorare",
+    "note": null
+  },
+  {
+    "lemma": "moment",
+    "meaning": "A brief period of time.",
+    "cue": "breve istante",
+    "note": null
+  },
+  {
+    "lemma": "fils",
+    "meaning": "A male child in relation to his parents.",
+    "cue": "figlio (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "commencer",
+    "meaning": "To start doing something.",
+    "cue": "cominciare",
+    "note": null
+  },
+  {
+    "lemma": "beau",
+    "meaning": "Beautiful in appearance.",
+    "cue": "bello (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "plaire",
+    "meaning": "To be pleasing to someone.",
+    "cue": "piacere (verbo)",
+    "note": null
+  },
+  {
+    "lemma": "rendre",
+    "meaning": "To give something back.",
+    "cue": "restituire",
+    "note": null
+  },
+  {
+    "lemma": "truc",
+    "meaning": "An informal word for an unnamed object.",
+    "cue": "coso (oggetto, colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "désoler",
+    "meaning": "To cause someone deep sadness.",
+    "cue": "affliggere qualcuno",
+    "note": "È un verbo transitivo: causare dispiacere, non chiedere scusa."
+  },
+  {
+    "lemma": "argent",
+    "meaning": "Money used to pay for things.",
+    "cue": "denaro",
+    "note": null
+  },
+  {
+    "lemma": "bonjour",
+    "meaning": "A greeting used during the day.",
+    "cue": "saluto diurno",
+    "note": null
+  },
+  {
+    "lemma": "moins",
+    "meaning": "To a smaller extent or amount.",
+    "cue": "meno",
+    "note": null
+  },
+  {
+    "lemma": "rentrer",
+    "meaning": "To return home.",
+    "cue": "rientrare a casa",
+    "note": null
+  },
+  {
+    "lemma": "air",
+    "meaning": "The mixture of gases we breathe.",
+    "cue": "aria da respirare",
+    "note": null
+  },
+  {
+    "lemma": "gars",
+    "meaning": "An informal word for a boy or man.",
+    "cue": "ragazzo (colloquiale)",
+    "note": null
+  },
+  {
+    "lemma": "mort",
+    "meaning": "The end of life.",
+    "cue": "fine della vita (sostantivo)",
+    "note": null
+  },
+  {
+    "lemma": "tenir",
+    "meaning": "To hold something in one's hand.",
+    "cue": "tenere in mano",
+    "note": null
+  },
+  {
+    "lemma": "affaire",
+    "meaning": "A matter requiring attention.",
+    "cue": "faccenda da sbrigare",
+    "note": null
+  },
+  {
+    "lemma": "désolé",
+    "meaning": "Sorry about something regrettable.",
+    "cue": "dispiaciuto (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "vivre",
+    "meaning": "To be alive.",
+    "cue": "vivere",
+    "note": null
+  },
+  {
+    "lemma": "famille",
+    "meaning": "A group of people related to one another.",
+    "cue": "famiglia",
+    "note": null
+  },
+  {
+    "lemma": "main",
+    "meaning": "The body part at the end of the arm.",
+    "cue": "mano",
+    "note": null
+  },
+  {
+    "lemma": "personne",
+    "meaning": "An individual human being.",
+    "cue": "persona (sostantivo)",
+    "note": "Qui indica un individuo, non il pronome negativo nessuno."
+  },
+  {
+    "lemma": "mec",
+    "meaning": "A slang word for a man.",
+    "cue": "tizio (gergale)",
+    "note": null
+  },
+  {
+    "lemma": "peur",
+    "meaning": "The feeling caused by perceived danger.",
+    "cue": "paura",
+    "note": null
+  },
+  {
+    "lemma": "question",
+    "meaning": "A request for information.",
+    "cue": "domanda",
+    "note": null
+  },
+  {
+    "lemma": "merci",
+    "meaning": "An expression of gratitude.",
+    "cue": "ringraziamento (formula)",
+    "note": null
+  },
+  {
+    "lemma": "devenir",
+    "meaning": "To change into a new state.",
+    "cue": "diventare",
+    "note": null
+  },
+  {
+    "lemma": "garçon",
+    "meaning": "A male child.",
+    "cue": "bambino maschio",
+    "note": null
+  },
+  {
+    "lemma": "changer",
+    "meaning": "To make something different.",
+    "cue": "cambiare",
+    "note": null
+  },
+  {
+    "lemma": "idée",
+    "meaning": "A thought formed in the mind.",
+    "cue": "idea",
+    "note": null
+  },
+  {
+    "lemma": "travail",
+    "meaning": "Work done to achieve a result.",
+    "cue": "lavoro (sostantivo)",
+    "note": null
+  },
+  {
+    "lemma": "voiture",
+    "meaning": "A car used for road travel.",
+    "cue": "automobile",
+    "note": null
+  },
+  {
+    "lemma": "tête",
+    "meaning": "The body part containing the brain.",
+    "cue": "testa",
+    "note": null
+  },
+  {
+    "lemma": "assez",
+    "meaning": "To a sufficient degree or amount.",
+    "cue": "abbastanza",
+    "note": null
+  },
+  {
+    "lemma": "oublier",
+    "meaning": "To fail to remember something.",
+    "cue": "dimenticare",
+    "note": null
+  },
+  {
+    "lemma": "coup",
+    "meaning": "A physical blow.",
+    "cue": "colpo (urto fisico)",
+    "note": null
+  },
+  {
+    "lemma": "mère",
+    "meaning": "A female parent.",
+    "cue": "madre",
+    "note": null
+  },
+  {
+    "lemma": "trois",
+    "meaning": "The number three.",
+    "cue": "tre",
+    "note": null
+  },
+  {
+    "lemma": "frère",
+    "meaning": "A male sibling.",
+    "cue": "fratello",
+    "note": null
+  },
+  {
+    "lemma": "chance",
+    "meaning": "Good luck.",
+    "cue": "fortuna (buona sorte)",
+    "note": null
+  },
+  {
+    "lemma": "minute",
+    "meaning": "A period of sixty seconds.",
+    "cue": "minuto (sessanta secondi)",
+    "note": null
+  },
+  {
+    "lemma": "meilleur",
+    "meaning": "Of better quality.",
+    "cue": "migliore (aggettivo maschile singolare)",
+    "note": "È un aggettivo; mieux è invece l'avverbio meglio."
+  },
+  {
+    "lemma": "manger",
+    "meaning": "To consume food.",
+    "cue": "mangiare",
+    "note": null
+  },
+  {
+    "lemma": "envoyer",
+    "meaning": "To send something to a destination.",
+    "cue": "inviare",
+    "note": null
+  },
+  {
+    "lemma": "prêt",
+    "meaning": "Ready to act or be used.",
+    "cue": "pronto (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "souvenir",
+    "meaning": "To remember something.",
+    "cue": "ricordarsi (verbo pronominale)",
+    "note": "Il verbo è pronominale e si costruisce con de."
+  },
+  {
+    "lemma": "oeil",
+    "meaning": "An organ of sight.",
+    "cue": "occhio (singolare)",
+    "note": "La grafia con legatura è œil; il plurale è yeux."
+  },
+  {
+    "lemma": "occuper",
+    "meaning": "To take up space.",
+    "cue": "occupare spazio",
+    "note": null
+  },
+  {
+    "lemma": "entrer",
+    "meaning": "To go into a place.",
+    "cue": "entrare",
+    "note": null
+  },
+  {
+    "lemma": "vite",
+    "meaning": "At high speed.",
+    "cue": "velocemente",
+    "note": null
+  },
+  {
+    "lemma": "tomber",
+    "meaning": "To fall downward.",
+    "cue": "cadere",
+    "note": null
+  },
+  {
+    "lemma": "aujourd'hui",
+    "meaning": "On the present day.",
+    "cue": "oggi",
+    "note": null
+  },
+  {
+    "lemma": "garder",
+    "meaning": "To keep something in one's possession.",
+    "cue": "tenere con sé (non cedere)",
+    "note": null
+  },
+  {
+    "lemma": "année",
+    "meaning": "A year considered as a span of time.",
+    "cue": "anno (considerato nella sua durata)",
+    "note": "Rispetto ad an, mette spesso in risalto il periodo vissuto o descritto, non il semplice conteggio."
+  },
+  {
+    "lemma": "payer",
+    "meaning": "To give money in exchange for something.",
+    "cue": "pagare",
+    "note": null
+  },
+  {
+    "lemma": "demain",
+    "meaning": "On the day after today.",
+    "cue": "domani",
+    "note": null
+  },
+  {
+    "lemma": "excuser",
+    "meaning": "To forgive someone for a fault.",
+    "cue": "scusare qualcuno",
+    "note": null
+  },
+  {
+    "lemma": "combien",
+    "meaning": "How much or how many.",
+    "cue": "quanto? (domanda sulla quantità)",
+    "note": null
+  },
+  {
+    "lemma": "histoire",
+    "meaning": "An account of events told as a story.",
+    "cue": "storia (racconto)",
+    "note": null
+  },
+  {
+    "lemma": "marcher",
+    "meaning": "To move on foot.",
+    "cue": "camminare",
+    "note": null
+  },
+  {
+    "lemma": "tant",
+    "meaning": "So much in quantity or degree.",
+    "cue": "in così grande quantità",
+    "note": null
+  },
+  {
+    "lemma": "tirer",
+    "meaning": "To pull something toward oneself.",
+    "cue": "tirare verso di sé",
+    "note": null
+  },
+  {
+    "lemma": "vieux",
+    "meaning": "Having existed for a long time.",
+    "cue": "vecchio (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "super",
+    "meaning": "Excellent, in informal speech.",
+    "cue": "fantastico (informale, invariabile)",
+    "note": null
+  },
+  {
+    "lemma": "apprendre",
+    "meaning": "To acquire knowledge or a skill.",
+    "cue": "imparare",
+    "note": null
+  },
+  {
+    "lemma": "espérer",
+    "meaning": "To hope that something will happen.",
+    "cue": "sperare",
+    "note": null
+  },
+  {
+    "lemma": "montrer",
+    "meaning": "To let someone see something.",
+    "cue": "mostrare",
+    "note": null
+  },
+  {
+    "lemma": "importer",
+    "meaning": "To bring goods into a country from abroad.",
+    "cue": "importare merci dall'estero",
+    "note": null
+  },
+  {
+    "lemma": "ensemble",
+    "meaning": "Together with others.",
+    "cue": "insieme",
+    "note": null
+  },
+  {
+    "lemma": "semaine",
+    "meaning": "A period of seven days.",
+    "cue": "settimana",
+    "note": null
+  },
+  {
+    "lemma": "tard",
+    "meaning": "At a late time.",
+    "cue": "a un'ora avanzata",
+    "note": null
+  },
+  {
+    "lemma": "part",
+    "meaning": "A share allocated to someone.",
+    "cue": "quota spettante a qualcuno",
+    "note": null
+  },
+  {
+    "lemma": "gros",
+    "meaning": "Bulky in size.",
+    "cue": "voluminoso (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "cas",
+    "meaning": "A particular situation to consider.",
+    "cue": "situazione specifica da esaminare",
+    "note": null
+  },
+  {
+    "lemma": "amour",
+    "meaning": "A deep feeling of affection.",
+    "cue": "amore",
+    "note": null
+  },
+  {
+    "lemma": "ouvrir",
+    "meaning": "To make something no longer closed.",
+    "cue": "aprire",
+    "note": null
+  },
+  {
+    "lemma": "sang",
+    "meaning": "The fluid circulating in the body's blood vessels.",
+    "cue": "fluido rosso che circola nelle vene",
+    "note": null
+  },
+  {
+    "lemma": "utiliser",
+    "meaning": "To use something for a purpose.",
+    "cue": "utilizzare",
+    "note": null
+  },
+  {
+    "lemma": "rencontrer",
+    "meaning": "To meet someone.",
+    "cue": "incontrare",
+    "note": null
+  },
+  {
+    "lemma": "porter",
+    "meaning": "To wear an item of clothing.",
+    "cue": "indossare",
+    "note": null
+  },
+  {
+    "lemma": "mari",
+    "meaning": "A married man in relation to his spouse.",
+    "cue": "uomo sposato rispetto al coniuge",
+    "note": null
+  },
+  {
+    "lemma": "fou",
+    "meaning": "Wildly unreasonable or reckless.",
+    "cue": "folle (sconsiderato, maschile singolare)",
+    "note": "Qui descrive un comportamento irragionevole, non una diagnosi clinica."
+  },
+  {
+    "lemma": "suivre",
+    "meaning": "To go behind someone along the same route.",
+    "cue": "seguire",
+    "note": null
+  },
+  {
+    "lemma": "mauvais",
+    "meaning": "Of poor quality.",
+    "cue": "cattivo (qualità, maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "porte",
+    "meaning": "A movable barrier used to close an entrance.",
+    "cue": "porta (ingresso, singolare)",
+    "note": null
+  },
+  {
+    "lemma": "genre",
+    "meaning": "A category of artistic works sharing features.",
+    "cue": "genere artistico",
+    "note": null
+  },
+  {
+    "lemma": "seulement",
+    "meaning": "Only, excluding anything more.",
+    "cue": "soltanto",
+    "note": null
+  },
+  {
+    "lemma": "bébé",
+    "meaning": "A very young child.",
+    "cue": "bimbo piccolissimo",
+    "note": null
+  },
+  {
+    "lemma": "gagner",
+    "meaning": "To win a contest.",
+    "cue": "vincere",
+    "note": null
+  },
+  {
+    "lemma": "sembler",
+    "meaning": "To appear to be a certain way.",
+    "cue": "sembrare",
+    "note": null
+  },
+  {
+    "lemma": "mois",
+    "meaning": "One of the twelve divisions of a year.",
+    "cue": "mese (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "ville",
+    "meaning": "A large urban settlement.",
+    "cue": "città",
+    "note": null
+  },
+  {
+    "lemma": "type",
+    "meaning": "A class of things sharing characteristics.",
+    "cue": "tipo (categoria)",
+    "note": null
+  },
+  {
+    "lemma": "police",
+    "meaning": "The public service that enforces the law.",
+    "cue": "polizia",
+    "note": null
+  },
+  {
+    "lemma": "droit",
+    "meaning": "A right someone is entitled to exercise.",
+    "cue": "diritto (facoltà riconosciuta)",
+    "note": null
+  },
+  {
+    "lemma": "point",
+    "meaning": "A unit used to count a score.",
+    "cue": "punto (nel punteggio)",
+    "note": null
+  },
+  {
+    "lemma": "foutre",
+    "meaning": "To put something somewhere, in vulgar speech.",
+    "cue": "mettere (verbo volgare)",
+    "note": "In questo uso equivale a mettre, ma ha un registro volgare."
+  },
+  {
+    "lemma": "putain",
+    "meaning": "A derogatory term for a woman who sells sexual services.",
+    "cue": "prostituta (termine volgare e spregiativo)",
+    "note": "È una denominazione offensiva, non un termine neutro per una lavoratrice del sesso."
+  },
+  {
+    "lemma": "rappeler",
+    "meaning": "To remind someone of something.",
+    "cue": "ricordare qualcosa a qualcuno",
+    "note": null
+  },
+  {
+    "lemma": "endroit",
+    "meaning": "A particular place.",
+    "cue": "luogo preciso",
+    "note": null
+  },
+  {
+    "lemma": "côté",
+    "meaning": "A side of something.",
+    "cue": "lato",
+    "note": null
+  },
+  {
+    "lemma": "jeune",
+    "meaning": "Not advanced in age.",
+    "cue": "giovane (aggettivo singolare)",
+    "note": null
+  },
+  {
+    "lemma": "coeur",
+    "meaning": "The organ that pumps blood.",
+    "cue": "cuore",
+    "note": "La grafia con legatura è cœur."
+  },
+  {
+    "lemma": "retrouver",
+    "meaning": "To find something that was lost.",
+    "cue": "ritrovare",
+    "note": null
+  },
+  {
+    "lemma": "continuer",
+    "meaning": "To keep doing something.",
+    "cue": "continuare",
+    "note": null
+  },
+  {
+    "lemma": "façon",
+    "meaning": "A way of doing something.",
+    "cue": "modo di fare qualcosa",
+    "note": null
+  },
+  {
+    "lemma": "salut",
+    "meaning": "Deliverance from danger or ruin.",
+    "cue": "salvezza (dal pericolo)",
+    "note": "Qui è il sostantivo che indica la salvezza, non il saluto informale."
+  },
+  {
+    "lemma": "longtemps",
+    "meaning": "For a long time.",
+    "cue": "a lungo",
+    "note": null
+  },
+  {
+    "lemma": "place",
+    "meaning": "A seat available for someone.",
+    "cue": "posto a sedere",
+    "note": null
+  },
+  {
+    "lemma": "sauver",
+    "meaning": "To rescue someone from danger.",
+    "cue": "salvare",
+    "note": null
+  },
+  {
+    "lemma": "train",
+    "meaning": "A railway vehicle made of connected carriages.",
+    "cue": "treno",
+    "note": null
+  },
+  {
+    "lemma": "boire",
+    "meaning": "To consume a liquid.",
+    "cue": "bere",
+    "note": null
+  },
+  {
+    "lemma": "retourner",
+    "meaning": "To turn something over to its other side.",
+    "cue": "capovolgere",
+    "note": null
+  },
+  {
+    "lemma": "asseoir",
+    "meaning": "To place someone in a sitting position.",
+    "cue": "far sedere qualcuno",
+    "note": "Il verbo semplice è transitivo; s'asseoir significa sedersi."
+  },
+  {
+    "lemma": "dormir",
+    "meaning": "To be asleep.",
+    "cue": "riposare nel sonno (verbo)",
+    "note": null
+  },
+  {
+    "lemma": "acheter",
+    "meaning": "To obtain something by paying for it.",
+    "cue": "comprare",
+    "note": null
+  },
+  {
+    "lemma": "arme",
+    "meaning": "An object designed for attack or defense.",
+    "cue": "arma (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "mot",
+    "meaning": "A single word in a language.",
+    "cue": "parola (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "corps",
+    "meaning": "The physical body of a person.",
+    "cue": "corpo (singolare)",
+    "note": null
+  },
+  {
+    "lemma": "tellement",
+    "meaning": "To such a high degree.",
+    "cue": "talmente",
+    "note": null
+  },
+  {
+    "lemma": "écrire",
+    "meaning": "To form words in writing.",
+    "cue": "scrivere",
+    "note": null
+  },
+  {
+    "lemma": "madame",
+    "meaning": "A polite title used to address an adult woman.",
+    "cue": "signora (titolo di cortesia)",
+    "note": null
+  },
+  {
+    "lemma": "important",
+    "meaning": "Having great significance.",
+    "cue": "di grande rilievo (aggettivo maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "matin",
+    "meaning": "The early part of the day before noon.",
+    "cue": "mattina",
+    "note": null
+  },
+  {
+    "lemma": "fort",
+    "meaning": "Loudly, with a high volume of sound.",
+    "cue": "a voce alta (avverbio)",
+    "note": "Qui modifica un verbo, come in parler fort: parlare a voce alta."
+  },
+  {
+    "lemma": "chéri",
+    "meaning": "A male loved one addressed affectionately.",
+    "cue": "tesoro (appellativo affettuoso maschile)",
+    "note": null
+  },
+  {
+    "lemma": "chambre",
+    "meaning": "A room used for sleeping.",
+    "cue": "camera da letto",
+    "note": null
+  },
+  {
+    "lemma": "quitter",
+    "meaning": "To leave a place behind.",
+    "cue": "lasciare un luogo",
+    "note": null
+  },
+  {
+    "lemma": "heureux",
+    "meaning": "Feeling happiness.",
+    "cue": "felice (maschile singolare)",
+    "note": null
+  },
+  {
+    "lemma": "partie",
+    "meaning": "A game played from start to finish.",
+    "cue": "partita (gioco)",
+    "note": null
+  },
+  {
+    "lemma": "lire",
+    "meaning": "To understand written words.",
+    "cue": "leggere",
+    "note": null
+  },
+  {
+    "lemma": "servir",
+    "meaning": "To provide food or drink to someone.",
+    "cue": "portare cibo ai commensali (verbo)",
+    "note": null
+  },
+  {
+    "lemma": "manquer",
+    "meaning": "To lack something needed.",
+    "cue": "essere privo di qualcosa",
+    "note": "In questo senso il verbo si costruisce con de."
+  },
+  {
+    "lemma": "terre",
+    "meaning": "The soil in which plants grow.",
+    "cue": "terra in cui crescono le piante",
+    "note": null
+  },
+  {
+    "lemma": "emmener",
+    "meaning": "To take someone along when going somewhere.",
+    "cue": "portare qualcuno con sé andando via",
+    "note": "L'accento è sulla partenza insieme alla persona."
+  },
+  {
+    "lemma": "adorer",
+    "meaning": "To like something very much.",
+    "cue": "adorare qualcosa, amarlo moltissimo",
+    "note": null
+  }
+]
