@@ -20,9 +20,11 @@ Install Bun 1.4.2 and Node.js 24 or newer. From the repository root:
 bun install --frozen-lockfile
 bun run setup:local you@example.com
 bun run db:migrate
-bun run db:seed
+bun run catalogue:import:families --allow-drafts --activate
 bun run dev
 ```
+
+This installs the checked-in 1,000-family French/Italian curriculum: 1,049 lemmas and 35 selected inflected forms. Italian cues are machine-authored drafts for personal dogfooding. The importer backs up the local database and preserves existing review histories. No corpus download is needed to use the checked-in curriculum.
 
 Local sign-in links appear in the terminal. Do not expose the development server or share those links. See [development and deployment](docs/development.md) for secrets, existing catalogue imports, and production safeguards.
 
@@ -74,10 +76,11 @@ Workspaces export TypeScript source, so the app bundles their production entrypo
 - [Module interfaces and dependency rules](docs/architecture.md)
 - [Web UI foundations, composition, and component maintenance](apps/web/DESIGN.md)
 - [Learning design and product direction](docs/learning-design.md)
+- [Vocabulary catalogue: research, JSON format, schema, import and remaining work](docs/catalogue.md)
 - [Local development, database workflow, and production deployment](docs/development.md)
 - [Interface languages and translation workflow](packages/i18n/README.md)
 
-The live catalogue import and initial Cloudflare deployment are complete. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker.
+The original live catalogue import and Cloudflare deployment are complete. The new French Lexique catalogue is a separate local-only pilot; its generated Italian cues remain drafts. See the catalogue guide before importing or publishing it. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker.
 
 ## Conventions
 

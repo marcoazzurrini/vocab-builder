@@ -38,7 +38,7 @@ From the repository root:
 bun install --frozen-lockfile
 bun run setup:local you@example.com
 bun run db:migrate
-bun run db:seed
+bun run catalogue:import:families --allow-drafts --activate
 bun run dev
 ```
 
@@ -46,7 +46,9 @@ bun run dev
 
 Local D1 state lives under `apps/web/.wrangler/`. When moving an existing checkout, preserve its `.dev.vars`, `.wrangler/`, and `exports/` under `apps/web/`; do not recreate or reseed an existing database merely because the project moved.
 
-The checked-in `packages/database/scripts/words.json` preserves all 50 original seed entries and the later question-mark corrections. Its IDs are deterministic because the old SQL seed generated IDs inside Postgres. Importing a live export into an empty D1 instead preserves live IDs and creation dates.
+The family importer installs the checked-in French/Italian dogfood curriculum locally; `--allow-drafts` acknowledges that its cues still need independent review. It creates a backup before importing. See [the catalogue guide](catalogue.md) for the family definition, source frequencies, and curriculum policy.
+
+The legacy `bun run db:seed` command remains available for the original fixture. The checked-in `packages/database/scripts/words.json` preserves all 50 original seed entries and the later question-mark corrections. Its IDs are deterministic because the old SQL seed generated IDs inside Postgres. Importing a live export into an empty D1 instead preserves live IDs and creation dates.
 
 ## Catalogue preservation
 
@@ -149,7 +151,7 @@ Runtime secrets remain encrypted Worker settings, not Git files or build variabl
 
 Resend verification records are scoped to `vocab-builder.marcoazzurrini.com`; leave unrelated domain email records alone. Better Auth runs in the app Worker, with users, sessions, verification tokens, and rate-limit state in D1. Magic links expire after ten minutes and are stored hashed. Resend requests have a ten-second timeout; delivery failures return an error without exposing provider credentials or response bodies. A provider outage can make allowed and disallowed addresses distinguishable by response status. The authentication limiter trusts Cloudflare's `cf-connecting-ip` header. Email credentials stay server-side.
 
-After deployment, verify the deployed commit and test sign-in, one-time link reuse rejection, sign-out, a guess, a recall, reload, and saved history. Keep Supabase and its export until the deployment is verified. Retiring Supabase is a separate action.
+After deployment, verify the deployed commit and test sign-in, one-time link reuse rejection, sign-out, a teaching completion, a recall after the introductory delay, reload, and saved history. Keep Supabase and its export until the deployment is verified. Retiring Supabase is a separate action.
 
 Preview builds remain disabled because bindings and the authentication origin point at production. Before enabling previews, provision an isolated staging Worker, database, and authentication origin.
 
