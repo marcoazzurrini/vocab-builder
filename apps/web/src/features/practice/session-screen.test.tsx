@@ -155,7 +155,7 @@ describe("the session screen", () => {
         unavailable?.({ kind: "failed", reason: "not-allowed" })
       );
     render(<SessionScreen transport={transport} userId="u1" />);
-    await screen.findByText("Seleziona Ascolta per sentire la pronuncia.");
+    await screen.findByRole("button", { name: "Ascolta" });
     expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Ascolta" }));
     expect(voice).toHaveBeenCalledTimes(2);
@@ -164,7 +164,7 @@ describe("the session screen", () => {
     ).toBeNull();
   });
 
-  it("presents a dictionary entry with meaning, context, and a clearly separate usage example", async () => {
+  it("shows the word, meaning, example, and teaching notes without extra interactions", async () => {
     loadSnapshot.mockResolvedValue(deck([ETRE]));
     render(<SessionScreen transport={transport} userId="u1" />);
     await screen.findByRole("heading", { name: "être" });
@@ -175,7 +175,12 @@ describe("the session screen", () => {
     expect({
       answerInput: screen.queryByRole("textbox"),
       legacyCue: screen.queryByText(ETRE.gloss),
-    }).toStrictEqual({ answerInput: null, legacyCue: null });
+      usageNotes: screen.queryByRole("button", { name: "Note d’uso" }),
+    }).toStrictEqual({
+      answerInput: null,
+      legacyCue: null,
+      usageNotes: null,
+    });
   });
 
   it("keeps the word meaning clear during recall without revealing the French entry or example", async () => {

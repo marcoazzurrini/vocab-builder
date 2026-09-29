@@ -44,6 +44,7 @@ msgstr "Chiudi menu"
 msgid "coming soon"
 msgstr "in arrivo"
 
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Continue"
 msgstr "Continua"
@@ -86,12 +87,16 @@ msgid "Easy"
 msgstr "Facile"
 
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
-msgid "Example · not the answer to memorise"
-msgstr "Esempio d’uso · non è la risposta da ricordare"
+msgid "Example"
+msgstr "Esempio"
 
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
-msgid "French"
-msgstr "Francese"
+#~ msgid "Example · not the answer to memorise"
+#~ msgstr "Esempio d’uso · non è la risposta da ricordare"
+
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
+#~ msgid "French"
+#~ msgstr "Francese"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Good"
@@ -118,14 +123,14 @@ msgid "Italian cue"
 msgstr "Significato in italiano"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Learn · new entry"
-msgstr "Impara · nuova parola"
+#~ msgid "Learn · new entry"
+#~ msgstr "Impara · nuova parola"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Learning language"
 msgstr "Lingua studiata"
 
-#: ../../apps/web/src/features/practice/session-screen.tsx
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
 msgid "Listen"
 msgstr "Ascolta"
 
@@ -144,8 +149,8 @@ msgid "Loading…"
 msgstr "Caricamento…"
 
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
-msgid "Meaning in this lesson"
-msgstr "Significato in questa lezione"
+#~ msgid "Meaning in this lesson"
+#~ msgstr "Significato in questa lezione"
 
 #: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
@@ -173,8 +178,8 @@ msgid "Progress"
 msgstr "Progressi"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Read, listen, and say the word aloud. We will ask you to recall it shortly."
-msgstr "Leggi, ascolta e ripeti la parola ad alta voce. Tra poco ti chiederemo di ricordarla."
+#~ msgid "Read, listen, and say the word aloud. We will ask you to recall it shortly."
+#~ msgstr "Leggi, ascolta e ripeti la parola ad alta voce. Tra poco ti chiederemo di ricordarla."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Recall"
@@ -189,8 +194,8 @@ msgid "Request another link"
 msgstr "Richiedi un altro link"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Select Listen to hear the pronunciation."
-msgstr "Seleziona Ascolta per sentire la pronuncia."
+#~ msgid "Select Listen to hear the pronunciation."
+#~ msgstr "Seleziona Ascolta per sentire la pronuncia."
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Send link"
@@ -247,6 +252,10 @@ msgstr "Riprova prima di continuare. Non cancellare i dati del browser: potrebbe
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "type the French word"
 msgstr "scrivi la parola in francese"
+
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
+#~ msgid "Usage notes"
+#~ msgstr "Note d’uso"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Well done"

@@ -202,23 +202,11 @@ const RecallInstruction = ({ kind }: { kind: "word" | "chunk" }) => (
   </p>
 );
 
-const AudioStatus = ({
-  error,
-  isTeaching,
-}: {
-  error: SpeechFailure | null;
-  isTeaching: boolean;
-}) => {
+const AudioStatus = ({ error }: { error: SpeechFailure | null }) => {
   const { t } = useLingui();
-  if (!error) {
+  // A blocked autoplay attempt needs no callout: Listen remains available.
+  if (!error || (error.kind === "failed" && error.reason === "not-allowed")) {
     return null;
-  }
-  if (error.kind === "failed" && error.reason === "not-allowed") {
-    return isTeaching ? (
-      <p className="text-muted-foreground text-sm">
-        <Trans>Select Listen to hear the pronunciation.</Trans>
-      </p>
-    ) : null;
   }
   return (
     <Alert>
@@ -298,43 +286,17 @@ export const SessionScreen = ({
       key={`${view.phase}:${promptGloss ?? ""}`}
     >
       {view.phase === "exposure" && (
-        <>
-          <p className="text-muted-foreground text-xs tracking-widest uppercase">
-            <Trans>Learn · new entry</Trans>
-          </p>
-          <DictionaryEntry
-            answer={view.answer}
-            meaning={view.prompt.meaning ?? view.prompt.gloss}
-            presentation={view.presentation}
-            note={view.revealNote}
-          />
-          <p className="text-muted-foreground max-w-prose text-sm leading-relaxed text-pretty">
-            <Trans>
-              Read, listen, and say the word aloud. We will ask you to recall it
-              shortly.
-            </Trans>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={() => {
-                setAudioError(null);
-                speak(view.answer, setAudioError);
-              }}
-            >
-              <Trans>Listen</Trans>
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => act(() => practice.exposureDone())}
-            >
-              <Trans>Continue</Trans>
-            </Button>
-          </div>
-        </>
+        <DictionaryEntry
+          answer={view.answer}
+          meaning={view.prompt.meaning ?? view.prompt.gloss}
+          presentation={view.presentation}
+          note={view.revealNote}
+          onListen={() => {
+            setAudioError(null);
+            speak(view.answer, setAudioError);
+          }}
+          onContinue={() => act(() => practice.exposureDone())}
+        />
       )}
       {view.phase === "recall" && (
         <form
@@ -453,7 +415,7 @@ export const SessionScreen = ({
           <SessionStats {...view.stats} />
         </>
       )}
-      <AudioStatus error={audioError} isTeaching={view.phase === "exposure"} />
+      <AudioStatus error={audioError} />
     </div>
   );
 };
