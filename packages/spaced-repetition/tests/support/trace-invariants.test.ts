@@ -10,7 +10,9 @@ import {
   closureContradictions,
   exposuresAfterAFirstRecall,
   gradingContradictions,
-  historiesNotStartingWithOneGuess,
+  historiesNotStartingWithOneTeaching,
+  firstRecallsTooSoon,
+  teachingMismatches,
   recallsWithoutExposure,
   repeatsInARow,
   reviewsDraggedFromTheFuture,
@@ -32,6 +34,8 @@ const history = () => {
     words: catalogue(1),
   });
   learner.sit();
+  learner.wait(60_000);
+  learner.sit();
   const exposure = checkedFixture(
     learner.trace.find((s) => s.at === "exposure")
   );
@@ -43,12 +47,12 @@ const history = () => {
 describe("invariant checker negative controls", () => {
   it("accepts a real history and detects missing or late exposure across closes", () => {
     const { learner, exposure, recall, closed } = history();
-    expect(violations(learner.trace, learner.attempts)).toEqual([]);
+    expect(
+      violations(learner.trace, learner.attempts, 0, learner.teachings)
+    ).toEqual([]);
     expect(recallsWithoutExposure([exposure, recall])).toEqual([]);
     expect(recallsWithoutExposure([recall])).toEqual([recall]);
-    expect(recallsWithoutExposure([exposure, closed, recall])).toEqual([
-      recall,
-    ]);
+    expect(recallsWithoutExposure([exposure, closed, recall])).toEqual([]);
     expect(exposuresAfterAFirstRecall([exposure, recall])).toEqual([]);
     expect(exposuresAfterAFirstRecall([recall, exposure])).toEqual([exposure]);
     expect(sittings([exposure, closed, recall])).toEqual([
@@ -61,7 +65,9 @@ describe("invariant checker negative controls", () => {
     const { exposure, recall } = history();
     const feedback: Step = { ...exposure, at: "feedback" };
     for (const previous of [exposure, feedback]) {
-      expect(repeatsInARow([previous, recall])).toEqual([]);
+      expect(repeatsInARow([previous, recall])).toHaveLength(
+        previous.at === "feedback" ? 0 : 1
+      );
       const next = {
         ...recall,
         eligibleWordIds: [recall.wordId, "another-word"],
@@ -71,36 +77,73 @@ describe("invariant checker negative controls", () => {
     expect(repeatsInARow([recall, recall])).toHaveLength(1);
   });
 
-  it("keeps only guess/exposure and recall/feedback as unconditional pipeline repeats", () => {
-    const { learner, exposure, recall } = history();
-    const guess = checkedFixture(learner.trace.find((s) => s.at === "guess"));
+  it("keeps only recall/feedback as an unconditional pipeline repeat", () => {
+    const { exposure, recall } = history();
     const alternatives = { eligibleWordIds: ["w0", "w1"] };
-    expect(repeatsInARow([guess, { ...exposure, ...alternatives }])).toEqual(
-      []
-    );
     expect(
       repeatsInARow([recall, { ...exposure, at: "feedback", ...alternatives }])
     ).toEqual([]);
+    expect(
+      repeatsInARow([exposure, { ...recall, ...alternatives }])
+    ).toHaveLength(1);
   });
 
-  it("detects missing and duplicate guesses and contradictory grades", () => {
+  it("detects missing and duplicate teachings and contradictory grades", () => {
     const { learner } = history();
-    expect(learner.attempts).toHaveLength(2);
-    const guess = checkedFixture(learner.attempts[0]);
-    const recall = checkedFixture(learner.attempts[1]);
-    expect(historiesNotStartingWithOneGuess(learner.attempts)).toEqual([]);
-    expect(historiesNotStartingWithOneGuess([recall])).toHaveLength(1);
+    expect(learner.attempts).toHaveLength(1);
+    expect(learner.teachings).toHaveLength(1);
+    const teaching = checkedFixture(learner.teachings[0]);
+    const recall = checkedFixture(learner.attempts[0]);
     expect(
-      historiesNotStartingWithOneGuess([guess, guess, recall])
+      historiesNotStartingWithOneTeaching(learner.attempts, learner.teachings)
+    ).toEqual([]);
+    expect(historiesNotStartingWithOneTeaching([recall], [])).toHaveLength(1);
+    expect(
+      historiesNotStartingWithOneTeaching([recall], [teaching, teaching])
+    ).toHaveLength(1);
+    expect(
+      historiesNotStartingWithOneTeaching(
+        [{ ...recall, phase: "guess" }],
+        [teaching]
+      )
     ).toHaveLength(1);
     expect(gradingContradictions(learner.attempts)).toEqual([]);
     for (const bad of [
-      { ...guess, rating: 1 as const },
+      { ...recall, phase: "guess" as const, rating: 1 as const },
       { ...recall, rating: null },
       { ...recall, correct: true, rating: 1 as const },
       { ...recall, correct: false, rating: 3 as const },
     ]) {
       expect(gradingContradictions([bad])).toEqual([bad]);
+    }
+  });
+
+  it("detects early first recalls and corrupt teaching events across closes", () => {
+    const { learner, exposure, recall, closed } = history();
+    expect(firstRecallsTooSoon(learner.trace)).toEqual([]);
+    const early = { ...recall, shownAt: exposure.actedAt + 59_999 };
+    expect(firstRecallsTooSoon([exposure, closed, early])).toEqual([early]);
+    expect(
+      firstRecallsTooSoon([
+        exposure,
+        closed,
+        { ...recall, shownAt: exposure.actedAt + 60_000 },
+      ])
+    ).toEqual([]);
+    expect(teachingMismatches(learner.trace, learner.teachings)).toEqual([]);
+    expect(teachingMismatches(learner.trace, [])).not.toEqual([]);
+    const teaching = checkedFixture(learner.teachings[0]);
+    for (const change of [
+      { wordId: "wrong" },
+      { reviewedAt: new Date(0) },
+      { latencyMs: 0 },
+      { correct: false },
+      { typed: "" },
+      { rating: null },
+    ]) {
+      expect(
+        teachingMismatches(learner.trace, [{ ...teaching, ...change }])
+      ).not.toEqual([]);
     }
   });
 
@@ -116,16 +159,13 @@ describe("invariant checker negative controls", () => {
       { reviewedAt: new Date(0) },
       {
         stateBefore: {
-          ...checkedFixture(learner.attempts[1]).stateBefore,
+          ...checkedFixture(learner.attempts[0]).stateBefore,
           reps: 99,
         },
       },
     ];
     for (const change of changes) {
-      const altered = [
-        checkedFixture(learner.attempts[0]),
-        { ...checkedFixture(learner.attempts[1]), ...change },
-      ];
+      const altered = [{ ...checkedFixture(learner.attempts[0]), ...change }];
       expect(
         attemptMismatches(learner.trace, altered),
         JSON.stringify(change)
@@ -137,7 +177,7 @@ describe("invariant checker negative controls", () => {
     expect(
       attemptMismatches(learner.trace, [
         ...learner.attempts,
-        checkedFixture(learner.attempts[1]),
+        checkedFixture(learner.attempts[0]),
       ])
     ).not.toEqual([]);
   });
@@ -187,11 +227,11 @@ describe("invariant checker negative controls", () => {
     const { learner } = history();
     const boundary = new Date("2026-08-11T04:00:00").getTime();
     const recall: Attempt = {
-      ...checkedFixture(learner.attempts[1]),
+      ...checkedFixture(learner.attempts[0]),
       latencyMs: 2000,
       reviewedAt: new Date(boundary + 1000),
       stateBefore: {
-        ...checkedFixture(learner.attempts[1]).stateBefore,
+        ...checkedFixture(learner.attempts[0]).stateBefore,
         due: new Date(boundary),
         state: State.Review,
       },

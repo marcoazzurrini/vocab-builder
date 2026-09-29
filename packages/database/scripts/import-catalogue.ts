@@ -56,7 +56,12 @@ export const compileCatalogue = v.parser(
       const keys = new Set<string>();
       const ids = new Set<string>();
       const statements = words.map((word) => {
-        const key = JSON.stringify([word.lang, word.text, word.gloss]);
+        const key = JSON.stringify([
+          word.lang,
+          word.text,
+          word.gloss,
+          word.gloss_lang,
+        ]);
         if (keys.has(key) || ids.has(word.id)) {
           throw new Error("Duplicate catalogue entry or ID.");
         }
@@ -66,7 +71,7 @@ export const compileCatalogue = v.parser(
           word.created_at === undefined
             ? columns
             : [...columns, "created_at" as const];
-        return `INSERT INTO words (${fields.join(",")}) VALUES (${fields.map((column) => quote(word[column])).join(",")}) ON CONFLICT(lang,text,gloss) DO UPDATE SET gloss_lang=excluded.gloss_lang,hint=excluded.hint,image=excluded.image,kind=excluded.kind,freq_rank=excluded.freq_rank${word.created_at === undefined ? "" : ",created_at=excluded.created_at"};`;
+        return `INSERT INTO words (${fields.join(",")}) VALUES (${fields.map((column) => quote(word[column])).join(",")}) ON CONFLICT(lang,text,gloss,gloss_lang) DO UPDATE SET gloss_lang=excluded.gloss_lang,hint=excluded.hint,image=excluded.image,kind=excluded.kind,freq_rank=excluded.freq_rank${word.created_at === undefined ? "" : ",created_at=excluded.created_at"};`;
       });
       return { count: words.length, sql: statements.join("\n") };
     })

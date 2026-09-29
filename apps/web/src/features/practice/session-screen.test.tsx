@@ -28,6 +28,7 @@ import { AppShell } from "@/components/patterns/app-shell";
 
 import { practiceKey, practiceOptions } from "./queries";
 import { SessionScreen } from "./session-screen";
+import * as speech from "./speak";
 import { SyncConflict } from "./sync-conflict";
 import { RetryableReadError } from "./transport";
 import type { PracticeTransport } from "./transport";
@@ -67,10 +68,34 @@ const CHIEN: Word = {
   text: "chien",
 };
 
+const ETRE: Word = {
+  ...CHIEN,
+  gloss: "essere in un luogo (infinito)",
+  image: null,
+  presentation: {
+    context: "Per indicare dove si trova qualcuno o qualcosa.",
+    example: { text: "être à la maison", translation: "essere a casa" },
+    explanation:
+      "Impara l'infinito être. Scrivi solo il verbo, non l'intero esempio.",
+    grammar: "verbo · infinito",
+    meaning: "essere",
+  },
+  text: "être",
+};
+
 const deck = (words: Word[] = [CHIEN]): ReviewSnapshot => ({
   cards: [],
   guesses: [],
   words,
+});
+
+const recallDeck = (words: Word[] = [CHIEN]): ReviewSnapshot => ({
+  ...deck(words),
+  teachings: words.map((word) => ({
+    initialRecallAt: new Date(Date.now() - 60_000).toISOString(),
+    reviewedAt: new Date(Date.now() - 120_000).toISOString(),
+    wordId: word.id,
+  })),
 });
 
 const deferred = <T,>() => {
@@ -104,21 +129,93 @@ describe("the session screen", () => {
     vi.restoreAllMocks();
   });
 
-  it("asks for a guess once the deck has loaded", async () => {
+  it("teaches a new word immediately without asking for a guess", async () => {
     render(<SessionScreen transport={transport} userId="u1" />);
-    await expect(screen.findByText("cane")).resolves.toBeDefined();
-    // The answer is absent from the guess screen, not merely hidden.
-    expect(screen.queryByText("chien")).toBeNull();
+    await screen.findByText("cane");
+    expect(screen.getByRole("heading", { name: "chien" })).toBeDefined();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(persistAnswer).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continua" }));
+    await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
+    expect(persistAnswer.mock.calls[0]?.[0]).toStrictEqual({
+      expectedReps: 0,
+      id: expect.any(String),
+      latencyMs: expect.any(Number),
+      phase: "teach",
+      reviewedAt: expect.any(String),
+      wordId: "w1",
+    });
+  });
+
+  it("offers Listen when the browser blocks autoplay instead of showing an error", async () => {
+    const voice = vi
+      .spyOn(speech, "speak")
+      .mockReturnValue()
+      .mockImplementationOnce((_text, unavailable) =>
+        unavailable?.({ kind: "failed", reason: "not-allowed" })
+      );
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByText("Seleziona Ascolta per sentire la pronuncia.");
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ascolta" }));
+    expect(voice).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByText("Seleziona Ascolta per sentire la pronuncia.")
+    ).toBeNull();
+  });
+
+  it("presents a dictionary entry with meaning, context, and a clearly separate usage example", async () => {
+    loadSnapshot.mockResolvedValue(deck([ETRE]));
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByRole("heading", { name: "être" });
+    expect(screen.getByText("essere")).toBeDefined();
+    expect(screen.getByText("verbo · infinito")).toBeDefined();
+    expect(screen.getByText("être à la maison")).toBeDefined();
+    expect(screen.getByText("essere a casa")).toBeDefined();
+    expect({
+      answerInput: screen.queryByRole("textbox"),
+      legacyCue: screen.queryByText(ETRE.gloss),
+    }).toStrictEqual({ answerInput: null, legacyCue: null });
+  });
+
+  it("keeps the word meaning clear during recall without revealing the French entry or example", async () => {
+    loadSnapshot.mockResolvedValue(recallDeck([ETRE]));
+    render(<SessionScreen transport={transport} userId="u1" />);
+    await screen.findByRole("textbox", {
+      name: "scrivi la parola in francese",
+    });
+    expect(screen.getByRole("heading", { name: "essere" })).toBeDefined();
+    expect(
+      screen.getByText("Per indicare dove si trova qualcuno o qualcosa.")
+    ).toBeDefined();
+    expect([
+      screen.queryByText("être"),
+      screen.queryByText("être à la maison"),
+      screen.queryByText(ETRE.presentation?.explanation ?? ""),
+      screen.queryByText(ETRE.gloss),
+    ]).toStrictEqual([null, null, null, null]);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "être à la maison" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Normale" }));
+    await screen.findByText("être");
+    await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
+    expect(persistAnswer.mock.calls[0]?.[0]).toMatchObject({
+      phase: "recall",
+      rating: 1,
+      typed: "être à la maison",
+    });
   });
 
   it("switches interface language without discarding the current answer or changing study content", async () => {
+    loadSnapshot.mockResolvedValue(recallDeck());
     render(<SessionScreen transport={transport} userId="u1" />);
     await screen.findByText("cane");
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "chi" } });
 
     await act(() => activateLocale(i18n, "en"));
 
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Good" })).toBeDefined();
     expect(screen.getByRole<HTMLInputElement>("textbox").value).toBe("chi");
     expect(screen.getByText("cane")).toBeDefined();
     expect(loadSnapshot).toHaveBeenCalledOnce();
@@ -173,7 +270,7 @@ describe("the session screen", () => {
 
     render(<SessionScreen transport={transport} userId="u1" />);
     await screen.findByText("cane");
-    // A guess, whose write hangs.
+    // Teaching completion, whose write hangs.
     fireEvent.click(screen.getByText("Continua"));
 
     vi.setSystemTime(new Date("2026-08-11T07:30:00"));
@@ -318,16 +415,17 @@ describe("the session screen", () => {
     await waitFor(() => expect(document.activeElement).toBe(cancel));
     await user.click(cancel);
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(window.localStorage).toHaveLength(1);
-    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect({
+      loads: loadSnapshot.mock.calls.length,
+      pending: window.localStorage.length,
+    }).toStrictEqual({ loads: 1, pending: 1 });
 
     await user.click(trigger);
     dialog = await screen.findByRole("alertdialog", { name: deleteLabel });
     await user.click(within(dialog).getByRole("button", { name: deleteLabel }));
     await waitFor(() => expect(window.localStorage).toHaveLength(0));
-    await screen.findByRole("textbox", {
-      name: "scrivi la parola in francese",
-    });
+    await screen.findByRole("heading", { name: "chien" });
+    expect(screen.queryByRole("textbox")).toBeNull();
     expect(loadSnapshot).toHaveBeenCalledTimes(2);
   });
 
@@ -360,26 +458,28 @@ describe("the session screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
     await screen.findByText("cane");
     expect({
-      alert: screen.queryByRole("alert"),
+      alert: screen.queryByText(
+        "Non è stato possibile salvare le risposte: storage full"
+      ),
       calls: persistAnswer.mock.calls,
       loads: loadSnapshot.mock.calls.length,
-      textbox: screen.getByRole("textbox"),
+      textbox: screen.queryByRole("textbox"),
     }).toStrictEqual({
       alert: null,
       calls: [],
       loads: 2,
-      textbox: expect.any(HTMLInputElement),
+      textbox: null,
     });
 
     fireEvent.click(screen.getByText("Continua"));
-    await screen.findByText("chien");
+    await screen.findByText("Per ora hai finito");
     await waitFor(() => {
       expect({
         calls: persistAnswer.mock.calls,
         stored: window.localStorage.length,
       }).toStrictEqual({
         calls: [
-          [expect.objectContaining({ phase: "guess", wordId: "w1" }), "u1"],
+          [expect.objectContaining({ phase: "teach", wordId: "w1" }), "u1"],
         ],
         stored: 0,
       });
@@ -393,20 +493,20 @@ describe("the session screen", () => {
       if (
         !practice.writeError &&
         !practice.loadError &&
-        practice.view?.phase === "guess"
+        practice.view?.phase === "exposure"
       ) {
         visiblePrompts.push(practice.view.prompt.gloss);
       }
       return practice;
     });
-    await waitFor(() => expect(result.current.view?.phase).toBe("guess"));
-    const submitOldPrompt = result.current.submitGuess;
+    await waitFor(() => expect(result.current.view?.phase).toBe("exposure"));
+    const submitOldPrompt = result.current.exposureDone;
     const write = vi
       .spyOn(Storage.prototype, "setItem")
       .mockImplementation(() => {
         throw new Error("storage full");
       });
-    act(() => result.current.submitGuess(""));
+    act(() => result.current.exposureDone());
     expect(result.current.writeError).toBe("storage full");
     write.mockRestore();
     loadSnapshot.mockResolvedValue(
@@ -418,14 +518,14 @@ describe("the session screen", () => {
     });
     await waitFor(() =>
       expect(result.current.view).toMatchObject({
-        phase: "guess",
+        phase: "exposure",
         prompt: { gloss: "gatto" },
       })
     );
     expect(visiblePrompts).not.toContain("cane");
-    act(() => submitOldPrompt("chien"));
+    act(() => submitOldPrompt());
     expect(result.current.view).toMatchObject({
-      phase: "guess",
+      phase: "exposure",
       prompt: { gloss: "gatto" },
     });
     expect(persistAnswer).not.toHaveBeenCalled();
@@ -493,10 +593,16 @@ describe("the session screen", () => {
   });
 
   it("does not replace an active session when query data changes or an answer is acknowledged", async () => {
+    loadSnapshot.mockResolvedValue(
+      deck([
+        CHIEN,
+        { ...CHIEN, freqRank: 2, gloss: "gatto", id: "w2", text: "chat" },
+      ])
+    );
     render(<SessionScreen transport={transport} userId="u1" />);
     await screen.findByText("cane");
     fireEvent.click(screen.getByText("Continua"));
-    await screen.findByText("chien");
+    await screen.findByText("chat");
     await waitFor(() => expect(window.localStorage).toHaveLength(0));
     act(() =>
       queryClient.setQueryData(practiceKey("u1"), {
@@ -507,7 +613,7 @@ describe("the session screen", () => {
     becomeVisible();
     window.dispatchEvent(new Event("online"));
     expect(loadSnapshot).toHaveBeenCalledOnce();
-    expect(screen.getByText("chien")).toBeDefined();
+    expect(screen.getByText("chat")).toBeDefined();
   });
 
   it("aborts pending reads and removes private cache data when an account unmounts", async () => {
@@ -596,21 +702,29 @@ describe("the session screen", () => {
   });
 
   it("publishes detached views and ignores handlers from a previous view", async () => {
+    loadSnapshot.mockResolvedValue(
+      deck([
+        CHIEN,
+        { ...CHIEN, freqRank: 2, gloss: "gatto", id: "w2", text: "chat" },
+      ])
+    );
     const { result } = renderHook(() => usePracticeSession("u1", transport));
-    await waitFor(() => expect(result.current.view?.phase).toBe("guess"));
+    await waitFor(() => expect(result.current.view?.phase).toBe("exposure"));
     const firstView = result.current.view;
-    const submit = result.current.submitGuess;
+    const submit = result.current.exposureDone;
     act(() => {
-      submit("");
-      submit("stale duplicate");
+      submit();
+      submit();
     });
     expect({
       before: firstView?.phase,
       error: result.current.writeError,
       phase: result.current.view?.phase,
-    }).toStrictEqual({ before: "guess", error: null, phase: "exposure" });
+    }).toStrictEqual({ before: "exposure", error: null, phase: "exposure" });
+    expect(firstView).toMatchObject({ answer: "chien" });
+    expect(result.current.view).toMatchObject({ answer: "chat" });
     await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
-    act(() => submit("stale handler"));
+    act(() => submit());
     expect({
       error: result.current.writeError,
       phase: result.current.view?.phase,
@@ -625,8 +739,8 @@ describe("the session screen", () => {
       throw new Error("offline");
     });
     const { result } = renderHook(() => usePracticeSession("u1", transport));
-    await waitFor(() => expect(result.current.view?.phase).toBe("guess"));
-    act(() => result.current.submitGuess(""));
+    await waitFor(() => expect(result.current.view?.phase).toBe("exposure"));
+    act(() => result.current.exposureDone());
     const finishExposure = result.current.exposureDone;
     await act(async () => {
       pending.resolve(true);
@@ -675,7 +789,7 @@ describe("the session screen", () => {
     );
     await screen.findByText("cane");
     fireEvent.click(screen.getByText("Continua"));
-    await screen.findByText("chien");
+    await screen.findByText("Per ora hai finito");
     await waitFor(() => expect(localStorage).toHaveLength(0));
     expect(persistAnswer).toHaveBeenCalledOnce();
   });
@@ -685,7 +799,7 @@ describe("the session screen", () => {
 
     render(<SessionScreen transport={transport} userId="u1" />);
     await screen.findByText("cane");
-    // The guess's write fails.
+    // The teaching completion cannot be saved.
     fireEvent.click(screen.getByText("Continua"));
 
     await expect(screen.findByText(/network down/u)).resolves.toBeDefined();

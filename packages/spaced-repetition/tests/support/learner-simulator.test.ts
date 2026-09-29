@@ -33,31 +33,33 @@ describe("public generated-history harness", () => {
         const cycle = (values) => { let i = 0; return () => values[i++ % values.length]; };
         const learner = createLearner({
           behaviour: {
-            correct: cycle([true, false]), guessCorrect: cycle([true, false]),
+            correct: cycle([true, false]),
             effort: () => "easy", msPerPrompt: 1000,
           },
           dayRolloverHour: 2, newPerDay: 1,
           start: new Date("2026-10-25T02:30:00"), words: catalogue(1),
         });
         learner.sit(3);
-        learner.wait(0);
+        learner.wait(60_000);
         learner.sit(1);
-        learner.wait(0);
+        learner.wait(60_000);
+        learner.sit(2);
+        learner.wait(60_000);
         assert.equal(learner.sit(200).at(-1).reason, "done");
-        assert.deepEqual(violations(learner.trace, learner.attempts, 2), []);
-        assert.equal(learner.attempts.length, 4);
+        assert.deepEqual(violations(learner.trace, learner.attempts, 2, learner.teachings), []);
+        assert.equal(learner.attempts.length, 3);
         assert.equal(learner.sit(1)[0].reason, "done");
         const nextDay = new Date("2026-10-26T02:00:00+01:00").getTime();
         learner.wait(nextDay - learner.now.getTime() - 1);
         // Even after its elapsed 24-hour interval, Review follows study days.
         assert.equal(learner.sit(1)[0].reason, "done");
-        assert.equal(learner.attempts.length, 4);
+        assert.equal(learner.attempts.length, 3);
         learner.wait(1);
         const reopened = learner.sit(1)[0];
         assert.equal(reopened.at, "recall");
         assert.equal(reopened.expectedReps, 3);
         assert.equal(reopened.wordId, "w0");
-        assert.deepEqual(violations(learner.trace, learner.attempts, 2), []);
+        assert.deepEqual(violations(learner.trace, learner.attempts, 2, learner.teachings), []);
       `,
       ],
       env: { ...process.env, TZ: "Europe/Rome" },
@@ -68,8 +70,8 @@ describe("public generated-history harness", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("charges distinct thinking times to their own answers, including the first guess and reopen", () => {
-    const thinks = [1100, 2300, 4700, 8900, 13_100, 17_300, 19_700, 23_900];
+  it("charges distinct thinking times to teaching and recalls, including reopen", () => {
+    const thinks = [1100, 2300, 4700, 8900];
     let thought = 0;
     const learner = createLearner({
       behaviour: {
@@ -83,28 +85,33 @@ describe("public generated-history harness", () => {
       start: START,
       words: catalogue(2),
     });
-    const first = learner.sit(5);
+    const first = learner.sit();
     expect(
       first.filter((s) => s.at !== "closed").map((s) => s.actedAt - s.shownAt)
-    ).toEqual(thinks.slice(0, 5));
-    expect(learner.attempts.map((a) => a.latencyMs)).toEqual([
-      1100, 4700, 13_100,
-    ]);
+    ).toEqual([1100, 2300]);
+    expect(learner.teachings.map((a) => a.latencyMs)).toEqual([1100, 2300]);
     expect(
-      learner.attempts.map((a) => a.reviewedAt.getTime() - START.getTime())
-    ).toEqual([1100, 8100, 30_100]);
+      learner.teachings.map((a) => a.reviewedAt.getTime() - START.getTime())
+    ).toEqual([1100, 3400]);
+    expect(learner.attempts).toEqual([]);
     learner.wait(60_000);
     const reopened = learner.sit(2);
     expect(
       reopened
         .filter((s) => s.at !== "closed")
         .map((s) => s.actedAt - s.shownAt)
-    ).toEqual([17_300, 19_700]);
+    ).toEqual([4700, 8900]);
+    expect(learner.attempts.map((a) => a.latencyMs)).toEqual([4700, 8900]);
+    expect(
+      learner.attempts.map((a) => a.reviewedAt.getTime() - START.getTime())
+    ).toEqual([68_100, 77_000]);
     expect(attemptMismatches(learner.trace, learner.attempts)).toEqual([]);
-    expect(learner.attempts.every((a) => a.latencyMs > 0)).toBe(true);
+    expect(
+      violations(learner.trace, learner.attempts, 0, learner.teachings)
+    ).toEqual([]);
   });
 
-  it("persists JSON commands and server schedules, rebuilding rowless guesses without re-guessing", () => {
+  it("persists JSON commands and server schedules, restoring completed teaching without repetition", () => {
     const learner = createLearner({
       newPerDay: 1,
       start: START,
@@ -114,21 +121,25 @@ describe("public generated-history harness", () => {
     expect(learner.commands).toHaveLength(1);
     expect(learner.commands[0]).toMatchObject({
       expectedReps: 0,
-      phase: "guess",
-      rating: null,
+      phase: "teach",
     });
+    expect(learner.commands[0]).not.toHaveProperty("rating");
     expect(learner.snapshot.cards).toEqual([]);
-    expect(learner.snapshot.guesses).toEqual([
+    expect(learner.snapshot.guesses).toEqual([]);
+    const { reviewedAt } = checkedFixture(learner.commands[0]);
+    expect(learner.snapshot.teachings).toEqual([
       {
-        reviewedAt: checkedFixture(learner.commands[0]).reviewedAt,
+        initialRecallAt: new Date(
+          new Date(reviewedAt).getTime() + 60_000
+        ).toISOString(),
+        reviewedAt,
         wordId: "w0",
       },
     ]);
-    const resumed = learner.sit(2);
-    expect(resumed.slice(0, 2).map((s) => s.at)).toEqual([
-      "exposure",
-      "recall",
-    ]);
+    expect(learner.sit(2).map((s) => s.at)).toEqual(["closed"]);
+    learner.wait(60_000);
+    const resumed = learner.sit(1);
+    expect(resumed[0]?.at).toBe("recall");
     expect(learner.snapshot.cards).toHaveLength(1);
     expect(learner.commands).toHaveLength(2);
     const stored = checkedFixture(learner.snapshot.cards[0]);
@@ -152,7 +163,9 @@ describe("public generated-history harness", () => {
     const before = checkedFixture(learner.attempts.at(-1)).stateBefore;
     // oxlint-disable-next-line unicorn/prefer-structured-clone -- Exercise JSON wire serialization, including Date strings and omitted undefined fields.
     expect(JSON.parse(JSON.stringify(before))).toEqual(scheduled);
-    expect(violations(learner.trace, learner.attempts)).toEqual([]);
+    expect(
+      violations(learner.trace, learner.attempts, 0, learner.teachings)
+    ).toEqual([]);
   });
 
   it("records caughtUp with the earliest remaining learning due and reopens at that time", () => {
@@ -181,7 +194,9 @@ describe("public generated-history harness", () => {
       shownAt: end.nextDueAt,
       wordId: "w0",
     });
-    expect(violations(learner.trace, learner.attempts)).toEqual([]);
+    expect(
+      violations(learner.trace, learner.attempts, 0, learner.teachings)
+    ).toEqual([]);
   });
 
   it("distinguishes a cut from done, including the last allowed action reaching an end screen", () => {

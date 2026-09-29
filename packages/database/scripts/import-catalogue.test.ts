@@ -174,7 +174,7 @@ describe("catalogue import", () => {
     const updatedWord = {
       ...word,
       freq_rank: 42,
-      gloss_lang: "en",
+      gloss_lang: word.gloss_lang,
       hint: "today's word",
       id: "source-id",
       image: "🗓️",
@@ -200,6 +200,20 @@ describe("catalogue import", () => {
         .prepare("SELECT id FROM words WHERE id = 'source-id'")
         .first()
     ).toBeNull();
+  });
+
+  it("keeps identical-looking cues in different prompt languages as separate targets", async () => {
+    const other = { ...word, gloss_lang: "en", id: "other-prompt-language" };
+    await fixture.binding.exec(compileCatalogue([word, other]).sql);
+    const rows = await fixture.binding
+      .prepare("SELECT id, gloss_lang FROM words ORDER BY id")
+      .all();
+    expect(rows.results).toHaveLength(2);
+    expect(rows.results).toContainEqual({
+      gloss_lang: word.gloss_lang,
+      id: word.id,
+    });
+    expect(rows.results).toContainEqual({ gloss_lang: "en", id: other.id });
   });
 
   it("validates every row before producing executable SQL", () => {

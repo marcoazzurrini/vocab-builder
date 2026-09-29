@@ -12,6 +12,8 @@ import {
   saveAnswer,
   readUiLocale,
   saveUiLocale,
+  readPromptLanguage,
+  savePromptLanguage,
 } from "./repository";
 import type { UiLocale } from "./repository";
 
@@ -22,6 +24,8 @@ export interface UserRepository {
   uiLocale: () => Promise<UiLocale>;
   setUiLocale: (locale: UiLocale) => Promise<void>;
   settings: () => Promise<Settings>;
+  promptLanguage: () => Promise<string>;
+  setPromptLanguage: (language: string) => Promise<void>;
   snapshot: (language: string) => Promise<ReviewSnapshot>;
   recordAnswer: (answer: AnswerCommand) => Promise<void>;
 }
@@ -35,7 +39,10 @@ export const createDatabase = (binding: DatabaseBinding) => {
         throw new Error("A user ID is required.");
       }
       return {
+        promptLanguage: () => readPromptLanguage(db, userId),
         recordAnswer: (answer) => saveAnswer(db, userId, answer),
+        setPromptLanguage: (language) =>
+          savePromptLanguage(db, userId, language),
         setUiLocale: (locale) => saveUiLocale(db, userId, locale),
         settings: () => readSettings(db, userId),
         snapshot: (language) => readDeck(db, userId, language),

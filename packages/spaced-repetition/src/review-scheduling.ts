@@ -13,6 +13,8 @@ import { matches } from "./answer-matching";
 export interface Card {
   wordId: string;
   fsrs: FsrsCard;
+  /** Durable teaching evidence, separate from FSRS ratings. */
+  initialRecallAt?: string;
 }
 
 /** A date as JSON returns it: an ISO string, or a Date if it never left. */
@@ -82,7 +84,10 @@ export const createScheduler = (): FSRS => fsrs({ enable_short_term: true });
 export const transition = (
   before: FsrsCard,
   expected: string,
-  answer: Pick<AnswerCommand, "typed" | "phase" | "rating">,
+  answer: Pick<
+    Exclude<AnswerCommand, { phase: "teach" }>,
+    "typed" | "phase" | "rating"
+  >,
   reviewedAt: Date,
   scheduler: FSRS = createScheduler()
 ) => {

@@ -9,6 +9,7 @@ import {
 } from "./review-scheduling";
 
 export { RevisionConflict } from "./review-scheduling";
+export { initialRecallAt, teachingSchedule } from "./teaching-schedule";
 
 export interface AnswerTransition {
   correct: boolean;
@@ -26,6 +27,9 @@ export const evaluateAnswer = (
   now = new Date()
 ): AnswerTransition => {
   const command = v.parse(AnswerCommand, raw);
+  if (command.phase === "teach") {
+    throw new TypeError("Teaching is not a rated answer.");
+  }
   if (!Number.isFinite(now.getTime())) {
     // oxlint-disable-next-line unicorn/prefer-type-error -- Preserve the public Error category for invalid server clocks.
     throw new Error("The server clock returned an invalid date.");

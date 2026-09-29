@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Rating, State, createEmptyCard } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 
-import type { Attempt } from "../src/answer-command";
+import type { Attempt, SessionAttempt } from "../src/answer-command";
 import type { Word } from "../src/restore-progress";
 import type { Card } from "../src/review-scheduling";
 import { startSession } from "../src/study-session";
@@ -44,7 +44,7 @@ const FENETRE: Word = {
 };
 
 let clockMs: number;
-let attempts: Attempt[];
+let attempts: SessionAttempt[];
 let changed: Card[];
 
 beforeEach(() => {
@@ -75,29 +75,27 @@ const makeSession = (
     words,
   });
 
-/** Walk a new word through guess → exposure → recall. */
+/** A completed teaching restored at its first recall boundary. */
+const recallSession = (words: Word[], newPerDay = words.length): Session =>
+  makeSession(
+    words,
+    newPerDay,
+    words.map((word) => ({
+      fsrs: createEmptyCard(new Date(clockMs)),
+      initialRecallAt: new Date(clockMs).toISOString(),
+      wordId: word.id,
+    }))
+  );
+
+/** Grade a word whose persisted teaching is already due. */
 const introduce = (
-  session: Session,
+  words: Word[],
   typed: string,
   effort: "hard" | "good" | "easy"
-) => {
-  session.submitGuess("boh");
-  session.exposureDone();
+): Session => {
+  const session = recallSession(words);
   session.submitRecall(typed, effort);
-};
-
-/** Work through introductions until a recall is asked for. */
-const stepUntilRecall = (session: Session) => {
-  for (let i = 0; i < 50; i += 1) {
-    const { view } = session;
-    if (view.phase === "guess") {
-      session.submitGuess("");
-    } else if (view.phase === "exposure") {
-      session.exposureDone();
-    } else {
-      return;
-    }
-  }
+  return session;
 };
 
 /** Answer everything until the session pauses or finishes. */
@@ -107,9 +105,7 @@ const drain = (session: Session, answerFor: (gloss: string) => string) => {
     if (view.phase === "done" || view.phase === "caughtUp") {
       return;
     }
-    if (view.phase === "guess") {
-      session.submitGuess("");
-    } else if (view.phase === "exposure") {
+    if (view.phase === "exposure") {
       session.exposureDone();
     } else if (view.phase === "recall") {
       session.submitRecall(answerFor(view.prompt.gloss), "good");
@@ -123,62 +119,65 @@ const drain = (session: Session, answerFor: (gloss: string) => string) => {
 
 describe("session", () => {
   describe("a new word", () => {
-    it("starts with a guess that does not leak the answer", () => {
+    it("starts by teaching the answer, without an active guess API", () => {
       const s = makeSession([CHIEN]);
       expect(s.view).toEqual({
-        phase: "guess",
+        answer: "chien",
+        phase: "exposure",
         prompt: { gloss: "cane", hint: null, image: "🐶", kind: "word" },
       });
-      // The answer is absent from the guess view — not hidden, absent.
-      expect(JSON.stringify(s.view)).not.toContain("chien");
+      expect("submitGuess" in s).toBe(false);
     });
 
-    it("reveals the word only at exposure", () => {
+    it("reveals the word at exposure without writing progress", () => {
       const s = makeSession([CHIEN]);
-      s.submitGuess("cane");
       expect(s.view).toMatchObject({ answer: "chien", phase: "exposure" });
+      expect(attempts).toEqual([]);
+      expect(changed).toEqual([]);
     });
 
-    it("logs the guess without rating it", () => {
+    it("logs teaching without any rating or fabricated answer", () => {
       const s = makeSession([CHIEN]);
       tick(3000);
-      s.submitGuess("cani");
-
-      expect(attempts).toHaveLength(1);
-      expect(attempts[0]).toMatchObject({
-        correct: false,
-        latencyMs: 3000,
-        phase: "guess",
-        rating: null,
-        typed: "cani",
+      s.exposureDone();
+      expect(attempts).toEqual([
+        {
+          latencyMs: 3000,
+          phase: "teach",
+          reviewedAt: new Date(clockMs),
+          wordId: CHIEN.id,
+        },
+      ]);
+      expect(changed[0]).toMatchObject({
+        fsrs: { due: new Date(clockMs + 60_000), reps: 0 },
+        initialRecallAt: new Date(clockMs + 60_000).toISOString(),
       });
+      expect(changed[0]?.fsrs.last_review).toBeUndefined();
     });
 
-    it("accepts an empty guess — a shrug is a valid pretest", () => {
+    it("requires no typing to complete teaching", () => {
       const s = makeSession([CHIEN]);
-      expect(() => s.submitGuess("")).not.toThrow();
-      expect(attempts[0]).toMatchObject({
-        correct: false,
-        rating: null,
-        typed: "",
-      });
+      expect(() => s.exposureDone()).not.toThrow();
+      expect(attempts[0]).toMatchObject({ phase: "teach" });
+      expect(attempts[0]).not.toHaveProperty("typed");
     });
 
-    it("notices a guess that happened to be right, still without rating it", () => {
+    it("does not classify teaching as correct or wrong", () => {
       const s = makeSession([CHIEN]);
-      s.submitGuess("chien");
-      expect(attempts[0]).toMatchObject({ correct: true, rating: null });
+      s.exposureDone();
+      expect(attempts[0]).not.toHaveProperty("correct");
+      expect(s.view).toMatchObject({
+        stats: { correct: 0, introduced: 1, recalls: 0, wrong: 0 },
+      });
     });
 
     it("withholds Easy on the first recall", () => {
-      const s = makeSession([CHIEN]);
-      s.submitGuess("x");
-      s.exposureDone();
-      // Easy here would send a word met twenty seconds ago eight days out.
+      const s = recallSession([CHIEN]);
       expect(s.view).toMatchObject({
         efforts: ["hard", "good"],
         phase: "recall",
       });
+      expect(JSON.stringify(s.view)).not.toContain("chien");
     });
 
     it("offers Easy once the card has been rated", () => {
@@ -197,55 +196,51 @@ describe("session", () => {
 
   describe("grading", () => {
     it("rates a correct answer with the effort pressed", () => {
-      const s = makeSession([CHIEN]);
-      introduce(s, "chien", "hard");
+      introduce([CHIEN], "chien", "hard");
       const recall = attempts.find((a) => a.phase === "recall");
       expect(recall).toMatchObject({ correct: true, rating: Rating.Hard });
     });
 
     it("rates a wrong answer Again regardless of effort", () => {
-      const s = makeSession([CHIEN]);
-      introduce(s, "chein", "good");
+      introduce([CHIEN], "chein", "good");
       const recall = attempts.find((a) => a.phase === "recall");
       expect(recall).toMatchObject({ correct: false, rating: Rating.Again });
     });
 
     it("treats a missing accent as wrong", () => {
-      const s = makeSession([FENETRE]);
-      introduce(s, "fenetre", "good");
+      introduce([FENETRE], "fenetre", "good");
       const recall = attempts.find((a) => a.phase === "recall");
       expect(recall).toMatchObject({ correct: false, rating: Rating.Again });
     });
 
     it("falls back to Good when an unoffered effort is pressed", () => {
-      const s = makeSession([CHIEN]);
-      s.submitGuess("x");
-      s.exposureDone();
+      const s = recallSession([CHIEN]);
       // not offered on a first recall
       s.submitRecall("chien", "easy");
       const recall = attempts.find((a) => a.phase === "recall");
       expect(recall).toMatchObject({ rating: Rating.Good });
     });
 
-    it("announces the card only when FSRS first rates it", () => {
-      // Attempts are keyed by word, so the guess needs no card row to point
-      // at. Nothing is written until there is scheduling state worth writing.
+    it("creates an unrated teaching schedule before the first real rating", () => {
       const s = makeSession([CHIEN]);
       expect(changed).toHaveLength(0);
-
-      s.submitGuess("cani");
       s.exposureDone();
-      expect(changed).toHaveLength(0);
-
-      s.submitRecall("chien", "good");
       expect(changed).toHaveLength(1);
-      expect(checkedFixture(changed[0]).wordId).toBe(CHIEN.id);
+      const card = checkedFixture(changed[0]);
+      expect(card.fsrs.reps).toBe(0);
+      tick(60_000);
+      const resumed = makeSession([CHIEN], 0, [card]);
+      resumed.submitRecall("chien", "good");
+      expect(changed).toHaveLength(2);
+      expect(checkedFixture(changed[1]).wordId).toBe(CHIEN.id);
+      expect(checkedFixture(changed[1]).fsrs.reps).toBe(1);
     });
 
     it("captures the state from before the answer, so history can be replayed", () => {
-      const s = makeSession([CHIEN]);
-      introduce(s, "chien", "good");
-      const recall = checkedFixture(attempts.find((a) => a.phase === "recall"));
+      introduce([CHIEN], "chien", "good");
+      const recall = checkedFixture(
+        attempts.find((a): a is Attempt => a.phase === "recall")
+      );
       expect(recall.stateBefore.state).toBe(State.New);
       expect(recall.stateBefore.reps).toBe(0);
       // The card itself has moved on; the attempt kept the earlier state.
@@ -255,16 +250,14 @@ describe("session", () => {
 
   describe("flow", () => {
     it("moves straight on after a correct answer", () => {
-      const s = makeSession([CHIEN, FENETRE], 2);
-      stepUntilRecall(s);
+      const s = recallSession([CHIEN, FENETRE], 2);
       s.submitRecall("chien", "good");
       // No feedback screen to dismiss — there is nothing to read.
       expect(s.view.phase).not.toBe("feedback");
     });
 
     it("pauses on a wrong answer and shows the correct spelling", () => {
-      const s = makeSession([FENETRE]);
-      introduce(s, "fenetre", "good");
+      const s = introduce([FENETRE], "fenetre", "good");
       expect(s.view).toEqual({
         expected: "fenêtre",
         phase: "feedback",
@@ -273,8 +266,7 @@ describe("session", () => {
     });
 
     it("carries on after the feedback is dismissed", () => {
-      const s = makeSession([CHIEN, FENETRE], 2);
-      stepUntilRecall(s);
+      const s = recallSession([CHIEN, FENETRE], 2);
       s.submitRecall("chein", "good");
       expect(s.view.phase).toBe("feedback");
       s.dismissFeedback();
@@ -285,9 +277,7 @@ describe("session", () => {
       // Sixty seconds staring at the feedback screen makes the failed card
       // genuinely due again at dismissal. It must still not come straight
       // back while another card could go between.
-      const s = makeSession([CHIEN, FENETRE], 2);
-      // both introduced; chien is asked first
-      stepUntilRecall(s);
+      const s = recallSession([CHIEN, FENETRE], 2);
       s.submitRecall("zzz", "good");
       expect(s.view.phase).toBe("feedback");
 
@@ -301,7 +291,7 @@ describe("session", () => {
 
     it("refuses a call made in the wrong phase", () => {
       const s = makeSession([CHIEN]);
-      expect(() => s.exposureDone()).toThrow(/expected phase/u);
+      expect(() => s.dismissFeedback()).toThrow(/expected phase/u);
       expect(() => s.submitRecall("chien", "good")).toThrow(/expected phase/u);
     });
   });
@@ -309,7 +299,7 @@ describe("session", () => {
   describe("allowance and ending", () => {
     it("never introduces more than the daily allowance", () => {
       const s = makeSession([CHIEN, FENETRE], 1);
-      introduce(s, "chien", "good");
+      s.exposureDone();
       // Caught up, not done: chien's next learning step is still coming today.
       expect(s.view).toMatchObject({
         phase: "caughtUp",
@@ -337,7 +327,7 @@ describe("session", () => {
       // The gap one card cannot fill is an honest pause, not an ending: the
       // session says when the card comes due, and the screen rebuilds then.
       const s = makeSession([CHIEN], 1);
-      introduce(s, "chien", "good");
+      s.exposureDone();
       expect(s.view).toMatchObject({
         nextDueAt: checkedFixture(changed.at(-1)).fsrs.due,
         phase: "caughtUp",
@@ -345,27 +335,25 @@ describe("session", () => {
     });
 
     it("reports what happened", () => {
-      const s = makeSession([CHIEN, FENETRE], 2);
+      const s = recallSession([CHIEN, FENETRE], 2);
       drain(s, (gloss) => (gloss === "cane" ? "chien" : "fenêtre"));
       const { view } = s;
       expect(view.phase).toBe("done");
       if (view.phase !== "done") {
         return;
       }
-      expect(view.stats.introduced).toBe(2);
+      expect(view.stats.introduced).toBe(0);
       expect(view.stats.wrong).toBe(0);
       expect(view.stats.correct).toBe(view.stats.recalls);
     });
 
     it("counts a wrong answer", () => {
-      const s = makeSession([FENETRE], 1);
-      // missing accent
-      introduce(s, "fenetre", "good");
+      const s = introduce([FENETRE], "fenetre", "good");
       s.dismissFeedback();
       // Caught up, not done: the failed card comes back in a minute.
       expect(s.view).toMatchObject({
         phase: "caughtUp",
-        stats: { correct: 0, introduced: 1, recalls: 1, wrong: 1 },
+        stats: { correct: 0, introduced: 0, recalls: 1, wrong: 1 },
       });
     });
   });
@@ -402,7 +390,9 @@ describe("session", () => {
       });
       expect(s.view.phase).toBe("exposure");
       s.exposureDone();
-      s.submitRecall("chien", "good");
+      tick(60_000);
+      const resumed = makeSession([CHIEN], 0, [checkedFixture(changed.at(-1))]);
+      resumed.submitRecall("chien", "good");
       // fenêtre must not follow: the single slot was spent on chien already.
       // Caught up rather than done, because chien itself is still coming today.
       expect(s.view.phase).toBe("caughtUp");
@@ -415,7 +405,9 @@ describe("session", () => {
         cardFor(CHIEN, createEmptyCard(new Date(clockMs))),
       ]);
       s.exposureDone();
-      s.submitRecall("chien", "good");
+      tick(60_000);
+      const resumed = makeSession([CHIEN], 0, [checkedFixture(changed.at(-1))]);
+      resumed.submitRecall("chien", "good");
       expect(attempts.filter((a) => a.phase === "guess")).toHaveLength(0);
     });
 
@@ -450,23 +442,18 @@ describe("session", () => {
       const s = makeSession(words, 5);
       const phases: string[] = [];
 
-      for (let i = 0; i < 10; i += 1) {
-        const { view } = s;
-        phases.push(view.phase);
-        if (view.phase === "guess") {
-          s.submitGuess("");
-        } else if (view.phase === "exposure") {
-          s.exposureDone();
-        } else {
-          break;
-        }
+      for (let i = 0; i < 5; i += 1) {
+        phases.push(s.view.phase);
+        s.exposureDone();
       }
-
-      // Ten steps: five guesses and five exposures, no recall among them.
-      expect(phases).toHaveLength(10);
-      expect(phases).not.toContain("recall");
-      expect(phases.filter((p) => p === "guess")).toHaveLength(5);
-      expect(s.view.phase).toBe("recall");
+      expect(phases).toEqual(Array.from({ length: 5 }, () => "exposure"));
+      expect(attempts.map((attempt) => attempt.phase)).toEqual(
+        Array.from({ length: 5 }, () => "teach")
+      );
+      expect(s.view.phase).toBe("caughtUp");
+      tick(60_000);
+      const resumed = makeSession(words, 0, changed);
+      expect(resumed.view.phase).toBe("recall");
     });
   });
 });

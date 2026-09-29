@@ -8,6 +8,7 @@ import type { Behaviour, Learner } from "./support/learner-simulator";
 import {
   attemptMismatches,
   closureContradictions,
+  teachingMismatches,
   violations,
 } from "./support/trace-invariants";
 
@@ -23,7 +24,7 @@ const checkedFixture = <T>(value: T | null | undefined): T => {
  *
  * The example tests next door cover the cases we thought of. Every bug this
  * module has shipped was a case we did not: a card written but never rated, a
- * word guessed but never recalled, an exposure the rule could not see. Those are
+ * word taught but never recalled, an exposure the rule could not see. Those are
  * reachable states rather than wrong arithmetic, and the way to find a reachable
  * state you have not imagined is to generate the ways of reaching it.
  *
@@ -113,7 +114,6 @@ const cycleFixture = <T>(values: readonly T[]) => {
 const behaviourFor = (s: Scenario): Behaviour => ({
   correct: cycleFixture(s.answers),
   effort: cycleFixture(s.efforts),
-  guessCorrect: cycleFixture(s.answers),
   msPerPrompt: cycleFixture(s.thinks),
 });
 
@@ -179,7 +179,12 @@ describe("however the history goes", () => {
             }
             learner.sit(200);
             expect(
-              violations(learner.trace, learner.attempts, rollover)
+              violations(
+                learner.trace,
+                learner.attempts,
+                rollover,
+                learner.teachings
+              )
             ).toEqual([]);
           }
         ),
@@ -257,7 +262,12 @@ describe("however the history goes", () => {
             expect(end.reason).not.toBe("cut");
             expect(closureContradictions(learner.trace)).toEqual([]);
             expect(
-              violations(learner.trace, learner.attempts, s.rollover)
+              violations(
+                learner.trace,
+                learner.attempts,
+                s.rollover,
+                learner.teachings
+              )
             ).toEqual([]);
           }
         ),
@@ -292,7 +302,12 @@ describe("however the history goes", () => {
             )
           ).toBe(true);
           expect(
-            violations(learner.trace, learner.attempts, s.rollover)
+            violations(
+              learner.trace,
+              learner.attempts,
+              s.rollover,
+              learner.teachings
+            )
           ).toEqual([]);
         }),
         { numRuns: 200 }
@@ -333,8 +348,7 @@ describe("however the history goes", () => {
   it(
     "never shows a word it has not introduced",
     () => {
-      // Restated from the trace rather than the attempts: every card that appears
-      // on screen at all must have been guessed first, in some sitting.
+      // A completed exposure introduces a word durably across sittings.
       fc.assert(
         fc.property(scenario({ maxGap: 2 * DAY }), (s) => {
           const learner = live(s);
@@ -344,7 +358,11 @@ describe("however the history goes", () => {
             if (step.at === "closed") {
               continue;
             }
-            if (step.at === "guess") {
+            if (step.at === "exposure") {
+              expect(
+                introduced.has(step.word),
+                "a taught word was re-exposed"
+              ).toBe(false);
               introduced.add(step.word);
             } else {
               expect(
@@ -363,18 +381,21 @@ describe("however the history goes", () => {
   it(
     "logs one attempt per prompt that takes an answer",
     () => {
-      // Guesses and recalls are answered; exposures and feedback are read. The
-      // attempts table is the source of truth for FSRS retraining, so a prompt
-      // that vanishes from it is history that cannot be rebuilt.
+      // Recall attempts train FSRS. Completed exposures have separate durable
+      // teaching events; neither kind of history may vanish on reopening.
       fc.assert(
         fc.property(scenario({ maxGap: DAY }), (s) => {
           const learner = live(s);
-          const answered = learner.trace.filter(
-            (step) => step.at === "guess" || step.at === "recall"
-          );
+          const answered = learner.trace.filter((step) => step.at === "recall");
           expect(learner.attempts).toHaveLength(answered.length);
           expect(attemptMismatches(learner.trace, learner.attempts)).toEqual(
             []
+          );
+          expect(teachingMismatches(learner.trace, learner.teachings)).toEqual(
+            []
+          );
+          expect(learner.commands).toHaveLength(
+            learner.attempts.length + learner.teachings.length
           );
           expect(learner.commands.map((c) => c.id).length).toBe(
             new Set(learner.commands.map((c) => c.id)).size

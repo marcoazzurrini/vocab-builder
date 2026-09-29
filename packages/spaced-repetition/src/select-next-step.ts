@@ -4,39 +4,14 @@ import type { Word } from "./restore-progress";
 import type { Card } from "./review-scheduling";
 import { studyDay } from "./study-day";
 
-/**
- * Where a card is in its life.
- *
- * This is the value that used to be implicit. It was spread across `reps`,
- * `state`, `due`, `guessed` and a set of ids held in the session — seven facts
- * in three places with three lifetimes — and every branch below re-derived it
- * from a slightly different subset. All three bugs this module has shipped were
- * two of those derivations disagreeing:
- *
- *   - a card written but never rated, read as a due learning card, so the user
- *     was asked to type a word that had never been shown (daa4fa4)
- *   - an exposure falling through to its own recall, so FSRS's rating #1
- *     measured the short-term buffer rather than the word (e43721e)
- *   - an exposure that changed nothing the rule could see, so on every resumed
- *     sitting the rule handed the same card straight back
- *
- * There used to be a third stage before these two: "unseen", a row written at
- * introduction that no guess had reached, because the guess attempt needed a
- * card row to point its foreign key at. Attempts are keyed by word now, so
- * nothing is written until the guess — a word abandoned on the guess screen
- * leaves no trace, and the ambiguous state is not labelled but impossible.
- *
- * FSRS cannot own this: it has no opinion about a card it has never rated, since
- * the first rating is its input and not its output. So the stage before that
- * first rating is ours to name, and it is named here, once.
- */
+/** Unrated teaching progress is separate from FSRS scheduling. */
 export type Stage =
-  /** Guessed, and waiting for the first rating. FSRS still has no opinion. */
+  /** Waiting for teaching or the first real recall. */
   | "awaiting"
   /** Rated at least once. FSRS owns it from here. */
   | "scheduled";
 
-/** `reps` counts FSRS ratings, and guesses are never rated. */
+/** `reps` counts real FSRS ratings, never teaching. */
 export const stageOf = (card: Card): Stage =>
   card.fsrs.reps > 0 ? "scheduled" : "awaiting";
 
@@ -64,16 +39,6 @@ export interface Queue {
   now: Date;
   /** Today's remaining new-word ceiling. Never exceeded to fill time. */
   allowanceLeft: number;
-  /**
-   * Words whose exposure has already been shown in this sitting.
-   *
-   * Not persisted, and deliberately so: closing the app loses the knowledge that
-   * an exposure was actually read, and re-showing a word costs seconds where
-   * skipping it would ask for a word that may never have been seen. It is an
-   * input to the rule rather than a fact the caller keeps to itself, because the
-   * caller keeping it to itself is what caused the third bug above.
-   */
-  exposed: ReadonlySet<string>;
   /**
    * Words already pulled forward once in this sitting.
    *
@@ -151,10 +116,8 @@ const dueLearning: Rule = (q) => {
  * Before the reviews, so that a new word's second recall lands *inside* the
  * review block — the longest gap the session can give it for free.
  *
- * Nothing is written until the word is guessed, so a word abandoned on the
- * guess screen was never introduced at all: it simply comes up again here,
- * still new, still costing allowance. A word guessed and then abandoned is a
- * different thing — it is "awaiting", and rules 4 and 5 own it.
+ * Nothing is written until teaching completes. An abandoned exposure remains
+ * new and costs no allowance. Completed teaching enters the awaiting stage.
  */
 const newWord: Rule = (q) => {
   if (q.allowanceLeft <= 0) {
@@ -188,37 +151,22 @@ const dueReview: Rule = (q) => {
   return card ? { card, do: "recall" } : null;
 };
 
-/**
- * 4. Show a word that is waiting for its first recall and has not been shown yet
- * in this sitting.
- *
- * Ahead of the recall step, so a batch of resumed words is shown through before
- * any of them is asked for — the same shape a fresh sitting has, where the whole
- * batch is introduced before the first recall.
- */
+/** 4. Legacy guessed-only words still require durable teaching. */
 const needsExposure: Rule = (q) => {
   const card = earliestDue(
-    at(q, "awaiting").filter((c) => !q.exposed.has(c.wordId))
+    at(q, "awaiting").filter((c) => c.initialRecallAt === undefined)
   );
   return card ? { card, do: "expose" } : null;
 };
 
-/**
- * 5. Ask for a word that has been shown.
- *
- * After the reviews, so the gap between seeing a word and producing it is filled
- * with real work rather than an interval we invented. FSRS has no opinion about
- * a card it has never rated, so this placement is ours, and ordering is the
- * honest lever.
- *
- * The card just shown is excluded here and offered again by rule 7, so that
- * anything else at all — including a learning card pulled forward — goes
- * between an exposure and the recall that follows it.
- */
+/** 5. First retrieval requires completed teaching and its persisted due time. */
 const awaitingRecall: Rule = (q) => {
   const card = earliestDue(
     at(q, "awaiting").filter(
-      (c) => q.exposed.has(c.wordId) && c.wordId !== q.justShownId
+      (c) =>
+        c.initialRecallAt !== undefined &&
+        c.fsrs.due <= q.now &&
+        c.wordId !== q.justShownId
     )
   );
   return card ? { card, do: "recall" } : null;
@@ -247,21 +195,12 @@ const learnAhead: Rule = (q) => {
   return card ? { card, do: "recall", pulledForward: true } : null;
 };
 
-/**
- * 7. Ask for the word just shown, when there is genuinely nothing else.
- *
- * Producing a word seconds after seeing it is trivial, and the rating it yields
- * is FSRS's first — the one that sets initial difficulty — so every other rule
- * gets to go first, including pulling a learning card forward. That trade is
- * worth making: an early review costs a little stability once, while a rating #1
- * taken from the short-term buffer misprices the card for its whole life.
- *
- * But it has to happen eventually. Refusing outright would show a lone word and
- * then never ask for it — again on the next sitting, and the one after that.
- */
+/** 7. A lone taught word may be recalled only once its first recall is due. */
 const showAnyway: Rule = (q) => {
   const card = earliestDue(
-    at(q, "awaiting").filter((c) => q.exposed.has(c.wordId))
+    at(q, "awaiting").filter(
+      (c) => c.initialRecallAt !== undefined && c.fsrs.due <= q.now
+    )
   );
   return card ? { card, do: "recall" } : null;
 };
@@ -312,14 +251,13 @@ export const pickNext = (queue: Queue): Slot => {
     }
   }
 
-  // Nothing is servable right now. If a learning card is still coming today,
-  // the honest answer is when — reviews and awaiting words can never be the
-  // reason to wait, because the rules above serve them any time today.
+  // Pending first recalls also wait for their persisted due time. Tomorrow
+  // does not prevent the current study day from being done.
   const upcoming = earliestDue(
     queue.cards.filter(
       (c) =>
-        stageOf(c) === "scheduled" &&
-        isLearning(c) &&
+        ((stageOf(c) === "scheduled" && isLearning(c)) ||
+          (stageOf(c) === "awaiting" && c.initialRecallAt !== undefined)) &&
         c.fsrs.due > queue.now &&
         c.fsrs.due < nextDay(queue)
     )

@@ -4,12 +4,16 @@ import { readFile } from "node:fs/promises";
 import type { D1PreparedStatement } from "@cloudflare/workers-types";
 import { createSession, DEFAULT_SETTINGS } from "@vocab/spaced-repetition";
 import type { AnswerCommand } from "@vocab/spaced-repetition";
-import { evaluateAnswer } from "@vocab/spaced-repetition/server";
+import {
+  evaluateAnswer,
+  initialRecallAt,
+  teachingSchedule,
+} from "@vocab/spaced-repetition/server";
 import { and, eq } from "drizzle-orm";
 
 import { parseCatalogue } from "../scripts/import-catalogue";
 import { createDatabase, SaveConflict } from "./index";
-import { attempts, cards, settings, user, words } from "./schema";
+import { attempts, cards, settings, teachings, user, words } from "./schema";
 import { testDatabase } from "./testing";
 
 let fixture: Awaited<ReturnType<typeof testDatabase>>;
@@ -76,6 +80,10 @@ const schedule = (userId: string) =>
 const savedProgress = async (userId: string) => ({
   attempts: await history(userId),
   cards: await schedule(userId),
+  teachings: await fixture.db
+    .select()
+    .from(teachings)
+    .where(eq(teachings.user_id, userId)),
 });
 
 /** Pause immediately before a real D1 batch, after repository reads and evaluation. */
@@ -121,6 +129,9 @@ const expectSavedAnswer = async (
   previousSchedule?: string,
   spelling = "chien"
 ) => {
+  if (command.phase === "teach") {
+    throw new Error("Teaching is not a rated answer.");
+  }
   const evaluated = evaluateAnswer(
     command,
     spelling,
@@ -404,7 +415,11 @@ describe("repository isolation and failure contracts", () => {
       );
     }
     expect(await savedProgress(a.id)).toEqual(before);
-    expect(await savedProgress(b.id)).toEqual({ attempts: [], cards: [] });
+    expect(await savedProgress(b.id)).toEqual({
+      attempts: [],
+      cards: [],
+      teachings: [],
+    });
   });
 
   it("returns ordered, fully mapped words and an empty snapshot for an unknown language", async () => {
@@ -429,6 +444,7 @@ describe("repository isolation and failure contracts", () => {
     expect(snapshot).toEqual({
       cards: [],
       guesses: [],
+      teachings: [],
       words: [entries[3], entries[2], entries[0], entries[1]].map((entry) => {
         if (!entry) {
           throw new Error("Expected catalogue fixture.");
@@ -447,6 +463,7 @@ describe("repository isolation and failure contracts", () => {
     expect(await store.forUser(l.id).snapshot("missing-language")).toEqual({
       cards: [],
       guesses: [],
+      teachings: [],
       words: [],
     });
   });
@@ -921,5 +938,381 @@ describe("D1 persistence", () => {
       .where(and(eq(words.lang, "fr"), eq(words.text, "comment ça va ?")));
     expect(stored).toHaveLength(1);
     expect(stored[0]?.gloss).toBe("come va?");
+  });
+});
+
+const teachCommand = (
+  wordId: string
+): Extract<AnswerCommand, { phase: "teach" }> => ({
+  expectedReps: 0,
+  id: crypto.randomUUID(),
+  latencyMs: 2400,
+  phase: "teach",
+  reviewedAt: now.toISOString(),
+  wordId,
+});
+
+describe("teach-first persistence", () => {
+  it("saves completion independently without a guess or rated card", async () => {
+    const l = await learner();
+    const command = teachCommand(l.wordId);
+    await store.forUser(l.id).recordAnswer(command);
+    const progress = await savedProgress(l.id);
+    expect(progress.attempts).toEqual([]);
+    expect(progress.cards).toEqual([]);
+    expect(progress.teachings).toEqual([
+      {
+        card_type: "production",
+        completed_at: command.reviewedAt,
+        id: command.id,
+        initial_recall_at: initialRecallAt(command.reviewedAt),
+        latency_ms: command.latencyMs,
+        request: expect.any(String),
+        user_id: l.id,
+        word_id: l.wordId,
+      },
+    ]);
+    const [saved] = progress.teachings;
+    if (!saved) {
+      throw new Error("Expected saved teaching.");
+    }
+    expect(JSON.parse(saved.request)).toEqual(command);
+    const snapshot = await store.forUser(l.id).snapshot("fr");
+    expect(snapshot.guesses).toEqual([]);
+    expect(snapshot.teachings).toEqual([
+      {
+        initialRecallAt: initialRecallAt(command.reviewedAt),
+        reviewedAt: command.reviewedAt,
+        wordId: l.wordId,
+      },
+    ]);
+    expect(createSession({ clock: () => now, snapshot }).view.phase).toBe(
+      "caughtUp"
+    );
+  });
+
+  it("rejects an early first recall, accepts its exact due boundary, and preserves the seed", async () => {
+    const l = await learner();
+    const command = teachCommand(l.wordId);
+    const repo = store.forUser(l.id);
+    await repo.recordAnswer(command);
+    const before = await savedProgress(l.id);
+    await expect(
+      repo.recordAnswer({
+        ...l.recall,
+        reviewedAt: new Date(now.getTime() + 59_999).toISOString(),
+      })
+    ).rejects.toBeInstanceOf(SaveConflict);
+    expect(await savedProgress(l.id)).toEqual(before);
+    const snapshot = await repo.snapshot("fr");
+    expect(
+      createSession({ clock: () => new Date(now.getTime() + 59_999), snapshot })
+        .view.phase
+    ).toBe("caughtUp");
+    expect(
+      createSession({ clock: () => new Date(now.getTime() + 60_000), snapshot })
+        .view.phase
+    ).toBe("recall");
+    await repo.recordAnswer(l.recall);
+    const first = await expectSavedAnswer(
+      l.id,
+      l.recall,
+      teachingSchedule(initialRecallAt(command.reviewedAt))
+    );
+    expect(await history(l.id)).toHaveLength(1);
+    const second = {
+      ...l.recall,
+      expectedReps: 1,
+      id: crypto.randomUUID(),
+      reviewedAt: new Date(now.getTime() + 120_000).toISOString(),
+    };
+    await repo.recordAnswer(second);
+    if (!first) {
+      throw new Error("Expected a rated schedule.");
+    }
+    await expectSavedAnswer(l.id, second, first);
+    const after = await savedProgress(l.id);
+    await repo.recordAnswer(command);
+    await repo.recordAnswer(l.recall);
+    expect(await savedProgress(l.id)).toEqual(after);
+  });
+
+  it("allows only one racing first recall after teaching", async () => {
+    const l = await learner();
+    const command = teachCommand(l.wordId);
+    await store.forUser(l.id).recordAnswer(command);
+    const barrier = twoWriters();
+    const writer = coordinateBatches(barrier.arrive).forUser(l.id);
+    try {
+      const results = await Promise.allSettled([
+        writer.recordAnswer(l.recall),
+        writer.recordAnswer({ ...l.recall, id: crypto.randomUUID() }),
+      ]);
+      expect(
+        results.filter((result) => result.status === "fulfilled")
+      ).toHaveLength(1);
+      for (const result of results) {
+        if (result.status === "rejected") {
+          expect(result.reason).toBeInstanceOf(SaveConflict);
+        }
+      }
+      const progress = await savedProgress(l.id);
+      expect(progress.teachings).toHaveLength(1);
+      expect(progress.attempts).toHaveLength(1);
+      expect(progress.attempts[0]?.state_before).toEqual(
+        JSON.parse(teachingSchedule(initialRecallAt(command.reviewedAt)))
+      );
+      expect(progress.cards[0]?.revision).toBe(1);
+    } finally {
+      barrier.close();
+    }
+  });
+
+  it("never resets the initial due time for another completion ID", async () => {
+    const l = await learner();
+    const command = teachCommand(l.wordId);
+    const repo = store.forUser(l.id);
+    await repo.recordAnswer(command);
+    const before = await savedProgress(l.id);
+    await expect(
+      repo.recordAnswer({
+        ...command,
+        id: crypto.randomUUID(),
+        reviewedAt: new Date(now.getTime() + 30_000).toISOString(),
+      })
+    ).rejects.toBeInstanceOf(SaveConflict);
+    expect(await savedProgress(l.id)).toEqual(before);
+  });
+
+  it.each([true, false])(
+    "handles racing teaching commands with identical ID = %s",
+    async (sameId) => {
+      const l = await learner();
+      const command = teachCommand(l.wordId);
+      const barrier = twoWriters();
+      const writer = coordinateBatches(barrier.arrive).forUser(l.id);
+      try {
+        const results = await Promise.allSettled([
+          writer.recordAnswer(command),
+          writer.recordAnswer(
+            sameId ? command : { ...command, id: crypto.randomUUID() }
+          ),
+        ]);
+        expect(barrier.arrivals).toBe(2);
+        expect(
+          results.filter((result) => result.status === "fulfilled")
+        ).toHaveLength(sameId ? 2 : 1);
+        for (const result of results) {
+          if (result.status === "rejected") {
+            expect(result.reason).toBeInstanceOf(SaveConflict);
+          }
+        }
+        const progress = await savedProgress(l.id);
+        expect(progress.teachings).toHaveLength(1);
+        expect(progress.attempts).toEqual([]);
+        expect(progress.cards).toEqual([]);
+      } finally {
+        barrier.close();
+      }
+    }
+  );
+
+  it("compares canonical teaching retries without rewriting historical bytes", async () => {
+    const l = await learner();
+    const command = teachCommand(l.wordId);
+    const request = JSON.stringify(command, [
+      "wordId",
+      "reviewedAt",
+      "phase",
+      "latencyMs",
+      "id",
+      "expectedReps",
+    ]);
+    await fixture.db.insert(teachings).values({
+      completed_at: command.reviewedAt,
+      id: command.id,
+      initial_recall_at: initialRecallAt(command.reviewedAt),
+      latency_ms: command.latencyMs,
+      request,
+      user_id: l.id,
+      word_id: l.wordId,
+    });
+    const before = await savedProgress(l.id);
+    await store.forUser(l.id).recordAnswer(command);
+    await expect(
+      store
+        .forUser(l.id)
+        .recordAnswer({ ...command, latencyMs: command.latencyMs + 1 })
+    ).rejects.toThrow("An answer ID cannot be reused for a different answer.");
+    expect(await savedProgress(l.id)).toEqual(before);
+  });
+
+  it.each(["guess", "teach"] as const)(
+    "guards IDs across history tables after %s",
+    async (phase) => {
+      const l = await learner();
+      const command = { ...teachCommand(l.wordId), id: l.guess.id };
+      const repo = store.forUser(l.id);
+      await repo.recordAnswer(phase === "guess" ? l.guess : command);
+      const before = await savedProgress(l.id);
+      await expect(
+        repo.recordAnswer(phase === "guess" ? command : l.guess)
+      ).rejects.toThrow(
+        "An answer ID cannot be reused for a different answer."
+      );
+      expect(await savedProgress(l.id)).toEqual(before);
+      const other = await learner();
+      await expect(
+        store
+          .forUser(other.id)
+          .recordAnswer({ ...command, wordId: other.wordId })
+      ).rejects.toBeInstanceOf(SaveConflict);
+      const otherProgress = await savedProgress(other.id);
+      expect(otherProgress.teachings).toEqual([]);
+    }
+  );
+
+  it("rejects future completions and fabricated answer fields", async () => {
+    const l = await learner();
+    const command = teachCommand(l.wordId);
+    await expect(
+      store.forUser(l.id).recordAnswer({
+        ...command,
+        reviewedAt: new Date(Date.now() + 6 * 60_000).toISOString(),
+      })
+    ).rejects.toThrow("Review time is in the future. Check your device clock.");
+    const fabricated = { ...command, rating: null, typed: "" };
+    await expect(
+      store.forUser(l.id).recordAnswer(fabricated)
+    ).rejects.toThrow();
+    const progress = await savedProgress(l.id);
+    expect(progress.teachings).toEqual([]);
+  });
+
+  it.each([false, true])(
+    "preserves legacy pending guesses and immediate recalls with teaching = %s",
+    async (taught) => {
+      const l = await learner();
+      const repo = store.forUser(l.id);
+      // A stale browser may replay a guess after a new browser saved teaching.
+      if (taught) {
+        await repo.recordAnswer(teachCommand(l.wordId));
+      }
+      await repo.recordAnswer(l.guess);
+      const recall = { ...l.recall, reviewedAt: l.guess.reviewedAt };
+      await repo.recordAnswer(recall);
+      const before = await savedProgress(l.id);
+      await repo.recordAnswer(l.guess);
+      await repo.recordAnswer(recall);
+      expect(await savedProgress(l.id)).toEqual(before);
+      expect(before.cards[0]?.revision).toBe(1);
+    }
+  );
+
+  it("does not charge introduction twice across a legacy guess and teaching", async () => {
+    const l = await learner();
+    await store.forUser(l.id).recordAnswer(l.guess);
+    await store.forUser(l.id).recordAnswer(teachCommand(l.wordId));
+    await fixture.db
+      .insert(words)
+      .values({ gloss: "gatto", id: "next-word", lang: "fr", text: "chat" });
+    const snapshot = await store.forUser(l.id).snapshot("fr");
+    const session = createSession({
+      clock: () => now,
+      settings: { ...DEFAULT_SETTINGS, newPerDay: 2 },
+      snapshot,
+    });
+    expect(session.view.phase).toBe("exposure");
+    session.exposureDone();
+    expect(session.view.phase).toBe("caughtUp");
+  });
+
+  it("preserves rated legacy progress when stale teaching arrives", async () => {
+    const l = await learner();
+    await store.forUser(l.id).recordAnswer(l.guess);
+    await store.forUser(l.id).recordAnswer(l.recall);
+    const before = await savedProgress(l.id);
+    await expect(
+      store.forUser(l.id).recordAnswer(teachCommand(l.wordId))
+    ).rejects.toBeInstanceOf(SaveConflict);
+    expect(await savedProgress(l.id)).toEqual(before);
+  });
+
+  it("checks stale teaching inside the batch after a concurrent legacy recall", async () => {
+    const l = await learner();
+    await store.forUser(l.id).recordAnswer(l.guess);
+    const writer = coordinateBatches(async () => {
+      await store.forUser(l.id).recordAnswer(l.recall);
+    }).forUser(l.id);
+    await expect(
+      writer.recordAnswer(teachCommand(l.wordId))
+    ).rejects.toBeInstanceOf(SaveConflict);
+    await expectSavedAnswer(l.id, l.recall);
+    const progress = await savedProgress(l.id);
+    expect(progress.teachings).toEqual([]);
+  });
+
+  it.each([false, true])(
+    "keeps teaching-only words visible with default collection = %s",
+    async (hasDefault) => {
+      const l = await learner();
+      const other = await learner();
+      await fixture.binding.batch([
+        fixture.binding.prepare(
+          "INSERT INTO catalogue_sources (id,title,version,url,license) VALUES ('source','Source','1','https://example.com','CC0')"
+        ),
+        fixture.binding.prepare(
+          "INSERT INTO lexical_entries (id,language,text,kind,source_id,source_key,forms,annotations) VALUES ('entry','fr','chien','word','source','entry','[]','{}')"
+        ),
+        fixture.binding.prepare(
+          "INSERT INTO catalogue_senses (id,entry_id,description,source_id) VALUES ('sense','entry','dog','source')"
+        ),
+        fixture.binding
+          .prepare(
+            "INSERT INTO catalogue_prompts (id,word_id,sense_id,language,version,status,source_id,content_hash) VALUES (?,?,'sense','it',1,'legacy','source','hash')"
+          )
+          .bind(l.wordId, l.wordId),
+      ]);
+      if (hasDefault) {
+        await fixture.binding
+          .prepare(
+            "INSERT INTO catalogue_lists (id,title,language,prompt_language,source_id,ranking_policy,is_default) VALUES ('list','New collection','fr','it','source','frequency',1)"
+          )
+          .run();
+      }
+      const before = await store.forUser(l.id).snapshot("fr");
+      expect(before.words.map((word) => word.id)).not.toContain(l.wordId);
+      await store.forUser(l.id).recordAnswer(teachCommand(l.wordId));
+      const after = await store.forUser(l.id).snapshot("fr");
+      expect(after.words.map((word) => word.id)).toContain(l.wordId);
+      const otherSnapshot = await store.forUser(other.id).snapshot("fr");
+      expect(otherSnapshot.words.map((word) => word.id)).not.toContain(
+        l.wordId
+      );
+    }
+  );
+
+  it("scopes teaching snapshots by user, target language, and prompt language", async () => {
+    const a = await learner();
+    const b = await learner();
+    await store.forUser(a.id).recordAnswer(teachCommand(a.wordId));
+    await fixture.db.insert(words).values([
+      { gloss: "cane", id: "taught-es", lang: "es", text: "perro" },
+      {
+        gloss: "dog",
+        gloss_lang: "en",
+        id: "taught-en-cue",
+        lang: "fr",
+        text: "chien",
+      },
+    ]);
+    await store.forUser(a.id).recordAnswer(teachCommand("taught-es"));
+    await store.forUser(a.id).recordAnswer(teachCommand("taught-en-cue"));
+    const french = await store.forUser(a.id).snapshot("fr");
+    const spanish = await store.forUser(a.id).snapshot("es");
+    const other = await store.forUser(b.id).snapshot("fr");
+    expect(french.teachings?.map((row) => row.wordId)).toEqual([a.wordId]);
+    expect(spanish.teachings?.map((row) => row.wordId)).toEqual(["taught-es"]);
+    expect(other.teachings).toEqual([]);
   });
 });

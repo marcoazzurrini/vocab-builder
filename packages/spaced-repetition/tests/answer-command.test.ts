@@ -251,6 +251,9 @@ describe("commandFor", () => {
     };
     const command = commandFor(input);
     expect(command.phase).toBe("guess");
+    if (command.phase !== "guess") {
+      throw new Error("Expected a legacy guess command");
+    }
     expect(command.rating).toBeNull();
     expect(command.expectedReps).toBe(0);
     expect(JSON.stringify(command)).toBe(

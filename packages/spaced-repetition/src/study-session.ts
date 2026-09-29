@@ -2,13 +2,19 @@ import { createEmptyCard } from "ts-fsrs";
 import type { FSRS } from "ts-fsrs";
 
 import { validateAnswerText } from "./answer-command";
-import type { Attempt } from "./answer-command";
+import type { SessionAttempt } from "./answer-command";
 import { effortsFor, gradeRecall } from "./answer-grading";
 import type { Effort } from "./answer-grading";
-import type { Word } from "./restore-progress";
-import { createScheduler, transition } from "./review-scheduling";
+import { toCard } from "./restore-progress";
+import type { Word, EntryPresentation } from "./restore-progress";
+import {
+  createScheduler,
+  transition,
+  RevisionConflict,
+} from "./review-scheduling";
 import type { Card } from "./review-scheduling";
 import { pickNext } from "./select-next-step";
+import { initialRecallAt, teachingSchedule } from "./teaching-schedule";
 
 /** Everything needed to pose the question, and nothing that answers it. */
 export interface Prompt {
@@ -16,6 +22,9 @@ export interface Prompt {
   hint: string | null;
   image: string | null;
   kind: "word" | "chunk";
+  meaning?: string;
+  context?: string | null;
+  grammar?: string | null;
 }
 
 export interface SessionStats {
@@ -27,16 +36,27 @@ export interface SessionStats {
 
 /**
  * The entire surface the UI sees. A discriminated union rather than a phase
- * plus a bag of optional fields, so asking for the answer during the guess
+ * plus a bag of optional fields, so asking for the answer during the recall
  * phase is not a bug to guard against — it does not typecheck.
  */
 export type SessionView =
-  | { phase: "guess"; prompt: Prompt }
-  | { phase: "exposure"; prompt: Prompt; answer: string }
+  | {
+      phase: "exposure";
+      prompt: Prompt;
+      answer: string;
+      revealNote?: string;
+      presentation?: EntryPresentation;
+    }
   /** `efforts` is the list of buttons to draw. The UI holds no grading policy. */
   | { phase: "recall"; prompt: Prompt; efforts: Effort[] }
   /** Only ever reached by a wrong answer, so there is no `correct` flag. */
-  | { phase: "feedback"; expected: string; typed: string }
+  | {
+      phase: "feedback";
+      expected: string;
+      typed: string;
+      revealNote?: string;
+      presentation?: EntryPresentation;
+    }
   /**
    * Nothing due right now, but a card is still coming today. The honest pause
    * Anki calls its congratulations screen: the user is told when, and the UI
@@ -47,7 +67,7 @@ export type SessionView =
 
 /** An answer and its derived card are accepted together, never as separate notifications. */
 export interface AnswerChange {
-  attempt: Attempt;
+  attempt: SessionAttempt;
   card: Card | null;
 }
 export interface SessionEngineOptions {
@@ -64,7 +84,6 @@ export interface SessionEngineOptions {
 
 export interface Session {
   readonly view: SessionView;
-  submitGuess: (typed: string) => void;
   exposureDone: () => void;
   submitRecall: (typed: string, effort: Effort) => void;
   dismissFeedback: () => void;
@@ -74,7 +93,7 @@ interface Current {
   card: Card;
   word: Word;
 }
-type PromptPhase = "guess" | "exposure" | "recall";
+type PromptPhase = "exposure" | "recall";
 type Flow =
   | { [P in PromptPhase]: { phase: P; current: Current } }[PromptPhase]
   | { phase: "feedback"; current: Current; typed: string }
@@ -87,23 +106,29 @@ interface SessionState {
   allowanceLeft: number;
   promptShownAt: Date;
   justShownId?: string;
-  exposed: Set<string>;
   pulledForward: Set<string>;
   stats: SessionStats;
 }
 
 type Action =
-  | { type: "guess"; typed: string }
   | { type: "exposure" }
   | { type: "recall"; typed: string; effort: Effort }
   | { type: "feedback" };
 
-const promptOf = (word: Word): Prompt => ({
-  gloss: word.gloss,
-  hint: word.hint,
-  image: word.image,
-  kind: word.kind,
-});
+const promptOf = (word: Word): Prompt => {
+  const prompt: Prompt = {
+    gloss: word.gloss,
+    hint: word.hint,
+    image: word.image,
+    kind: word.kind,
+  };
+  if (word.presentation) {
+    prompt.meaning = word.presentation.meaning;
+    prompt.context = word.presentation.context;
+    prompt.grammar = word.presentation.grammar;
+  }
+  return prompt;
+};
 
 const current = (
   draft: SessionState,
@@ -149,7 +174,6 @@ export const startSession = (options: SessionEngineOptions): Session => {
       allowanceLeft: draft.allowanceLeft,
       cards: draft.cards,
       dayRolloverHour: options.dayRolloverHour,
-      exposed: draft.exposed,
       justShownId: draft.justShownId,
       now,
       pulledForward: draft.pulledForward,
@@ -172,7 +196,7 @@ export const startSession = (options: SessionEngineOptions): Session => {
             card: { fsrs: createEmptyCard(now), wordId: slot.word.id },
             word: slot.word,
           },
-          phase: "guess",
+          phase: "exposure",
         };
         return;
       }
@@ -203,7 +227,6 @@ export const startSession = (options: SessionEngineOptions): Session => {
       options.newPerDay - (options.introducedToday ?? 0)
     ),
     cards: structuredClone(options.cards),
-    exposed: new Set(),
     flow: { phase: "done" },
     promptShownAt: startedAt,
     pulledForward: new Set(),
@@ -217,7 +240,7 @@ export const startSession = (options: SessionEngineOptions): Session => {
     now: Date
   ): AnswerChange | undefined => {
     const { card, word } = current(draft, action.type);
-    if (action.type === "guess" || action.type === "recall") {
+    if (action.type === "recall") {
       validateAnswerText(action.typed);
     }
     const latencyMs = Math.min(
@@ -225,42 +248,36 @@ export const startSession = (options: SessionEngineOptions): Session => {
       86_400_000
     );
     switch (action.type) {
-      case "guess": {
-        const result = transition(
-          card.fsrs,
-          word.text,
-          { phase: "guess", rating: null, typed: action.typed },
-          now,
-          scheduler
-        );
+      case "exposure": {
+        const due = initialRecallAt(now.toISOString());
+        card.fsrs = toCard({
+          schedule: teachingSchedule(due),
+          wordId: card.wordId,
+        }).fsrs;
+        card.initialRecallAt = due;
+        // A legacy guess already spent its introduction allowance.
+        if (!draft.cards.some((existing) => existing.wordId === card.wordId)) {
+          draft.cards.push(card);
+          draft.allowanceLeft -= 1;
+          draft.stats.introduced += 1;
+        }
         const change: AnswerChange = {
           attempt: {
-            correct: result.correct,
             latencyMs,
-            phase: "guess",
-            rating: null,
+            phase: "teach",
             reviewedAt: now,
-            stateBefore: card.fsrs,
-            typed: action.typed,
             wordId: card.wordId,
           },
-          card: null,
+          card,
         };
-        // The guess, not merely displaying a prompt, introduces this word.
-        card.fsrs = createEmptyCard(now);
-        draft.cards.push(card);
-        draft.allowanceLeft -= 1;
-        draft.stats.introduced += 1;
-        draft.flow = { current: { card, word }, phase: "exposure" };
-        return change;
-      }
-      case "exposure": {
-        draft.exposed.add(card.wordId);
         advance(draft, now);
-        return;
+        return change;
       }
       case "recall": {
         const before = card.fsrs;
+        if (before.reps === 0 && now < before.due) {
+          throw new RevisionConflict();
+        }
         const { correct, rating } = gradeRecall(
           action.typed,
           word.text,
@@ -336,21 +353,24 @@ export const startSession = (options: SessionEngineOptions): Session => {
   return {
     dismissFeedback: () => dispatch({ type: "feedback" }),
     exposureDone: () => dispatch({ type: "exposure" }),
-    submitGuess: (typed) => dispatch({ type: "guess", typed }),
     submitRecall: (typed, effort) =>
       dispatch({ effort, type: "recall", typed }),
     get view(): SessionView {
       const { flow } = state;
       switch (flow.phase) {
-        case "guess": {
-          return { phase: flow.phase, prompt: promptOf(flow.current.word) };
-        }
         case "exposure": {
-          return {
+          const view: SessionView = {
             answer: flow.current.word.text,
             phase: flow.phase,
             prompt: promptOf(flow.current.word),
           };
+          if (flow.current.word.revealNote) {
+            view.revealNote = flow.current.word.revealNote;
+          }
+          if (flow.current.word.presentation) {
+            view.presentation = structuredClone(flow.current.word.presentation);
+          }
+          return view;
         }
         case "recall": {
           return {
@@ -360,11 +380,18 @@ export const startSession = (options: SessionEngineOptions): Session => {
           };
         }
         case "feedback": {
-          return {
+          const view: SessionView = {
             expected: flow.current.word.text,
             phase: flow.phase,
             typed: flow.typed,
           };
+          if (flow.current.word.revealNote) {
+            view.revealNote = flow.current.word.revealNote;
+          }
+          if (flow.current.word.presentation) {
+            view.presentation = structuredClone(flow.current.word.presentation);
+          }
+          return view;
         }
         case "caughtUp": {
           return {

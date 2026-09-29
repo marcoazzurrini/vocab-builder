@@ -29,6 +29,34 @@
       "when": 1789592796893,
       "tag": "0003_ui_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789951606869,
+      "tag": "0004_catalogue_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790514156993,
+      "tag": "0005_family_curriculum",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790700522175,
+      "tag": "0006_teach_first",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790701519900,
+      "tag": "0007_dictionary_presentations",
+      "breakpoints": true
     }
   ]
 }

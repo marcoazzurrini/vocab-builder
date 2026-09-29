@@ -57,7 +57,7 @@ msgstr "Could not check whether you're signed in. Try again."
 msgid "Could not load your session"
 msgstr "Could not load your session"
 
-#. placeholder {0}: audioError.reason
+#. placeholder {0}: error.reason
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Could not play the audio ({0})."
 msgstr "Could not play the audio ({0})."
@@ -86,6 +86,14 @@ msgstr "Delete unsynced answers and reload"
 msgid "Easy"
 msgstr "Easy"
 
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
+msgid "Example · not the answer to memorise"
+msgstr "Example · not the answer to memorise"
+
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
+msgid "French"
+msgstr "French"
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Good"
 msgstr "Good"
@@ -95,28 +103,40 @@ msgid "Hard"
 msgstr "Hard"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "how do you say it in French?"
-msgstr "how do you say it in French?"
+#~ msgid "how do you say it in French?"
+#~ msgstr "how do you say it in French?"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "I've said it aloud"
-msgstr "I've said it aloud"
+#~ msgid "I've said it aloud"
+#~ msgstr "I've said it aloud"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "If this email address has access, you'll receive a link at <0>{sentTo}</0>. Open it on this device."
 msgstr "If this email address has access, you'll receive a link at <0>{sentTo}</0>. Open it on this device."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Italian cue"
+msgstr "Italian cue"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Learn · new entry"
+msgstr "Learn · new entry"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Learning language"
 msgstr "Learning language"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Listen again"
-msgstr "Listen again"
+msgid "Listen"
+msgstr "Listen"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "listen and repeat aloud"
-msgstr "listen and repeat aloud"
+#~ msgid "Listen again"
+#~ msgstr "Listen again"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+#~ msgid "listen and repeat aloud"
+#~ msgstr "listen and repeat aloud"
 
 #: ../../apps/web/src/components/ui/spinner.tsx
 #: ../../apps/web/src/features/practice/session-screen.tsx
@@ -124,14 +144,18 @@ msgstr "listen and repeat aloud"
 msgid "Loading…"
 msgstr "Loading…"
 
+#: ../../apps/web/src/features/practice/dictionary-entry.tsx
+msgid "Meaning in this lesson"
+msgstr "Meaning in this lesson"
+
 #: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Menu"
 msgstr "Menu"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "new word · take a guess"
-msgstr "new word · take a guess"
+#~ msgid "new word · take a guess"
+#~ msgstr "new word · take a guess"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Next word in about {minutes} min. Your session will resume automatically."
@@ -149,6 +173,14 @@ msgstr "Open menu"
 msgid "Progress"
 msgstr "Progress"
 
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Read, listen, and say the word aloud. We will ask you to recall it shortly."
+msgstr "Read, listen, and say the word aloud. We will ask you to recall it shortly."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Recall"
+msgstr "Recall"
+
 #: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "Reload"
 msgstr "Reload"
@@ -156,6 +188,10 @@ msgstr "Reload"
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Request another link"
 msgstr "Request another link"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Select Listen to hear the pronunciation."
+msgstr "Select Listen to hear the pronunciation."
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Send link"
@@ -220,6 +256,14 @@ msgstr "Well done"
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Words"
 msgstr "Words"
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Write only the French word. The context clarifies its meaning; do not translate the whole description."
+msgstr "Write only the French word. The context clarifies its meaning; do not translate the whole description."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+msgid "Write the French expression you learned."
+msgstr "Write the French expression you learned."
 
 #. placeholder {0}: view.typed || "—"
 #: ../../apps/web/src/features/practice/session-screen.tsx

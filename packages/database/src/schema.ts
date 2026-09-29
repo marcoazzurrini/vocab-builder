@@ -9,6 +9,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+import { catalogueSenses, catalogueSources } from "./catalogue-schema";
+
 // Better Auth owns these four tables. Dates use its millisecond timestamp convention.
 export const user = sqliteTable("user", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
@@ -107,9 +109,52 @@ export const words = sqliteTable(
     text: text("text").notNull(),
   },
   (t) => [
-    uniqueIndex("words_lang_text_gloss_unique").on(t.lang, t.text, t.gloss),
+    uniqueIndex("words_lang_text_gloss_unique").on(
+      t.lang,
+      t.text,
+      t.gloss,
+      t.gloss_lang
+    ),
     index("words_lang_freq_rank_idx").on(t.lang, t.freq_rank),
     check("words_kind", sql`${t.kind} in ('word', 'chunk')`),
+  ]
+);
+
+// `words` remains the immutable production-prompt projection used by the scheduler.
+// Keeping its IDs preserves all existing progress and append-only attempts.
+export const cataloguePrompts = sqliteTable(
+  "catalogue_prompts",
+  {
+    content_hash: text("content_hash").notNull(),
+    cue_type: text("cue_type").notNull().default("text"),
+    id: text("id").primaryKey(),
+    language: text("language").notNull(),
+    sense_id: text("sense_id")
+      .notNull()
+      .references(() => catalogueSenses.id),
+    source_id: text("source_id")
+      .notNull()
+      .references(() => catalogueSources.id),
+    status: text("status", {
+      enum: ["legacy", "machine_draft", "reviewed"],
+    }).notNull(),
+    version: integer("version").notNull(),
+    word_id: text("word_id")
+      .notNull()
+      .unique()
+      .references(() => words.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    uniqueIndex("catalogue_prompt_version").on(
+      t.sense_id,
+      t.language,
+      t.version
+    ),
+    check("catalogue_prompt_version_positive", sql`${t.version} > 0`),
+    check(
+      "catalogue_prompt_status",
+      sql`${t.status} in ('legacy','machine_draft','reviewed')`
+    ),
   ]
 );
 
@@ -181,12 +226,47 @@ export const attempts = sqliteTable(
   ]
 );
 
+// Teaching completion is durable evidence, not a guessed or rated answer.
+export const teachings = sqliteTable(
+  "teachings",
+  {
+    card_type: text("card_type").notNull().default("production"),
+    completed_at: text("completed_at").notNull(),
+    id: text("id").primaryKey(),
+    initial_recall_at: text("initial_recall_at").notNull(),
+    latency_ms: integer("latency_ms").notNull(),
+    request: text("request").notNull(),
+    user_id: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    word_id: text("word_id")
+      .notNull()
+      .references(() => words.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    uniqueIndex("teachings_one_completion_idx").on(
+      t.user_id,
+      t.word_id,
+      t.card_type
+    ),
+    check("teachings_production", sql`${t.card_type} = 'production'`),
+    check("teachings_latency", sql`${t.latency_ms} between 0 and 86400000`),
+    check("teachings_request_json", sql`json_valid(${t.request})`),
+    check(
+      "teachings_timestamps",
+      sql`strftime('%Y-%m-%dT%H:%M:%fZ', ${t.completed_at}) is not null and ${t.completed_at} = strftime('%Y-%m-%dT%H:%M:%fZ', ${t.completed_at}) and strftime('%Y-%m-%dT%H:%M:%fZ', ${t.completed_at}, '+60 seconds') is not null and ${t.initial_recall_at} = strftime('%Y-%m-%dT%H:%M:%fZ', ${t.completed_at}, '+60 seconds')`
+    ),
+  ]
+);
+
 export const settings = sqliteTable(
   "settings",
   {
     day_rollover_hour: integer("day_rollover_hour").notNull().default(4),
     lang: text("lang").notNull().default("fr"),
     new_per_day: integer("new_per_day").notNull().default(15),
+    // Prompt language is independent of both target language and interface locale.
+    prompt_language: text("prompt_language").notNull().default("it"),
     // UI preference is independent of the language studied in `lang`.
     ui_locale: text("ui_locale", { enum: ["en", "it"] }),
     user_id: text("user_id")

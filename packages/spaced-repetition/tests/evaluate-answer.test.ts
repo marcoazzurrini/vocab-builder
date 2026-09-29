@@ -18,8 +18,9 @@ const scheduler = fsrs({ enable_short_term: true });
 const ID = "e581fc23-29bd-48a2-a842-071f9eb9f406";
 
 // Raw payloads intentionally include combinations that the schema must reject.
+type HistoricalCommand = Exclude<AnswerCommand, { phase: "teach" }>;
 type CommandOverrides = {
-  [Key in keyof AnswerCommand]?: AnswerCommand[Key];
+  [Key in keyof HistoricalCommand]?: HistoricalCommand[Key];
 };
 
 const recall = (overrides: CommandOverrides = {}) => ({

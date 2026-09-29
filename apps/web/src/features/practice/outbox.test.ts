@@ -205,7 +205,7 @@ describe("durable answer outbox", () => {
       .fn<Send>()
       .mockImplementationOnce((command) => {
         command.id = crypto.randomUUID();
-        command.typed = "changed";
+        command.wordId = "changed";
         return Promise.reject(new Error("offline"));
       })
       .mockResolvedValue();
@@ -582,7 +582,30 @@ describe("durable answer outbox", () => {
     queue.push(a);
     a.typed = "changed";
     await queue.settled();
-    expect(send.mock.calls[0]?.[0].typed).toBe("");
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
+      phase: "guess",
+      typed: "",
+    });
+  });
+
+  it("persists and replays an unrated teaching completion after reload", async () => {
+    const teaching: AnswerCommand = {
+      expectedReps: 0,
+      id: crypto.randomUUID(),
+      latencyMs: 1000,
+      phase: "teach",
+      reviewedAt: new Date().toISOString(),
+      wordId: "word",
+    };
+    const previous = box(() => Promise.reject(new Error("offline")));
+    previous.push(teaching);
+    await expect(previous.settled()).rejects.toThrow("offline");
+    expect(storedAnswer()).toStrictEqual(teaching);
+    const send = vi.fn<Send>().mockResolvedValue();
+    const reloaded = box(send);
+    await reloaded.settled();
+    expect(send).toHaveBeenCalledExactlyOnceWith(teaching);
+    expect(localStorage).toHaveLength(0);
   });
 
   it("does not erase another tab's pending answer", async () => {

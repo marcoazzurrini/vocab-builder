@@ -306,12 +306,16 @@ describe("populated D1 migration upgrade", () => {
         "INSERT INTO cards (user_id,word_id,fsrs_state,revision) VALUES ('learner','known','{\"reps\":1,\"due\":\"2026-09-11T09:01:00.000Z\"}',1)",
       ].map((sql) => binding.prepare(sql))
     );
-    // The new nullable preference is the only intentional shape change.
+    // New settings preserve existing values and initialize their documented defaults.
     const original = await snapshot(binding);
     before = original.map(({ rows, table }) => ({
       rows:
         table === "settings"
-          ? rows.map((row) => ({ ...row, ui_locale: null }))
+          ? rows.map((row) => ({
+              ...row,
+              prompt_language: "it",
+              ui_locale: null,
+            }))
           : rows,
       table,
     }));
@@ -338,6 +342,9 @@ describe("populated D1 migration upgrade", () => {
   it("preserves every populated table while upgrading the initial schema", async () => {
     expect(before.every(({ rows }) => rows.length > 0)).toBe(true);
     expect(await snapshot(binding)).toEqual(before);
+    // Historical guesses do not prove that teaching was completed.
+    const teachings = await binding.prepare("SELECT * FROM teachings").all();
+    expect(teachings.results).toEqual([]);
     const foreignKeys = await binding.prepare("PRAGMA foreign_key_check").all();
     expect(foreignKeys.results).toEqual([]);
   });
@@ -527,13 +534,38 @@ it("applies and reapplies migrations through local Wrangler with isolated state"
     expect(
       rows.filter(({ kind }) => kind === "trigger").map(({ name }) => name)
     ).toEqual([
+      "attempts_history_id_guard",
       "attempts_no_delete",
       "attempts_no_update",
       "attempts_recall_revision",
+      "catalogue_curricula_immutable",
+      "catalogue_curriculum_scope",
+      "catalogue_curriculum_steps_immutable",
+      "catalogue_entry_identity_immutable",
+      "catalogue_forms_immutable",
+      "catalogue_frequency_immutable",
+      "catalogue_list_identity_immutable",
+      "catalogue_presentation_immutable",
+      "catalogue_presentation_no_delete",
+      "catalogue_presentation_no_replace",
+      "catalogue_prompt_identity_immutable",
+      "catalogue_sense_immutable",
+      "catalogue_source_immutable",
+      "catalogue_word_content_immutable",
+      "teachings_insert_guard",
+      "teachings_no_delete",
+      "teachings_no_update",
     ]);
     expect(
       rows.filter(({ kind }) => kind === "table").map(({ name }) => name)
-    ).toEqual(expect.arrayContaining([...legacyTables, "rate_limit"]));
+    ).toEqual(
+      expect.arrayContaining([
+        ...legacyTables,
+        "rate_limit",
+        "teachings",
+        "catalogue_presentations",
+      ])
+    );
   } finally {
     await rm(temporary.directory, { force: true, recursive: true });
   }

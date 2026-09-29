@@ -16,6 +16,15 @@ export interface Attempt {
   reviewedAt: Date;
 }
 
+export interface TeachingAttempt {
+  wordId: string;
+  phase: "teach";
+  latencyMs: number;
+  reviewedAt: Date;
+}
+
+export type SessionAttempt = Attempt | TeachingAttempt;
+
 const fields = {
   id: v.pipe(v.string(), v.uuid()),
   latencyMs: v.pipe(
@@ -32,6 +41,15 @@ const fields = {
 // Preserve the serialized field order: existing idempotency records contain this JSON.
 // oxlint-disable-next-line eslint/no-redeclare -- The public schema and inferred type intentionally share one export.
 export const AnswerCommand = v.variant("phase", [
+  // oxlint-disable-next-line eslint/sort-keys -- Canonical command field order is persisted for idempotency.
+  v.strictObject({
+    id: fields.id,
+    wordId: fields.wordId,
+    phase: v.literal("teach"),
+    latencyMs: fields.latencyMs,
+    reviewedAt: fields.reviewedAt,
+    expectedReps: v.literal(0),
+  }),
   // oxlint-disable-next-line eslint/sort-keys -- Valibot emits this persisted JSON order; sorting breaks idempotency comparisons.
   v.strictObject({
     id: fields.id,
@@ -62,8 +80,18 @@ export type AnswerCommand = v.InferOutput<typeof AnswerCommand>;
 export const validateAnswerText = (typed: unknown): string =>
   v.parse(fields.typed, typed);
 
-export const commandFor = (attempt: Attempt): AnswerCommand =>
-  v.parse(AnswerCommand, {
+export const commandFor = (attempt: SessionAttempt): AnswerCommand => {
+  if (attempt.phase === "teach") {
+    return v.parse(AnswerCommand, {
+      expectedReps: 0,
+      id: crypto.randomUUID(),
+      latencyMs: attempt.latencyMs,
+      phase: "teach",
+      reviewedAt: attempt.reviewedAt.toISOString(),
+      wordId: attempt.wordId,
+    });
+  }
+  return v.parse(AnswerCommand, {
     expectedReps: attempt.stateBefore.reps,
     id: crypto.randomUUID(),
     latencyMs: attempt.latencyMs,
@@ -73,3 +101,4 @@ export const commandFor = (attempt: Attempt): AnswerCommand =>
     typed: attempt.typed,
     wordId: attempt.wordId,
   });
+};

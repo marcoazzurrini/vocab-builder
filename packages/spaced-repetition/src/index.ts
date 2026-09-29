@@ -12,7 +12,7 @@ export { dayStart as studyDayStart } from "./study-day";
 export type { ReviewSnapshot } from "./restore-progress";
 export type { Effort } from "./answer-grading";
 export type { SessionView } from "./study-session";
-export type { Word } from "./restore-progress";
+export type { Word, EntryPresentation } from "./restore-progress";
 export type { Session } from "./study-session";
 
 export interface Settings {
@@ -65,7 +65,8 @@ export const createSession = ({
     snapshot.cards,
     snapshot.guesses,
     clock(),
-    parsedSettings.dayRolloverHour
+    parsedSettings.dayRolloverHour,
+    snapshot.teachings
   );
   return startSession({
     ...progress,

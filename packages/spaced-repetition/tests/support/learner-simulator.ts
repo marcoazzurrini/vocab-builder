@@ -2,7 +2,7 @@
 import { State } from "ts-fsrs";
 import type { Card as FsrsCard } from "ts-fsrs";
 
-import type { Attempt } from "../../src/answer-command";
+import type { Attempt, TeachingAttempt } from "../../src/answer-command";
 import type { Effort } from "../../src/answer-grading";
 import { evaluateAnswer } from "../../src/evaluate-answer";
 import { createSession } from "../../src/index";
@@ -12,6 +12,7 @@ import type {
   SessionView,
 } from "../../src/index";
 import type { Word } from "../../src/restore-progress";
+import { initialRecallAt, teachingSchedule } from "../../src/teaching-schedule";
 
 /** Independent facts at selection time, not the production queue's decision. */
 export interface Eligibility {
@@ -31,7 +32,6 @@ interface AnswerFacts {
   expectedReps: number;
 }
 export type Step =
-  | (PromptFacts & AnswerFacts & { at: "guess" })
   | (PromptFacts & { at: "exposure" })
   | (PromptFacts &
       AnswerFacts & { at: "recall"; first: boolean; effort: Effort })
@@ -44,8 +44,6 @@ export type Step =
     });
 
 export interface Behaviour {
-  /** Pretests are unrated whether the learner already knows the word or not. */
-  guessCorrect?: (word: Word) => boolean;
   correct?: (word: Word, recallNumber: number) => boolean;
   effort?: (word: Word) => Effort;
   msPerPrompt?: number | (() => number);
@@ -58,6 +56,7 @@ export interface Learner {
   readonly now: Date;
   readonly trace: readonly Step[];
   readonly attempts: readonly Attempt[];
+  readonly teachings: readonly TeachingAttempt[];
   readonly commands: readonly AnswerCommand[];
   readonly snapshot: ReviewSnapshot;
   readonly cardedWordIds: readonly string[];
@@ -149,22 +148,27 @@ export const createLearner = (options: {
   const cardRows = new Map<string, string>();
   const commands: AnswerCommand[] = [];
   const attempts: Attempt[] = [];
+  const teachings: TeachingAttempt[] = [];
   const trace: Step[] = [];
   const recallCount = new Map<string, number>();
   let nowMs = start.getTime();
-  const guessRows = () =>
-    commands
-      .filter((c) => c.phase === "guess")
-      .map(({ wordId, reviewedAt }) => ({ reviewedAt, wordId }));
+  const teachingRows = () =>
+    teachings.map(({ wordId, reviewedAt }) => ({
+      initialRecallAt: initialRecallAt(reviewedAt.toISOString()),
+      reviewedAt: reviewedAt.toISOString(),
+      wordId,
+    }));
   const introducedToday = () => {
     const boundary = studyBounds(nowMs, rollover).start;
-    return guessRows().filter((g) => Date.parse(g.reviewedAt) >= boundary)
-      .length;
+    return teachings.filter((t) => t.reviewedAt.getTime() >= boundary).length;
   };
   const snapshot = (): ReviewSnapshot =>
     json({
-      cards: [...cardRows].map(([wordId, schedule]) => ({ schedule, wordId })),
-      guesses: guessRows(),
+      cards: [...cardRows]
+        .filter(([, schedule]) => scheduleFromJSON(schedule).reps > 0)
+        .map(([wordId, schedule]) => ({ schedule, wordId })),
+      guesses: [],
+      teachings: teachingRows(),
       words,
     });
 
@@ -176,20 +180,26 @@ export const createLearner = (options: {
     // This is a set of admissible work, not a copy of queue priority rules.
     const eligibility = (): Eligibility => {
       const { start: studyStart, end } = studyBounds(nowMs, rollover);
-      const guessed = new Set(guessRows().map((g) => g.wordId));
+      const taught = new Set(teachings.map((t) => t.wordId));
       const eligibleWordIds: string[] = [];
       const remainingLearning: Eligibility["remainingLearning"] = [];
       for (const word of words) {
         const row = cardRows.get(word.id);
         if (!row) {
-          if (guessed.has(word.id) || allowance > 0) {
+          if (allowance > 0) {
             eligibleWordIds.push(word.id);
           }
           continue;
         }
         const card = scheduleFromJSON(row);
         const due = card.due.getTime();
-        if (card.state === State.Review) {
+        if (card.reps === 0) {
+          if (!taught.has(word.id) || due <= nowMs) {
+            eligibleWordIds.push(word.id);
+          } else if (due <= end) {
+            remainingLearning.push({ due, wordId: word.id });
+          }
+        } else if (card.state === State.Review) {
           const ratedToday =
             (card.last_review?.getTime() ?? -Infinity) >= studyStart;
           if (due <= end && !ratedToday) {
@@ -216,6 +226,18 @@ export const createLearner = (options: {
         const word = byId.get(command.wordId);
         if (!word) {
           throw new Error(`unknown word in answer ${command.wordId}`);
+        }
+        if (command.phase === "teach") {
+          const due = initialRecallAt(command.reviewedAt);
+          cardRows.set(command.wordId, teachingSchedule(due));
+          teachings.push({
+            latencyMs: command.latencyMs,
+            phase: "teach",
+            reviewedAt: new Date(command.reviewedAt),
+            wordId: command.wordId,
+          });
+          commands.push(command);
+          return;
         }
         const result = evaluateAnswer(
           command,
@@ -251,21 +273,10 @@ export const createLearner = (options: {
       base: PromptFacts,
       reps: number
     ): void => {
-      if (view.phase === "guess") {
-        const right = options.behaviour?.guessCorrect?.(word) ?? false;
-        const typed = right ? word.text : "";
-        steps.push({
-          ...base,
-          at: "guess",
-          correct: right,
-          expectedReps: 0,
-          typed,
-        });
-        session.submitGuess(typed);
-        allowance -= 1;
-      } else if (view.phase === "exposure") {
+      if (view.phase === "exposure") {
         steps.push({ ...base, at: "exposure" });
         session.exposureDone();
+        allowance -= 1;
       } else if (view.phase === "recall") {
         const n = (recallCount.get(word.id) ?? 0) + 1;
         recallCount.set(word.id, n);
@@ -310,7 +321,11 @@ export const createLearner = (options: {
         const row = cardRows.get(word.id);
         if (row) {
           const before = scheduleFromJSON(row);
-          if (before.state !== State.Review && before.due.getTime() > shownAt) {
+          if (
+            before.reps > 0 &&
+            before.state !== State.Review &&
+            before.due.getTime() > shownAt
+          ) {
             pulled.add(word.id);
           }
         }
@@ -366,6 +381,9 @@ export const createLearner = (options: {
     sit,
     get snapshot() {
       return snapshot();
+    },
+    get teachings() {
+      return teachings;
     },
     get trace() {
       return trace;

@@ -28,6 +28,11 @@
     "db:migrate": "bun run --filter @vocab/web db:migrate",
     "db:migrate:remote": "bun run --filter @vocab/web db:migrate:remote",
     "db:seed": "bun packages/database/scripts/import-catalogue.ts --config apps/web/wrangler.jsonc",
+    "catalogue:extract": "bun packages/database/scripts/catalogue/extract.ts",
+    "catalogue:build": "bun packages/database/scripts/catalogue/build.ts",
+    "catalogue:import": "bun packages/database/scripts/catalogue/import.ts --config apps/web/wrangler.jsonc",
+    "catalogue:families": "bun packages/database/scripts/catalogue/curriculum.ts && oxfmt packages/database/scripts/catalogue/family-resource.json packages/database/scripts/catalogue/curriculum-fr-it.json",
+    "catalogue:import:families": "bun packages/database/scripts/catalogue/import.ts --families --config apps/web/wrangler.jsonc",
     "deploy": "bun run ci && bun run deploy:only",
     "deploy:only": "bun run --filter @vocab/web deploy",
     "setup:local": "bun apps/web/scripts/setup-local.mjs apps/web/.dev.vars"

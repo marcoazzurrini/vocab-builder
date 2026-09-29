@@ -8,14 +8,14 @@
 
 import { State } from "ts-fsrs";
 
-import type { Attempt } from "../../src/answer-command";
+import type { Attempt, TeachingAttempt } from "../../src/answer-command";
 import { studyBounds } from "./learner-simulator";
 import type { Step } from "./learner-simulator";
 
 /** A step that actually put something on screen. */
 export type PromptStep = Exclude<Step, { at: "closed" }>;
 
-/** Split a trace into sittings. `exposedThisSession` does not survive a close. */
+/** Split a trace into sittings for adjacency and batch-order checks. */
 export const sittings = (trace: readonly Step[]): PromptStep[][] => {
   let sitting: PromptStep[] = [];
   const out: PromptStep[][] = [sitting];
@@ -30,26 +30,18 @@ export const sittings = (trace: readonly Step[]): PromptStep[][] => {
   return out.filter((s) => s.length > 0);
 };
 
-/**
- * Never ask for a word that has not been shown.
- *
- * FSRS's rating #1 can only be earned by a card whose exposure happened in this
- * same sitting: closing the app loses the knowledge that the exposure was ever
- * read, so it has to be shown again. Violated by the bug fixed in daa4fa4.
- */
+/** Never ask for an untaught word. Completed teaching survives a close. */
 export const recallsWithoutExposure = (
   trace: readonly Step[]
 ): PromptStep[] => {
   const bad: PromptStep[] = [];
-  for (const sitting of sittings(trace)) {
-    const exposed = new Set<string>();
-    for (const step of sitting) {
-      if (step.at === "exposure") {
-        exposed.add(step.word);
-      }
-      if (step.at === "recall" && step.first && !exposed.has(step.word)) {
-        bad.push(step);
-      }
+  const exposed = new Set<string>();
+  for (const step of trace) {
+    if (step.at === "exposure") {
+      exposed.add(step.wordId);
+    }
+    if (step.at === "recall" && step.first && !exposed.has(step.wordId)) {
+      bad.push(step);
     }
   }
   return bad;
@@ -63,11 +55,8 @@ export const recallsWithoutExposure = (
  * difficulty — so an exposure has to be separated from its recall by real work.
  * Once any card has been asked for, no card is still waiting to be shown.
  *
- * Stated this way rather than as "an exposure is never followed by its own
- * recall", because that adjacency is legitimate when it is the only card left:
- * refusing it would show a lone word and then never ask for it. This form has no
- * such exception — with one card it is trivially satisfied, and with two or more
- * it is exactly what the bug violated.
+ * First recall also requires a full minute after teaching, checked separately.
+ * A lone word waits instead of bypassing that spacing floor.
  */
 export const exposuresAfterAFirstRecall = (
   trace: readonly Step[]
@@ -89,16 +78,14 @@ export const exposuresAfterAFirstRecall = (
 /**
  * Never the same card twice running.
  *
- * Four adjacencies are the pipeline working as designed: a guess is followed by
- * the exposure that answers it, a wrong recall is followed by the feedback that
- * corrects it, and — only when there is nothing else at all — an exposure is
- * followed by its own recall, or a failed card that came due during its own
- * feedback is asked again. Every other repeat is massing.
+ * A wrong recall is followed by its corrective feedback. A failed card that
+ * came due during feedback may recur only when no other work can intervene.
+ * Teaching never bypasses the first-recall spacing floor.
  */
 export const repeatsInARow = (
   trace: readonly Step[]
 ): { previous: PromptStep; next: PromptStep }[] => {
-  const allowed = new Set(["guess→exposure", "recall→feedback"]);
+  const allowed = new Set(["recall→feedback"]);
   const bad: { previous: PromptStep; next: PromptStep }[] = [];
 
   for (const sitting of sittings(trace)) {
@@ -111,7 +98,7 @@ export const repeatsInARow = (
         continue;
       }
       if (
-        (previous.at === "exposure" || previous.at === "feedback") &&
+        previous.at === "feedback" &&
         next.at === "recall" &&
         !next.eligibleWordIds.some((id) => id !== next.wordId)
       ) {
@@ -123,30 +110,78 @@ export const repeatsInARow = (
   return bad;
 };
 
-/**
- * Every card's history opens with exactly one guess.
- *
- * A pretest before the first exposure is the whole of §3, and `attempts` is
- * where the claim that it happened is stored — so if the table does not show it,
- * it did not happen, whatever the session believed at the time.
- */
-export const historiesNotStartingWithOneGuess = (
-  attempts: readonly Attempt[]
+/** Every newly generated history has exactly one durable teaching before recall. */
+export const historiesNotStartingWithOneTeaching = (
+  attempts: readonly Attempt[],
+  teachings: readonly TeachingAttempt[]
 ): string[] => {
-  const byWord = new Map<string, Attempt[]>();
-  for (const a of attempts) {
-    const list = byWord.get(a.wordId) ?? [];
-    list.push(a);
-    byWord.set(a.wordId, list);
-  }
-
   const bad: string[] = [];
-  for (const [wordId, history] of byWord) {
-    const guesses = history.filter((a) => a.phase === "guess");
-    if (history[0]?.phase !== "guess") {
-      bad.push(`${wordId}: first attempt is not a guess`);
-    } else if (guesses.length !== 1) {
-      bad.push(`${wordId}: ${guesses.length} guesses`);
+  const wordIds = new Set([...attempts, ...teachings].map((a) => a.wordId));
+  for (const wordId of wordIds) {
+    const rows = teachings.filter((t) => t.wordId === wordId);
+    if (rows.length !== 1) {
+      bad.push(`${wordId}: ${rows.length} teachings`);
+      continue;
+    }
+    for (const attempt of attempts.filter((a) => a.wordId === wordId)) {
+      if (attempt.phase !== "recall") {
+        bad.push(`${wordId}: new history contains a guess`);
+      }
+      const [teaching] = rows;
+      if (
+        teaching &&
+        attempt.reviewedAt.getTime() - attempt.latencyMs <
+          teaching.reviewedAt.getTime()
+      ) {
+        bad.push(`${wordId}: recalled before teaching`);
+      }
+    }
+  }
+  return bad;
+};
+
+/** First recall is never pulled forward, including after reopening. */
+export const firstRecallsTooSoon = (trace: readonly Step[]): PromptStep[] => {
+  const taughtAt = new Map<string, number>();
+  const bad: PromptStep[] = [];
+  for (const step of trace) {
+    if (step.at === "exposure") {
+      taughtAt.set(step.wordId, step.actedAt);
+    } else if (step.at === "recall" && step.first) {
+      const completed = taughtAt.get(step.wordId);
+      if (completed !== undefined && step.shownAt < completed + 60_000) {
+        bad.push(step);
+      }
+    }
+  }
+  return bad;
+};
+
+/** Teaching is an event, not a graded answer or an FSRS review. */
+export const teachingMismatches = (
+  trace: readonly Step[],
+  teachings: readonly TeachingAttempt[]
+): string[] => {
+  const exposures = trace.filter((s) => s.at === "exposure");
+  const bad: string[] = [];
+  if (exposures.length !== teachings.length) {
+    bad.push("exposure/teaching count differs");
+  }
+  for (const [i, step] of exposures.entries()) {
+    const teaching = teachings[i];
+    if (!teaching) {
+      continue;
+    }
+    if (
+      Object.keys(teaching).toSorted().join(",") !==
+        "latencyMs,phase,reviewedAt,wordId" ||
+      teaching.phase !== "teach" ||
+      teaching.wordId !== step.wordId ||
+      teaching.reviewedAt.getTime() !== step.actedAt ||
+      teaching.latencyMs !==
+        Math.min(86_400_000, Math.max(0, step.actedAt - step.shownAt))
+    ) {
+      bad.push(`teaching ${i}: event differs`);
     }
   }
   return bad;
@@ -197,11 +232,8 @@ export const reviewsDraggedFromTheFuture = (
   });
 
 const expectedRating = (
-  step: Extract<Step, { at: "guess" | "recall" }>
+  step: Extract<Step, { at: "recall" }>
 ): Attempt["rating"] => {
-  if (step.at === "guess") {
-    return null;
-  }
   if (!step.correct) {
     return 1;
   }
@@ -216,7 +248,7 @@ export const attemptMismatches = (
   trace: readonly Step[],
   attempts: readonly Attempt[]
 ): string[] => {
-  const answered = trace.filter((s) => s.at === "guess" || s.at === "recall");
+  const answered = trace.filter((s) => s.at === "recall");
   const bad: string[] = [];
   if (answered.length !== attempts.length) {
     bad.push("answer/attempt count differs");
@@ -293,9 +325,14 @@ export const closureContradictions = (trace: readonly Step[]): string[] => {
 export const violations = (
   trace: readonly Step[],
   attempts: readonly Attempt[],
-  dayRolloverHour = 0
+  dayRolloverHour = 0,
+  teachings: readonly TeachingAttempt[] = []
 ): string[] => [
   ...attemptMismatches(trace, attempts),
+  ...teachingMismatches(trace, teachings),
+  ...firstRecallsTooSoon(trace).map(
+    (s) => `${s.word}: first recall before teaching + 60 seconds`
+  ),
   ...closureContradictions(trace),
   ...reviewsDraggedFromTheFuture(attempts, dayRolloverHour).map(
     (a) =>
@@ -303,8 +340,7 @@ export const violations = (
       `but shown ${a.reviewedAt.toISOString()}`
   ),
   ...recallsWithoutExposure(trace).map(
-    (s) =>
-      `first recall of ${s.word} with no exposure before it in this sitting`
+    (s) => `first recall of ${s.word} with no completed teaching before it`
   ),
   ...exposuresAfterAFirstRecall(trace).map(
     (s) =>
@@ -314,7 +350,7 @@ export const violations = (
     ({ previous, next }) =>
       `${previous.word}: ${previous.at} followed straight by ${next.at}`
   ),
-  ...historiesNotStartingWithOneGuess(attempts),
+  ...historiesNotStartingWithOneTeaching(attempts, teachings),
   ...gradingContradictions(attempts).map(
     (a) => `${a.phase} on ${a.wordId}: correct=${a.correct} rating=${a.rating}`
   ),

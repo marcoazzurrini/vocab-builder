@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 
+import { DictionaryEntry } from "./dictionary-entry";
 import { speak, warmUpVoices } from "./speak";
 import type { SpeechFailure } from "./speak";
 import type { PracticeTransport } from "./transport";
@@ -44,17 +45,41 @@ const SessionStats = ({
 );
 
 const Prompt = ({
-  image,
   gloss,
   hint,
+  meaning,
+  context,
+  grammar,
 }: {
-  image: string | null;
   gloss: string;
   hint: string | null;
+  meaning?: string;
+  context?: string | null;
+  grammar?: string | null;
 }) => (
-  <div className="flex flex-col gap-3">
-    {image && <p className="text-5xl">{image}</p>}
-    <p className="text-xl text-pretty">{gloss}</p>
+  <div className="flex flex-col gap-4">
+    <p className="text-muted-foreground text-xs tracking-widest uppercase">
+      <Trans>Italian cue</Trans>
+    </p>
+    <h1
+      lang="it"
+      className="font-serif text-4xl leading-tight font-normal tracking-tight text-pretty [overflow-wrap:anywhere] sm:text-5xl"
+    >
+      {meaning ?? gloss}
+    </h1>
+    {grammar && (
+      <p lang="it" className="text-muted-foreground text-sm">
+        {grammar}
+      </p>
+    )}
+    {context && (
+      <p
+        lang="it"
+        className="text-muted-foreground max-w-prose text-base leading-relaxed text-pretty"
+      >
+        {context}
+      </p>
+    )}
     {hint && (
       <p className="text-muted-foreground text-sm text-pretty">{hint}</p>
     )}
@@ -159,6 +184,53 @@ const Recovery = ({
   );
 };
 
+const RevealNote = ({ text }: { text?: string }) =>
+  text ? (
+    <p className="text-muted-foreground text-sm text-pretty">{text}</p>
+  ) : null;
+
+const RecallInstruction = ({ kind }: { kind: "word" | "chunk" }) => (
+  <p className="text-muted-foreground text-sm leading-relaxed">
+    {kind === "word" ? (
+      <Trans>
+        Write only the French word. The context clarifies its meaning; do not
+        translate the whole description.
+      </Trans>
+    ) : (
+      <Trans>Write the French expression you learned.</Trans>
+    )}
+  </p>
+);
+
+const AudioStatus = ({
+  error,
+  isTeaching,
+}: {
+  error: SpeechFailure | null;
+  isTeaching: boolean;
+}) => {
+  const { t } = useLingui();
+  if (!error) {
+    return null;
+  }
+  if (error.kind === "failed" && error.reason === "not-allowed") {
+    return isTeaching ? (
+      <p className="text-muted-foreground text-sm">
+        <Trans>Select Listen to hear the pronunciation.</Trans>
+      </p>
+    ) : null;
+  }
+  return (
+    <Alert>
+      <AlertDescription>
+        {error.kind === "unsupported"
+          ? t`This browser does not support reading words aloud.`
+          : t`Could not play the audio (${error.reason}).`}
+      </AlertDescription>
+    </Alert>
+  );
+};
+
 export const SessionScreen = ({
   userId,
   transport,
@@ -195,7 +267,7 @@ export const SessionScreen = ({
   }, [exposureAnswer]);
 
   useEffect(() => {
-    if (phase === "guess" || phase === "recall") {
+    if (phase === "recall") {
       inputRef.current?.focus();
     }
     // eslint-disable-next-line react/exhaustive-effect-dependencies -- A new card must refocus the remounted input even when its phase is unchanged.
@@ -204,6 +276,7 @@ export const SessionScreen = ({
   const act = (fn: () => void) => {
     fn();
     setTyped("");
+    setAudioError(null);
   };
 
   if (loadError || writeError) {
@@ -221,77 +294,44 @@ export const SessionScreen = ({
   return (
     // A new card remounts its input; the effect above restores answer focus.
     <div
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-8 py-4 sm:py-8"
       key={`${view.phase}:${promptGloss ?? ""}`}
     >
-      {view.phase === "guess" && (
-        <form
-          className="flex flex-col gap-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            act(() => practice.submitGuess(typed));
-          }}
-        >
-          <p className="text-muted-foreground text-sm">
-            <Trans>new word · take a guess</Trans>
-          </p>
-          <Prompt
-            image={view.prompt.image}
-            gloss={view.prompt.gloss}
-            hint={view.prompt.hint}
-          />
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="guess-answer" className="sr-only">
-                <Trans>type the French word</Trans>
-              </FieldLabel>
-              <Input
-                id="guess-answer"
-                ref={inputRef}
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                placeholder={t`how do you say it in French?`}
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-            </Field>
-          </FieldGroup>
-          {/* Empty is a valid answer: a shrug is a legitimate pretest (§3). */}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit">
-              <Trans>Continue</Trans>
-            </Button>
-          </div>
-        </form>
-      )}
       {view.phase === "exposure" && (
         <>
-          <p className="text-muted-foreground text-sm">
-            <Trans>listen and repeat aloud</Trans>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">
+            <Trans>Learn · new entry</Trans>
           </p>
-          {view.prompt.image && <p className="text-5xl">{view.prompt.image}</p>}
-          <p
-            lang="fr"
-            className="text-4xl font-semibold [overflow-wrap:anywhere]"
-          >
-            {view.answer}
+          <DictionaryEntry
+            answer={view.answer}
+            meaning={view.prompt.meaning ?? view.prompt.gloss}
+            presentation={view.presentation}
+            note={view.revealNote}
+          />
+          <p className="text-muted-foreground max-w-prose text-sm leading-relaxed text-pretty">
+            <Trans>
+              Read, listen, and say the word aloud. We will ask you to recall it
+              shortly.
+            </Trans>
           </p>
-          <p className="text-xl text-pretty">{view.prompt.gloss}</p>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => speak(view.answer, setAudioError)}
+              size="lg"
+              onClick={() => {
+                setAudioError(null);
+                speak(view.answer, setAudioError);
+              }}
             >
-              <Trans>Listen again</Trans>
+              <Trans>Listen</Trans>
             </Button>
             <Button
               type="button"
+              size="lg"
               onClick={() => act(() => practice.exposureDone())}
             >
-              <Trans>I&apos;ve said it aloud</Trans>
+              <Trans>Continue</Trans>
             </Button>
           </div>
         </>
@@ -305,14 +345,11 @@ export const SessionScreen = ({
             act(() => practice.submitRecall(typed, "good"));
           }}
         >
-          <p className="text-muted-foreground text-sm">
-            <Trans>type the French word</Trans>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase">
+            <Trans>Recall</Trans>
           </p>
-          <Prompt
-            image={view.prompt.image}
-            gloss={view.prompt.gloss}
-            hint={view.prompt.hint}
-          />
+          <Prompt {...view.prompt} />
+          <RecallInstruction kind={view.prompt.kind} />
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="recall-answer" className="sr-only">
@@ -335,6 +372,7 @@ export const SessionScreen = ({
             {view.efforts.map((effort) => (
               <Button
                 key={effort}
+                size="lg"
                 type={effort === "good" ? "submit" : "button"}
                 variant={effort === "good" ? "default" : "ghost"}
                 onClick={
@@ -361,10 +399,18 @@ export const SessionScreen = ({
           </p>
           <p
             lang="fr"
-            className="text-4xl font-semibold [overflow-wrap:anywhere]"
+            className="font-serif text-5xl leading-tight font-normal tracking-tight [overflow-wrap:anywhere]"
           >
             {view.expected}
           </p>
+          {view.presentation && (
+            <p lang="it" className="text-xl text-pretty">
+              {view.presentation.meaning}
+            </p>
+          )}
+          <RevealNote
+            text={view.presentation?.explanation ?? view.revealNote}
+          />
           {/* No diff highlighting: finding the difference is the point (§2). */}
           <p className="text-muted-foreground text-sm text-pretty [overflow-wrap:anywhere]">
             <Trans>
@@ -407,15 +453,7 @@ export const SessionScreen = ({
           <SessionStats {...view.stats} />
         </>
       )}
-      {audioError && (
-        <Alert>
-          <AlertDescription>
-            {audioError.kind === "unsupported"
-              ? t`This browser does not support reading words aloud.`
-              : t`Could not play the audio (${audioError.reason}).`}
-          </AlertDescription>
-        </Alert>
-      )}
+      <AudioStatus error={audioError} isTeaching={view.phase === "exposure"} />
     </div>
   );
 };

@@ -314,8 +314,6 @@ export const usePracticeSession = (
     loadError: recoveryError?.kind === "load" ? recoveryError.message : null,
     recovering: state.screen.status === "recovering",
     retry,
-    submitGuess: (typed: string) =>
-      act((current) => current.submitGuess(typed)),
     submitRecall: (typed: string, effort: Effort) =>
       act((current) => current.submitRecall(typed, effort)),
     syncConflict: recoveryError?.syncConflict ?? false,

@@ -47,15 +47,24 @@ const scheduled = (wordId: string, state: State, due: Date): Card => ({
   wordId,
 });
 
-const ask = (q: Partial<Queue> & Pick<Queue, "cards">): Slot =>
-  pickNext({
+// Fixture shorthand for persisted teaching evidence, not session-local exposure.
+const ask = (
+  q: Partial<Queue> & Pick<Queue, "cards"> & { taught?: ReadonlySet<string> }
+): Slot => {
+  const { taught, ...queue } = q;
+  for (const card of queue.cards) {
+    if (taught?.has(card.wordId)) {
+      card.initialRecallAt = card.fsrs.due.toISOString();
+    }
+  }
+  return pickNext({
     allowanceLeft: 0,
-    exposed: new Set(),
     now: NOW,
     pulledForward: new Set(),
     words: WORDS,
-    ...q,
+    ...queue,
   });
+};
 
 describe("review spacing within a study day", () => {
   const start = new Date("2026-08-10T04:00:00");
@@ -149,8 +158,8 @@ describe("the next-card rule", () => {
       expect(
         ask({
           cards: [due, shown],
-          exposed: new Set(["w2"]),
           justShownId: "w1",
+          taught: new Set(["w2"]),
         })
       ).toEqual({
         card: shown,
@@ -230,7 +239,7 @@ describe("the next-card rule", () => {
   });
 
   describe("4. showing a word waiting for its first recall", () => {
-    it("shows it when this sitting has not", () => {
+    it("shows legacy progress without completed teaching", () => {
       const card = awaiting("w1");
       expect(ask({ cards: [card] })).toEqual({ card, do: "expose" });
     });
@@ -240,7 +249,7 @@ describe("the next-card rule", () => {
       const a = awaiting("w1", NOW);
       const b = awaiting("w2", new Date(NOW.getTime() + 1000));
       expect(
-        ask({ cards: [a, b], exposed: new Set(["w1"]), justShownId: "w1" })
+        ask({ cards: [a, b], justShownId: "w1", taught: new Set(["w1"]) })
       ).toEqual({
         card: b,
         do: "expose",
@@ -258,9 +267,9 @@ describe("the next-card rule", () => {
   });
 
   describe("5. asking for a word that has been shown", () => {
-    it("asks once the exposure has happened", () => {
+    it("asks once teaching is complete and the persisted due time is reached", () => {
       const card = awaiting("w1");
-      expect(ask({ cards: [card], exposed: new Set(["w1"]) })).toEqual({
+      expect(ask({ cards: [card], taught: new Set(["w1"]) })).toEqual({
         card,
         do: "recall",
       });
@@ -273,8 +282,8 @@ describe("the next-card rule", () => {
       expect(
         ask({
           cards: [a, b],
-          exposed: new Set(["w1", "w2"]),
           justShownId: "w2",
+          taught: new Set(["w1", "w2"]),
         })
       ).toEqual({
         card: a,
@@ -294,8 +303,8 @@ describe("the next-card rule", () => {
       expect(
         ask({
           cards: [shown, soon],
-          exposed: new Set(["w1"]),
           justShownId: "w1",
+          taught: new Set(["w1"]),
         })
       ).toEqual({
         card: soon,
@@ -306,12 +315,12 @@ describe("the next-card rule", () => {
   });
 
   describe("7. asking straight back, when there is nothing else at all", () => {
-    it("does ask for it rather than never asking", () => {
+    it("does ask for it at its due time rather than never asking", () => {
       // Refusing outright would show a lone word and never ask for it — again on
       // the next sitting, and the one after that.
       const card = awaiting("w1");
       expect(
-        ask({ cards: [card], exposed: new Set(["w1"]), justShownId: "w1" })
+        ask({ cards: [card], justShownId: "w1", taught: new Set(["w1"]) })
       ).toEqual({
         card,
         do: "recall",
@@ -554,7 +563,7 @@ describe("queue edge cases", () => {
       do: "expose",
     });
     expect(
-      ask({ cards: [first, second], exposed: new Set(["w1", "w2"]) })
+      ask({ cards: [first, second], taught: new Set(["w1", "w2"]) })
     ).toEqual({
       card: first,
       do: "recall",
@@ -634,7 +643,7 @@ describe("queue edge cases", () => {
             const cardAt = (at) => ({ wordId: "edge", fsrs: { ...createEmptyCard(now), reps: 1, state, due: new Date(at) } });
             const ask = (card, spent = false) => pickNext({
               cards: [card], words: [], now, dayRolloverHour: 4, allowanceLeft: 0,
-              exposed: new Set(), pulledForward: new Set(spent ? ["edge"] : []),
+              pulledForward: new Set(spent ? ["edge"] : []),
             });
             const edge = cardAt(nextStart);
             assert.deepEqual(ask(edge), { do: "done" });
