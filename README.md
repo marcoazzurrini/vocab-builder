@@ -28,6 +28,12 @@ This installs the checked-in 1,000-family French/Italian curriculum: 1,049 lemma
 
 Local sign-in links appear in the terminal. Do not expose the development server or share those links. See [development and deployment](docs/development.md) for secrets, existing catalogue imports, and production safeguards.
 
+## Short practice sessions
+
+Choose a 3-, 5-, or 10-minute active-practice goal. The quiet progress bar measures time, not mastery, and shows approximate minutes remaining. Pause whenever needed, finish the current word without a deadline, and explicitly choose whether to continue after a block ends. Refreshing restores the timer paused. Preferences stay on this device, scoped by account and learning language.
+
+Existing due work comes before new words. Ending a block does not mark remaining reviews complete or change their FSRS schedules. See [session-duration research and implementation](docs/session-duration-ux-research.md) for the evidence, safeguards, and limitations.
+
 ## Install as an app
 
 On the HTTPS deployment, use your browser's install action. On iPhone or iPad, open the site in Safari and choose Share → Add to Home Screen (enable Open as Web App if offered). Installation adds a standalone app window; an internet connection is still required for sign-in and practice. There is no service worker or offline cache, and installation does not change answer persistence or authentication.
@@ -76,6 +82,7 @@ Workspaces export TypeScript source, so the app bundles their production entrypo
 - [Module interfaces and dependency rules](docs/architecture.md)
 - [Web UI foundations, composition, and component maintenance](apps/web/DESIGN.md)
 - [Learning design and product direction](docs/learning-design.md)
+- [Session-duration research and bounded practice](docs/session-duration-ux-research.md)
 - [Vocabulary catalogue: research, JSON format, schema, import and remaining work](docs/catalogue.md)
 - [Local development, database workflow, and production deployment](docs/development.md)
 - [Interface languages and translation workflow](packages/i18n/README.md)

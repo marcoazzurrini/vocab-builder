@@ -29,11 +29,20 @@ export type Slot =
   | { do: "expose"; card: Card }
   /** `pulledForward` marks filler: a card shown before it was actually due. */
   | { do: "recall"; card: Card; pulledForward?: true }
-  /** Nothing due right now, but a card is still coming today: caught up. */
+  /** Nothing due right now, but a card is still coming: caught up. */
   | { do: "wait"; until: Date }
   | { do: "done" };
 
+/** Optional queue limits for a bounded practice block, never FSRS settings. */
+export interface PracticePolicy {
+  /** Permit new introductions within the existing daily allowance. */
+  allowNew: boolean;
+  /** Prioritize genuinely due recalls and disable all learn-ahead. */
+  dueOnly: boolean;
+}
+
 export interface Queue {
+  practicePolicy?: PracticePolicy;
   cards: readonly Card[];
   words: readonly Word[];
   now: Date;
@@ -120,7 +129,7 @@ const dueLearning: Rule = (q) => {
  * new and costs no allowance. Completed teaching enters the awaiting stage.
  */
 const newWord: Rule = (q) => {
-  if (q.allowanceLeft <= 0) {
+  if (q.allowanceLeft <= 0 || q.practicePolicy?.allowNew === false) {
     return null;
   }
   const carded = new Set(q.cards.map((c) => c.wordId));
@@ -137,6 +146,7 @@ const newWord: Rule = (q) => {
  * Review due can still fall before the next rollover. Its persisted last rating
  * keeps that graduation out of today's review block, including after reopening.
  * Learning and Relearning remain governed by their minute-scale rules.
+ * Due-only practice instead honors the exact due time and interleaving.
  */
 const dueReview: Rule = (q) => {
   const { start, nextStart } = studyDay(q.now, q.dayRolloverHour ?? 0);
@@ -144,8 +154,10 @@ const dueReview: Rule = (q) => {
     at(q, "scheduled").filter(
       (c) =>
         c.fsrs.state === State.Review &&
-        c.fsrs.due < nextStart &&
-        (c.fsrs.last_review === undefined || c.fsrs.last_review < start)
+        (q.practicePolicy?.dueOnly
+          ? c.fsrs.due <= q.now && c.wordId !== q.justShownId
+          : c.fsrs.due < nextStart &&
+            (c.fsrs.last_review === undefined || c.fsrs.last_review < start))
     )
   );
   return card ? { card, do: "recall" } : null;
@@ -217,7 +229,9 @@ const showAnyway: Rule = (q) => {
  */
 const dueEvenIfJustShown: Rule = (q) => {
   const card = earliestDue(
-    at(q, "scheduled").filter((c) => isLearning(c) && c.fsrs.due <= q.now)
+    at(q, "scheduled").filter(
+      (c) => (isLearning(c) || q.practicePolicy?.dueOnly) && c.fsrs.due <= q.now
+    )
   );
   return card ? { card, do: "recall" } : null;
 };
@@ -243,23 +257,36 @@ export const RULE: readonly Rule[] = [
   dueEvenIfJustShown,
 ];
 
+// Due-only practice prioritizes real recalls without bypassing interleaving.
+const DUE_ONLY_RULE: readonly Rule[] = [
+  dueLearning,
+  awaitingRecall,
+  dueReview,
+  newWord,
+  needsExposure,
+  showAnyway,
+  dueEvenIfJustShown,
+];
+
 export const pickNext = (queue: Queue): Slot => {
-  for (const rule of RULE) {
+  const rules = queue.practicePolicy?.dueOnly ? DUE_ONLY_RULE : RULE;
+  for (const rule of rules) {
     const slot = rule(queue);
     if (slot) {
       return slot;
     }
   }
 
-  // Pending first recalls also wait for their persisted due time. Tomorrow
-  // does not prevent the current study day from being done.
+  // Bounded practice reports the next real due time, even beyond today.
+  // Without a policy, preserve the existing study-day completion boundary.
   const upcoming = earliestDue(
     queue.cards.filter(
       (c) =>
-        ((stageOf(c) === "scheduled" && isLearning(c)) ||
+        ((stageOf(c) === "scheduled" &&
+          (queue.practicePolicy !== undefined || isLearning(c))) ||
           (stageOf(c) === "awaiting" && c.initialRecallAt !== undefined)) &&
         c.fsrs.due > queue.now &&
-        c.fsrs.due < nextDay(queue)
+        (queue.practicePolicy !== undefined || c.fsrs.due < nextDay(queue))
     )
   );
   return upcoming ? { do: "wait", until: upcoming.fsrs.due } : { do: "done" };

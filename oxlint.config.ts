@@ -26,7 +26,11 @@ export default defineConfig({
           "error",
           {
             allowConstantExport: true,
-            allowExportNames: ["buttonVariants", "badgeVariants"],
+            allowExportNames: [
+              "buttonVariants",
+              "badgeVariants",
+              "toggleVariants",
+            ],
           },
         ],
       },

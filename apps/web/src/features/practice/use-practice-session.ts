@@ -17,6 +17,7 @@ import { practiceKey, practiceOptions } from "./queries";
 import { SyncConflict } from "./sync-conflict";
 import { practiceTransport } from "./transport";
 import type { PracticeTransport } from "./transport";
+import { usePracticeBlock } from "./use-practice-block";
 
 interface PracticeError {
   kind: "load" | "write";
@@ -99,11 +100,21 @@ export const usePracticeSession = (
     reloadCount: 0,
     screen: { status: "loading" },
   });
+  const { controller: block, state: blockState } = usePracticeBlock(
+    userId,
+    state.screen.status === "ready" &&
+      !["caughtUp", "done"].includes(state.screen.view.phase)
+  );
   // The engine has one owner. Snapshot identity rejects stale event handlers,
   // including events fired before React has rendered an action or reload.
   const sessionRef = useRef<{ session: Session; view: SessionView } | null>(
     null
   );
+  const pendingFeedback = useRef<Extract<
+    SessionView,
+    { phase: "feedback" }
+  > | null>(null);
+  const rejectedPhase = useRef<SessionView["phase"] | null>(null);
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
   const loadedOnRef = useRef(
     studyDayStart(new Date(), DEFAULT_SETTINGS.dayRolloverHour).getTime()
@@ -175,6 +186,11 @@ export const usePracticeSession = (
         if (cancelled) {
           return;
         }
+        block.configure(settings.lang);
+        if (settings.lang !== settingsRef.current.lang) {
+          pendingFeedback.current = null;
+          rejectedPhase.current = null;
+        }
         settingsRef.current = settings;
         loadedOnRef.current = studyDayStart(
           new Date(),
@@ -184,10 +200,29 @@ export const usePracticeSession = (
           acceptAnswer: (answer) => {
             queue.push(answer);
           },
+          practicePolicy: () => {
+            const policy = block.policy();
+            // Rebuild an unaccepted teaching prompt once, even after the goal.
+            // Later selections use the normal budget and the fresh snapshot.
+            return rejectedPhase.current === "exposure"
+              ? { ...policy, allowNew: true }
+              : policy;
+          },
           settings,
           snapshot,
         });
-        const { view } = session;
+        // A save retry must not skip an explanation the learner has not dismissed.
+        const view = pendingFeedback.current ?? session.view;
+        // A rejected local write is not an answer boundary. Keep the fresh
+        // prompt available until the learner submits it successfully.
+        if (
+          !rejectedPhase.current ||
+          view.phase === "caughtUp" ||
+          view.phase === "done"
+        ) {
+          block.settle(view);
+        }
+        rejectedPhase.current = null;
         sessionRef.current = { session, view };
         dispatch({ type: "loaded", view });
       } catch (error) {
@@ -206,7 +241,7 @@ export const usePracticeSession = (
       });
     };
     // eslint-disable-next-line react/exhaustive-effect-dependencies -- The reload counter intentionally invalidates the snapshot.
-  }, [reloadCount, queue, transport, queryClient, userId, fail]);
+  }, [reloadCount, queue, transport, queryClient, userId, fail, block]);
 
   // This account-keyed mount owns practice reads. Drop private data on logout/account changes.
   // The durable outbox is separate and must survive unmounting.
@@ -236,9 +271,8 @@ export const usePracticeSession = (
           new Date(),
           settingsRef.current.dayRolloverHour
         ).getTime() !== loadedOnRef.current;
-      const phase = sessionRef.current?.view.phase;
-      // Never replace an active prompt merely because the tab became visible.
-      if (newDay || phase === "done" || phase === "caughtUp") {
+      // A finished block never resumes merely because a card becomes due.
+      if (newDay) {
         reload();
       }
     };
@@ -249,17 +283,6 @@ export const usePracticeSession = (
   const view = state.screen.status === "ready" ? state.screen.view : undefined;
   const recoveryError =
     "error" in state.screen ? state.screen.error : undefined;
-  const nextDue = view?.phase === "caughtUp" ? view.nextDueAt.getTime() : null;
-  useEffect(() => {
-    if (nextDue === null) {
-      return;
-    }
-    const timer = setTimeout(
-      reload,
-      Math.max(1000, nextDue - Date.now() + 1000)
-    );
-    return () => clearTimeout(timer);
-  }, [nextDue, reload]);
 
   const retry = async () => {
     if (state.screen.status !== "error") {
@@ -282,6 +305,8 @@ export const usePracticeSession = (
     }
     try {
       queue.discard();
+      pendingFeedback.current = null;
+      rejectedPhase.current = null;
       reload();
     } catch (error) {
       fail("write", error);
@@ -293,27 +318,59 @@ export const usePracticeSession = (
     if (
       !current ||
       queue.needsRecovery ||
+      block.getSnapshot().phase !== "running" ||
       state.screen.status !== "ready" ||
       current.view !== state.screen.view
     ) {
       return;
     }
     try {
+      block.updateActivity(
+        document.visibilityState === "visible",
+        performance.now()
+      );
       action(current.session);
       current.view = current.session.view;
+      pendingFeedback.current =
+        current.view.phase === "feedback" ? current.view : null;
+      block.settle(current.view);
       dispatch({ type: "publish", view: current.view });
     } catch (error) {
+      rejectedPhase.current = current.view.phase;
       fail("write", error);
     }
   };
 
   return {
+    block,
+    blockState,
     discard,
-    dismissFeedback: () => act((current) => current.dismissFeedback()),
+    dismissFeedback: () =>
+      act((current) => {
+        // After recovery, the rebuilt engine is already at the following prompt.
+        if (current.view.phase === "feedback") {
+          current.dismissFeedback();
+        }
+      }),
     exposureDone: () => act((current) => current.exposureDone()),
     loadError: recoveryError?.kind === "load" ? recoveryError.message : null,
     recovering: state.screen.status === "recovering",
+    resume: () => {
+      block.resume();
+      if (view?.phase === "caughtUp" || view?.phase === "done") {
+        reload();
+      }
+    },
     retry,
+    start: () => {
+      if (block.getSnapshot().phase === "running") {
+        return;
+      }
+      pendingFeedback.current = null;
+      rejectedPhase.current = null;
+      block.start();
+      reload();
+    },
     submitRecall: (typed: string, effort: Effort) =>
       act((current) => current.submitRecall(typed, effort)),
     syncConflict: recoveryError?.syncConflict ?? false,

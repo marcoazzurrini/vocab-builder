@@ -4,6 +4,7 @@ import { commandFor } from "./answer-command";
 import type { AnswerCommand } from "./answer-command";
 import { restoreProgress } from "./restore-progress";
 import type { ReviewSnapshot } from "./restore-progress";
+import type { PracticePolicy } from "./select-next-step";
 import { startSession } from "./study-session";
 import type { Session } from "./study-session";
 
@@ -14,6 +15,7 @@ export type { Effort } from "./answer-grading";
 export type { SessionView } from "./study-session";
 export type { Word, EntryPresentation } from "./restore-progress";
 export type { Session } from "./study-session";
+export type { PracticePolicy } from "./select-next-step";
 
 export interface Settings {
   lang: string;
@@ -34,6 +36,8 @@ export interface SessionOptions {
   /** Persist to a local outbox synchronously, or throw without accepting the command. */
   acceptAnswer?: (answer: AnswerCommand) => undefined;
   clock?: () => Date;
+  /** Read at every queue selection, including the initial selection. */
+  practicePolicy?: () => PracticePolicy;
 }
 
 const SessionSettings = v.object({
@@ -53,6 +57,7 @@ export const createSession = ({
   settings = DEFAULT_SETTINGS,
   acceptAnswer,
   clock = () => new Date(),
+  practicePolicy,
 }: SessionOptions): Session => {
   if (acceptAnswer?.constructor.name === "AsyncFunction") {
     throw new TypeError(
@@ -78,5 +83,6 @@ export const createSession = ({
     clock,
     dayRolloverHour: parsedSettings.dayRolloverHour,
     newPerDay: parsedSettings.newPerDay,
+    practicePolicy,
   });
 };

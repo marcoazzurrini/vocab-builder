@@ -14,6 +14,7 @@ import {
 } from "./review-scheduling";
 import type { Card } from "./review-scheduling";
 import { pickNext } from "./select-next-step";
+import type { PracticePolicy } from "./select-next-step";
 import { initialRecallAt, teachingSchedule } from "./teaching-schedule";
 
 /** Everything needed to pose the question, and nothing that answers it. */
@@ -58,9 +59,8 @@ export type SessionView =
       presentation?: EntryPresentation;
     }
   /**
-   * Nothing due right now, but a card is still coming today. The honest pause
-   * Anki calls its congratulations screen: the user is told when, and the UI
-   * rebuilds the session at that moment. `done` remains final for the day.
+   * Nothing due right now, but a card is still coming. The UI owns whether and
+   * when to restart practice; the due time does not trigger an automatic restart.
    */
   | { phase: "caughtUp"; nextDueAt: Date; stats: SessionStats }
   | { phase: "done"; stats: SessionStats };
@@ -80,6 +80,8 @@ export interface SessionEngineOptions {
   accept?: (change: AnswerChange) => void;
   clock?: () => Date;
   scheduler?: FSRS;
+  /** Read at every queue selection, including the initial selection. */
+  practicePolicy?: () => PracticePolicy;
 }
 
 export interface Session {
@@ -176,6 +178,7 @@ export const startSession = (options: SessionEngineOptions): Session => {
       dayRolloverHour: options.dayRolloverHour,
       justShownId: draft.justShownId,
       now,
+      practicePolicy: options.practicePolicy?.(),
       pulledForward: draft.pulledForward,
       words,
     });

@@ -1,5 +1,5 @@
-import { Trans, Plural, useLingui } from "@lingui/react/macro";
-import type { Effort } from "@vocab/spaced-repetition";
+import { Trans, useLingui } from "@lingui/react/macro";
+import type { Effort, SessionView } from "@vocab/spaced-repetition";
 import { useEffect, useRef, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,29 +20,12 @@ import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 
+import { BlockPanel, BlockProgress } from "./block-controls";
 import { DictionaryEntry } from "./dictionary-entry";
 import { speak, warmUpVoices } from "./speak";
 import type { SpeechFailure } from "./speak";
 import type { PracticeTransport } from "./transport";
 import { usePracticeSession } from "./use-practice-session";
-
-const SessionStats = ({
-  introduced,
-  correct,
-  recalls,
-}: {
-  introduced: number;
-  correct: number;
-  recalls: number;
-}) => (
-  <p className="text-muted-foreground text-sm tabular-nums">
-    <Plural value={introduced} one="# new word" other="# new words" />
-    {" · "}
-    <Trans>
-      {correct}/{recalls} correct answers
-    </Trans>
-  </p>
-);
 
 const Prompt = ({
   gloss,
@@ -85,20 +68,6 @@ const Prompt = ({
     )}
   </div>
 );
-
-const NextDueNote = ({ due }: { due: number }) => {
-  // eslint-disable-next-line react/hook-use-state -- Capture time when this due notice mounts; its keyed remount refreshes the estimate without impure renders.
-  const [now] = useState(Date.now);
-  const minutes = Math.max(1, Math.ceil((due - now) / 60_000));
-  return (
-    <p className="text-muted-foreground text-sm text-pretty">
-      <Trans>
-        Next word in about {minutes} min. Your session will resume
-        automatically.
-      </Trans>
-    </p>
-  );
-};
 
 const Recovery = ({
   practice,
@@ -219,6 +188,43 @@ const AudioStatus = ({ error }: { error: SpeechFailure | null }) => {
   );
 };
 
+const Feedback = ({
+  view,
+  onContinue,
+}: {
+  view: Extract<SessionView, { phase: "feedback" }>;
+  onContinue: () => void;
+}) => (
+  <>
+    <p className="text-destructive text-sm">
+      <Trans>not quite</Trans>
+    </p>
+    <p
+      lang="fr"
+      className="font-serif text-5xl leading-tight font-normal tracking-tight [overflow-wrap:anywhere]"
+    >
+      {view.expected}
+    </p>
+    {view.presentation && (
+      <p lang="it" className="text-xl text-pretty">
+        {view.presentation.meaning}
+      </p>
+    )}
+    <RevealNote text={view.presentation?.explanation ?? view.revealNote} />
+    {/* No diff highlighting: finding the difference is the point (§2). */}
+    <p className="text-muted-foreground text-sm text-pretty [overflow-wrap:anywhere]">
+      <Trans>
+        you wrote: <b>{view.typed || "—"}</b>
+      </Trans>
+    </p>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" onClick={onContinue}>
+        <Trans>Continue</Trans>
+      </Button>
+    </div>
+  </>
+);
+
 export const SessionScreen = ({
   userId,
   transport,
@@ -233,9 +239,13 @@ export const SessionScreen = ({
     hard: t`Hard`,
   };
   const practice = usePracticeSession(userId, transport);
-  const { view, loadError, writeError } = practice;
+  const { view, loadError, writeError, blockState } = practice;
   const [audioError, setAudioError] = useState<SpeechFailure | null>(null);
-  const [typed, setTyped] = useState("");
+  const [draft, setDraft] = useState<{
+    view: SessionView;
+    text: string;
+  } | null>(null);
+  const typed = draft && draft.view === view ? draft.text : "";
   const inputRef = useRef<HTMLInputElement>(null);
   const phase = view?.phase;
 
@@ -249,21 +259,22 @@ export const SessionScreen = ({
 
   // One clean exposure: see it, hear it, say it (§2, §6).
   useEffect(() => {
-    if (exposureAnswer) {
+    if (exposureAnswer && blockState.phase === "running") {
       speak(exposureAnswer, setAudioError);
     }
-  }, [exposureAnswer]);
+    return () => window.speechSynthesis?.cancel();
+  }, [exposureAnswer, blockState.phase]);
 
   useEffect(() => {
-    if (phase === "recall") {
+    if (phase === "recall" && blockState.phase === "running") {
       inputRef.current?.focus();
     }
     // eslint-disable-next-line react/exhaustive-effect-dependencies -- A new card must refocus the remounted input even when its phase is unchanged.
-  }, [phase, promptGloss]);
+  }, [phase, promptGloss, blockState.phase]);
 
   const act = (fn: () => void) => {
     fn();
-    setTyped("");
+    setDraft(null);
     setAudioError(null);
   };
 
@@ -279,143 +290,99 @@ export const SessionScreen = ({
     );
   }
 
+  if (blockState.phase === "setup" || blockState.phase === "complete") {
+    return <BlockPanel practice={practice} />;
+  }
+
   return (
-    // A new card remounts its input; the effect above restores answer focus.
-    <div
-      className="flex flex-col gap-8 py-4 sm:py-8"
-      key={`${view.phase}:${promptGloss ?? ""}`}
-    >
-      {view.phase === "exposure" && (
-        <DictionaryEntry
-          answer={view.answer}
-          meaning={view.prompt.meaning ?? view.prompt.gloss}
-          presentation={view.presentation}
-          note={view.revealNote}
-          onListen={() => {
-            setAudioError(null);
-            speak(view.answer, setAudioError);
-          }}
-          onContinue={() => act(() => practice.exposureDone())}
-        />
-      )}
-      {view.phase === "recall" && (
-        <form
-          className="flex flex-col gap-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            // Enter means Good: no separate grading decision on the default path.
-            act(() => practice.submitRecall(typed, "good"));
-          }}
+    <>
+      {blockState.phase === "paused" && <BlockPanel practice={practice} />}
+      {/* Keep the current input mounted while paused, including its draft. */}
+      <div hidden={blockState.phase === "paused"}>
+        {/* A new card remounts its input; the effect above restores answer focus. */}
+        <div
+          className="flex flex-col gap-8 py-4 sm:py-8"
+          key={`${view.phase}:${promptGloss ?? ""}`}
         >
-          <p className="text-muted-foreground text-xs tracking-widest uppercase">
-            <Trans>Recall</Trans>
-          </p>
-          <Prompt {...view.prompt} />
-          <RecallInstruction kind={view.prompt.kind} />
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="recall-answer" className="sr-only">
-                <Trans>type the French word</Trans>
-              </FieldLabel>
-              <Input
-                id="recall-answer"
-                ref={inputRef}
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-            </Field>
-          </FieldGroup>
-          <div className="flex flex-wrap gap-2">
-            {/* The session decides which effort choices are offered. */}
-            {view.efforts.map((effort) => (
-              <Button
-                key={effort}
-                size="lg"
-                type={effort === "good" ? "submit" : "button"}
-                variant={effort === "good" ? "default" : "ghost"}
-                onClick={
-                  effort === "good"
-                    ? undefined
-                    : () => act(() => practice.submitRecall(typed, effort))
-                }
-              >
-                {effortLabel[effort]}
-              </Button>
-            ))}
-          </div>
-          <p className="text-muted-foreground text-xs">
-            <Trans>
-              <Kbd>Enter</Kbd> = Good
-            </Trans>
-          </p>
-        </form>
-      )}
-      {view.phase === "feedback" && (
-        <>
-          <p className="text-destructive text-sm">
-            <Trans>not quite</Trans>
-          </p>
-          <p
-            lang="fr"
-            className="font-serif text-5xl leading-tight font-normal tracking-tight [overflow-wrap:anywhere]"
-          >
-            {view.expected}
-          </p>
-          {view.presentation && (
-            <p lang="it" className="text-xl text-pretty">
-              {view.presentation.meaning}
-            </p>
+          <BlockProgress practice={practice} />
+          {view.phase === "exposure" && (
+            <DictionaryEntry
+              answer={view.answer}
+              meaning={view.prompt.meaning ?? view.prompt.gloss}
+              presentation={view.presentation}
+              note={view.revealNote}
+              onListen={() => {
+                setAudioError(null);
+                speak(view.answer, setAudioError);
+              }}
+              onContinue={() => act(() => practice.exposureDone())}
+            />
           )}
-          <RevealNote
-            text={view.presentation?.explanation ?? view.revealNote}
-          />
-          {/* No diff highlighting: finding the difference is the point (§2). */}
-          <p className="text-muted-foreground text-sm text-pretty [overflow-wrap:anywhere]">
-            <Trans>
-              you wrote: <b>{view.typed || "—"}</b>
-            </Trans>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              onClick={() => act(() => practice.dismissFeedback())}
+          {view.phase === "recall" && (
+            <form
+              className="flex flex-col gap-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                // Enter means Good: no separate grading decision on the default path.
+                act(() => practice.submitRecall(typed, "good"));
+              }}
             >
-              <Trans>Continue</Trans>
-            </Button>
-          </div>
-        </>
-      )}
-      {view.phase === "caughtUp" && (
-        <>
-          <p className="text-muted-foreground text-sm">
-            <Trans>you&apos;re all caught up</Trans>
-          </p>
-          <h1 className="text-3xl font-semibold text-balance">
-            <Trans>All done, for now</Trans>
-          </h1>
-          <SessionStats {...view.stats} />
-          <NextDueNote
-            key={view.nextDueAt.getTime()}
-            due={view.nextDueAt.getTime()}
-          />
-        </>
-      )}
-      {view.phase === "done" && (
-        <>
-          <p className="text-muted-foreground text-sm">
-            <Trans>session complete</Trans>
-          </p>
-          <h1 className="text-3xl font-semibold text-balance">
-            <Trans>Well done</Trans>
-          </h1>
-          <SessionStats {...view.stats} />
-        </>
-      )}
-      <AudioStatus error={audioError} />
-    </div>
+              <p className="text-muted-foreground text-xs tracking-widest uppercase">
+                <Trans>Recall</Trans>
+              </p>
+              <Prompt {...view.prompt} />
+              <RecallInstruction kind={view.prompt.kind} />
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="recall-answer" className="sr-only">
+                    <Trans>type the French word</Trans>
+                  </FieldLabel>
+                  <Input
+                    id="recall-answer"
+                    ref={inputRef}
+                    value={typed}
+                    onChange={(e) => setDraft({ text: e.target.value, view })}
+                    autoComplete="off"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </Field>
+              </FieldGroup>
+              <div className="flex flex-wrap gap-2">
+                {/* The session decides which effort choices are offered. */}
+                {view.efforts.map((effort) => (
+                  <Button
+                    key={effort}
+                    size="lg"
+                    type={effort === "good" ? "submit" : "button"}
+                    variant={effort === "good" ? "default" : "ghost"}
+                    onClick={
+                      effort === "good"
+                        ? undefined
+                        : () => act(() => practice.submitRecall(typed, effort))
+                    }
+                  >
+                    {effortLabel[effort]}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                <Trans>
+                  <Kbd>Enter</Kbd> = Good
+                </Trans>
+              </p>
+            </form>
+          )}
+          {view.phase === "feedback" && (
+            <Feedback
+              view={view}
+              onContinue={() => act(() => practice.dismissFeedback())}
+            />
+          )}
+          <AudioStatus error={audioError} />
+        </div>
+      </div>
+    </>
   );
 };

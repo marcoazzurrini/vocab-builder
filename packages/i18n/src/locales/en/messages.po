@@ -14,24 +14,44 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "{correct}/{recalls} correct answers"
-msgstr "{correct}/{recalls} correct answers"
+#~ msgid "{correct}/{recalls} correct answers"
+#~ msgstr "{correct}/{recalls} correct answers"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "{introduced, plural, one {# new word} other {# new words}}"
-msgstr "{introduced, plural, one {# new word} other {# new words}}"
+#~ msgid "{introduced, plural, one {# new word} other {# new words}}"
+#~ msgstr "{introduced, plural, one {# new word} other {# new words}}"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "{minutes} min"
+msgstr "{minutes} min"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "{minutes} minutes"
+msgstr "{minutes} minutes"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "<0>Enter</0> = Good"
 msgstr "<0>Enter</0> = Good"
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "A little practice, at your pace"
+#~ msgstr "A little practice, at your pace"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "About {minutes} min left"
+msgstr "About {minutes} min left"
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "All done, for now"
-msgstr "All done, for now"
+#~ msgid "All done, for now"
+#~ msgstr "All done, for now"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Cancel"
 msgstr "Cancel"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Choose a short time goal. There is no answer deadline, and you can stop whenever you need."
+#~ msgstr "Choose a short time goal. There is no answer deadline, and you can stop whenever you need."
 
 #: ../../apps/web/src/components/ui/sheet.tsx
 msgid "Close"
@@ -49,6 +69,10 @@ msgstr "coming soon"
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Continue"
 msgstr "Continue"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Continue practicing"
+msgstr "Continue practicing"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Could not check whether you're signed in. Try again."
@@ -94,6 +118,14 @@ msgstr "Example"
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #~ msgid "Example · not the answer to memorise"
 #~ msgstr "Example · not the answer to memorise"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Finish"
+msgstr "Finish"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Finish this word at your own pace."
+msgstr "Finish this word at your own pace."
 
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #~ msgid "French"
@@ -163,8 +195,8 @@ msgstr "Menu"
 #~ msgstr "new word · take a guess"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Next word in about {minutes} min. Your session will resume automatically."
-msgstr "Next word in about {minutes} min. Your session will resume automatically."
+#~ msgid "Next word in about {minutes} min. Your session will resume automatically."
+#~ msgstr "Next word in about {minutes} min. Your session will resume automatically."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "not quite"
@@ -174,9 +206,29 @@ msgstr "not quite"
 msgid "Open menu"
 msgstr "Open menu"
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Pause"
+msgstr "Pause"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Practice"
+msgstr "Practice"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Practice time"
+msgstr "Practice time"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Practice time goal"
+msgstr "Practice time goal"
+
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Progress"
 msgstr "Progress"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Progress through your practice time goal"
+#~ msgstr "Progress through your practice time goal"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "Read, listen, and say the word aloud. We will ask you to recall it shortly."
@@ -193,6 +245,10 @@ msgstr "Reload"
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Request another link"
 msgstr "Request another link"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Resume session"
+msgstr "Resume session"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "Select Listen to hear the pronunciation."
@@ -211,12 +267,28 @@ msgid "Session"
 msgstr "Session"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "session complete"
-msgstr "session complete"
+#~ msgid "session complete"
+#~ msgstr "session complete"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Session finished"
+msgstr "Session finished"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Session paused"
+msgstr "Session paused"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Session progress"
+msgstr "Session progress"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Settings"
 msgstr "Settings"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Show remaining time"
+#~ msgstr "Show remaining time"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Sign in with an email link"
@@ -234,6 +306,14 @@ msgstr "Skip to content"
 msgid "something went wrong"
 msgstr "something went wrong"
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Start session"
+msgstr "Start session"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "This browser could not remember your session timer. Refreshing may reset the timer. Answer saving is separate."
+msgstr "This browser could not remember your session timer. Refreshing may reset the timer. Answer saving is separate."
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "This browser does not support reading words aloud."
 msgstr "This browser does not support reading words aloud."
@@ -241,6 +321,10 @@ msgstr "This browser does not support reading words aloud."
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "This link is invalid or has expired. Request a new one."
 msgstr "This link is invalid or has expired. Request a new one."
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "This practice block is finished. Any remaining reviews stay scheduled."
+msgstr "This practice block is finished. Any remaining reviews stay scheduled."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Try again"
@@ -259,8 +343,8 @@ msgstr "type the French word"
 #~ msgstr "Usage notes"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Well done"
-msgstr "Well done"
+#~ msgid "Well done"
+#~ msgstr "Well done"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Words"
@@ -274,14 +358,18 @@ msgstr "Write only the French word. The context clarifies its meaning; do not tr
 msgid "Write the French expression you learned."
 msgstr "Write the French expression you learned."
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "You reached the end of available practice in this block. More reviews may be due later."
+msgstr "You reached the end of available practice in this block. More reviews may be due later."
+
 #. placeholder {0}: view.typed || "—"
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "you wrote: <0>{0}</0>"
 msgstr "you wrote: <0>{0}</0>"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "you're all caught up"
-msgstr "you're all caught up"
+#~ msgid "you're all caught up"
+#~ msgstr "you're all caught up"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "you@example.com"
@@ -290,3 +378,7 @@ msgstr "you@example.com"
 #: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "Your answers have been saved. Reload to pick up where you left off."
 msgstr "Your answers have been saved. Reload to pick up where you left off."
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Your timer is paused. Resume when you are ready."
+#~ msgstr "Your timer is paused. Resume when you are ready."

@@ -109,8 +109,23 @@ const deferred = <T,>() => {
 };
 
 const becomeVisible = () => {
-  document.dispatchEvent(new Event("visibilitychange"));
+  act(() => document.dispatchEvent(new Event("visibilitychange")));
 };
+
+const startSession = async () => {
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: /^(?:Start session|Inizia sessione)$/u,
+    })
+  );
+};
+
+const FINISHED = /^(?:Session finished|Sessione terminata)$/u;
+const CONTINUE_PRACTICING = /^(?:Continue practicing|Continua a esercitarti)$/u;
+const outboxKeys = () =>
+  Object.keys(window.localStorage).filter((key) =>
+    /^vocab-builder:answer:v[12]:/u.test(key)
+  );
 
 describe("the session screen", () => {
   beforeEach(async () => {
@@ -129,8 +144,9 @@ describe("the session screen", () => {
     vi.restoreAllMocks();
   });
 
-  it("teaches a new word immediately without asking for a guess", async () => {
+  it("teaches a new word after starting without asking for a guess", async () => {
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     expect(screen.getByRole("heading", { name: "chien" })).toBeDefined();
     expect(screen.queryByRole("textbox")).toBeNull();
@@ -155,6 +171,7 @@ describe("the session screen", () => {
         unavailable?.({ kind: "failed", reason: "not-allowed" })
       );
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByRole("button", { name: "Ascolta" });
     expect(screen.queryByRole("alert")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Ascolta" }));
@@ -167,6 +184,7 @@ describe("the session screen", () => {
   it("shows the word, meaning, example, and teaching notes without extra interactions", async () => {
     loadSnapshot.mockResolvedValue(deck([ETRE]));
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByRole("heading", { name: "être" });
     expect(screen.getByText("essere")).toBeDefined();
     expect(screen.getByText("verbo · infinito")).toBeDefined();
@@ -186,6 +204,7 @@ describe("the session screen", () => {
   it("keeps the word meaning clear during recall without revealing the French entry or example", async () => {
     loadSnapshot.mockResolvedValue(recallDeck([ETRE]));
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByRole("textbox", {
       name: "scrivi la parola in francese",
     });
@@ -215,6 +234,7 @@ describe("the session screen", () => {
   it("switches interface language without discarding the current answer or changing study content", async () => {
     loadSnapshot.mockResolvedValue(recallDeck());
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "chi" } });
 
@@ -223,27 +243,29 @@ describe("the session screen", () => {
     expect(screen.getByRole("button", { name: "Good" })).toBeDefined();
     expect(screen.getByRole<HTMLInputElement>("textbox").value).toBe("chi");
     expect(screen.getByText("cane")).toBeDefined();
-    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
   });
 
   it("does not rebuild the session mid-card when the tab comes back", async () => {
     // Rebuilding here would throw away the prompt on screen.
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
 
     becomeVisible();
-    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledOnce());
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
   });
 
-  it("rebuilds when the tab comes back on a finished session", async () => {
-    // `done` is final, so without this the end screen is what a phone shows
-    // hours later, with the day's cards waiting behind it.
+  it("keeps a finished block ended when the tab comes back on the same day", async () => {
     loadSnapshot.mockResolvedValue(deck([]));
     render(<SessionScreen transport={transport} userId="u1" />);
-    await screen.findByText("sessione completata");
+    await startSession();
+    await screen.findByRole("heading", { name: FINISHED });
 
     becomeVisible();
-    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("heading", { name: FINISHED })).toBeDefined();
+    expect(screen.queryByRole("textbox")).toBeNull();
   });
 
   it("rebuilds when the tab comes back on a new day", async () => {
@@ -251,6 +273,7 @@ describe("the session screen", () => {
     vi.setSystemTime(new Date("2026-08-10T23:50:00"));
 
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
 
     // Left open across midnight: the rule would start serving tomorrow's
@@ -258,7 +281,7 @@ describe("the session screen", () => {
     vi.setSystemTime(new Date("2026-08-11T07:30:00"));
     becomeVisible();
 
-    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(3));
   });
 
   it("waits for writes in flight before rebuilding the deck", async () => {
@@ -274,6 +297,7 @@ describe("the session screen", () => {
     });
 
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     // Teaching completion, whose write hangs.
     fireEvent.click(screen.getByText("Continua"));
@@ -283,13 +307,13 @@ describe("the session screen", () => {
     becomeVisible();
 
     await act(() => vi.advanceTimersByTimeAsync(20));
-    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
 
     pending.resolve(null);
-    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(3));
   });
 
-  it("pauses caught up, then rebuilds itself when the next card comes due", async () => {
+  it("keeps a finished block ended when a card becomes due until explicitly continued", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-08-10T09:00:00"));
 
@@ -315,24 +339,36 @@ describe("the session screen", () => {
     });
 
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
+    // Bounded practice does not pull future learning cards forward.
+    await screen.findByRole("heading", { name: FINISHED });
+    expect({
+      saves: persistAnswer.mock.calls,
+      textbox: screen.queryByRole("textbox"),
+    }).toStrictEqual({ saves: [], textbox: null });
+    expect(
+      screen.getByRole("button", { name: /^(?:Finish|Termina)$/u })
+    ).toBeDefined();
+
+    await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+    becomeVisible();
+    expect({
+      finished: screen.queryByRole("heading", { name: FINISHED }) !== null,
+      loads: loadSnapshot.mock.calls.length,
+      textbox: screen.queryByRole("textbox"),
+    }).toStrictEqual({ finished: true, loads: 2, textbox: null });
+
+    fireEvent.click(screen.getByRole("button", { name: CONTINUE_PRACTICING }));
     await screen.findByRole("textbox", {
       name: "scrivi la parola in francese",
     });
+    expect(loadSnapshot).toHaveBeenCalledTimes(3);
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "chien" },
     });
     fireEvent.click(screen.getByText("Normale"));
-
-    // Nothing else to do, and the card's next step is minutes away: the
-    // honest screen, not a fake end of session.
-    await expect(
-      screen.findByText("Per ora hai finito")
-    ).resolves.toBeDefined();
-    expect(screen.queryByText("Ottimo lavoro")).toBeNull();
-
-    // When the due time passes, the screen rebuilds on its own.
-    vi.advanceTimersByTime(60 * 60_000);
-    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
+    await screen.findByRole("heading", { name: FINISHED });
+    await waitFor(() => expect(persistAnswer).toHaveBeenCalledOnce());
   });
 
   it("does not accept answers against an old snapshot during a reload", async () => {
@@ -341,12 +377,14 @@ describe("the session screen", () => {
     const pending = deferred<ReviewSnapshot>();
     loadSnapshot
       .mockResolvedValueOnce(deck())
+      .mockResolvedValueOnce(deck())
       .mockReturnValueOnce(pending.promise);
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     vi.setSystemTime(new Date("2026-08-11T07:30:00"));
     becomeVisible();
-    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(3));
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByText("Continua")).toBeNull();
     await act(() => {
@@ -359,7 +397,7 @@ describe("the session screen", () => {
   it("ignores a previous account's response after a keyed remount", async () => {
     const pending = deferred<ReviewSnapshot>();
     loadSnapshot.mockReturnValueOnce(pending.promise);
-    loadSnapshot.mockResolvedValueOnce(
+    loadSnapshot.mockResolvedValue(
       deck([{ ...CHIEN, gloss: "gatto", id: "w2", text: "chat" }])
     );
     const mounted = render(
@@ -369,6 +407,7 @@ describe("the session screen", () => {
     mounted.rerender(
       <SessionScreen transport={transport} key="u2" userId="u2" />
     );
+    await startSession();
     await screen.findByText("gatto");
     await act(() => {
       pending.resolve(deck());
@@ -381,16 +420,19 @@ describe("the session screen", () => {
   it("retries the same stored answer under its original account", async () => {
     persistAnswer.mockRejectedValueOnce(new Error("network down"));
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     fireEvent.click(screen.getByText("Continua"));
     await screen.findByText(/network down/u);
-    expect(window.localStorage).toHaveLength(1);
+    expect(outboxKeys()).toHaveLength(1);
     const [first] = persistAnswer.mock.calls;
     expect(first?.[1]).toBe("u1");
     fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
     await waitFor(() => expect(persistAnswer).toHaveBeenCalledTimes(2));
     expect(persistAnswer.mock.calls[1]).toStrictEqual(first);
-    await waitFor(() => expect(window.localStorage).toHaveLength(0));
+    await waitFor(() => expect(outboxKeys()).toHaveLength(0));
+    await screen.findByRole("heading", { name: FINISHED });
+    expect(screen.queryByText("cane")).toBeNull();
   });
 
   it("preserves unsynced answers unless deletion is explicitly confirmed", async () => {
@@ -401,11 +443,12 @@ describe("the session screen", () => {
         <SessionScreen transport={transport} userId="u1" />
       </AppShell>
     );
+    await startSession();
     await screen.findByText("cane");
     await user.click(screen.getByRole("button", { name: "Continua" }));
     const deleteLabel = "Elimina le risposte non sincronizzate e ricarica";
     const trigger = await screen.findByRole("button", { name: deleteLabel });
-    expect(window.localStorage).toHaveLength(1);
+    expect(outboxKeys()).toHaveLength(1);
 
     await user.click(trigger);
     let dialog = await screen.findByRole("alertdialog", { name: deleteLabel });
@@ -422,20 +465,29 @@ describe("the session screen", () => {
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     expect({
       loads: loadSnapshot.mock.calls.length,
-      pending: window.localStorage.length,
-    }).toStrictEqual({ loads: 1, pending: 1 });
+      pending: outboxKeys().length,
+    }).toStrictEqual({ loads: 2, pending: 1 });
 
     await user.click(trigger);
     dialog = await screen.findByRole("alertdialog", { name: deleteLabel });
     await user.click(within(dialog).getByRole("button", { name: deleteLabel }));
-    await waitFor(() => expect(window.localStorage).toHaveLength(0));
+    await waitFor(() => expect(outboxKeys()).toHaveLength(0));
+    await screen.findByRole("heading", { name: FINISHED });
+    expect({
+      answer: screen.queryByText("chien"),
+      loads: loadSnapshot.mock.calls.length,
+    }).toStrictEqual({ answer: null, loads: 3 });
+    await user.click(screen.getByRole("button", { name: CONTINUE_PRACTICING }));
     await screen.findByRole("heading", { name: "chien" });
-    expect(screen.queryByRole("textbox")).toBeNull();
-    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    expect({
+      loads: loadSnapshot.mock.calls.length,
+      textbox: screen.queryByRole("textbox"),
+    }).toStrictEqual({ loads: 4, textbox: null });
   });
 
   it("recovers from a rejected local write without sending or losing the unanswered prompt", async () => {
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     const write = vi
       .spyOn(Storage.prototype, "setItem")
@@ -449,7 +501,7 @@ describe("the session screen", () => {
       alert: alert.textContent,
       answer: screen.queryByText("chien"),
       calls: persistAnswer.mock.calls,
-      stored: window.localStorage.length,
+      stored: outboxKeys().length,
       textbox: screen.queryByRole("textbox"),
     }).toStrictEqual({
       alert: "Non è stato possibile salvare le risposte: storage full",
@@ -472,16 +524,16 @@ describe("the session screen", () => {
     }).toStrictEqual({
       alert: null,
       calls: [],
-      loads: 2,
+      loads: 3,
       textbox: null,
     });
 
     fireEvent.click(screen.getByText("Continua"));
-    await screen.findByText("Per ora hai finito");
+    await screen.findByRole("heading", { name: FINISHED });
     await waitFor(() => {
       expect({
         calls: persistAnswer.mock.calls,
-        stored: window.localStorage.length,
+        stored: outboxKeys().length,
       }).toStrictEqual({
         calls: [
           [expect.objectContaining({ phase: "teach", wordId: "w1" }), "u1"],
@@ -505,6 +557,7 @@ describe("the session screen", () => {
       return practice;
     });
     await waitFor(() => expect(result.current.view?.phase).toBe("exposure"));
+    act(() => result.current.block.start());
     const submitOldPrompt = result.current.exposureDone;
     const write = vi
       .spyOn(Storage.prototype, "setItem")
@@ -545,9 +598,10 @@ describe("the session screen", () => {
         { updatedAt: Date.now() + clockSkew }
       );
       render(<SessionScreen transport={transport} userId="u1" />);
+      await startSession();
       await screen.findByText("cane");
-      expect(loadSnapshot).toHaveBeenCalledOnce();
-      expect(screen.queryByText("sessione completata")).toBeNull();
+      expect(loadSnapshot).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("heading", { name: FINISHED })).toBeNull();
     }
   );
 
@@ -555,14 +609,16 @@ describe("the session screen", () => {
     const stale = deferred<ReviewSnapshot>();
     loadSnapshot
       .mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(deck())
       .mockResolvedValueOnce(deck());
     const olderRead = queryClient
       .query(practiceOptions("u1", transport))
       .catch(() => null);
     await waitFor(() => expect(loadSnapshot).toHaveBeenCalledOnce());
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
-    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    expect(loadSnapshot).toHaveBeenCalledTimes(3);
     await act(async () => {
       stale.resolve(deck([]));
       await olderRead;
@@ -576,8 +632,9 @@ describe("the session screen", () => {
   it("retries transient read failures but does not automatically retry permanent errors", async () => {
     loadSnapshot.mockRejectedValueOnce(new RetryableReadError("network down"));
     const mounted = render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
-    expect(loadSnapshot).toHaveBeenCalledTimes(2);
+    expect(loadSnapshot).toHaveBeenCalledTimes(3);
     mounted.unmount();
 
     loadSnapshot.mockReset().mockRejectedValue(new Error("Session expired"));
@@ -593,8 +650,9 @@ describe("the session screen", () => {
     expect(loadSnapshot).toHaveBeenCalledTimes(3);
     loadSnapshot.mockResolvedValue(deck());
     fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await startSession();
     await screen.findByText("cane");
-    expect(loadSnapshot).toHaveBeenCalledTimes(4);
+    expect(loadSnapshot).toHaveBeenCalledTimes(5);
   });
 
   it("does not replace an active session when query data changes or an answer is acknowledged", async () => {
@@ -605,10 +663,11 @@ describe("the session screen", () => {
       ])
     );
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     fireEvent.click(screen.getByText("Continua"));
     await screen.findByText("chat");
-    await waitFor(() => expect(window.localStorage).toHaveLength(0));
+    await waitFor(() => expect(outboxKeys()).toHaveLength(0));
     act(() =>
       queryClient.setQueryData(practiceKey("u1"), {
         settings: DEFAULT_SETTINGS,
@@ -617,7 +676,7 @@ describe("the session screen", () => {
     );
     becomeVisible();
     window.dispatchEvent(new Event("online"));
-    expect(loadSnapshot).toHaveBeenCalledOnce();
+    expect(loadSnapshot).toHaveBeenCalledTimes(2);
     expect(screen.getByText("chat")).toBeDefined();
   });
 
@@ -643,6 +702,7 @@ describe("the session screen", () => {
     const mounted = render(
       <SessionScreen key="u1" transport={transport} userId="u1" />
     );
+    await startSession();
     await screen.findByText("cane");
     expect(queryClient.getQueryData(practiceKey("u1"))).toBeDefined();
     loadSnapshot.mockResolvedValue(
@@ -651,6 +711,7 @@ describe("the session screen", () => {
     mounted.rerender(
       <SessionScreen key="u2" transport={transport} userId="u2" />
     );
+    await startSession();
     await screen.findByText("gatto");
     expect(queryClient.getQueryState(practiceKey("u1"))).toBeUndefined();
     expect(queryClient.getQueryData(practiceKey("u2"))).toBeDefined();
@@ -687,9 +748,10 @@ describe("the session screen", () => {
 
     localStorage.setItem(key, JSON.stringify(command));
     fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await startSession();
     await screen.findByText("cane");
     expect(persistAnswer).toHaveBeenCalledExactlyOnceWith(command, "u1");
-    expect(localStorage).toHaveLength(0);
+    expect(outboxKeys()).toHaveLength(0);
   });
 
   it("handles unavailable browser storage through recovery instead of crashing render", async () => {
@@ -703,6 +765,7 @@ describe("the session screen", () => {
     expect(loadSnapshot).not.toHaveBeenCalled();
     storage.mockRestore();
     fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    await startSession();
     await screen.findByText("cane");
   });
 
@@ -715,6 +778,7 @@ describe("the session screen", () => {
     );
     const { result } = renderHook(() => usePracticeSession("u1", transport));
     await waitFor(() => expect(result.current.view?.phase).toBe("exposure"));
+    act(() => result.current.block.start());
     const firstView = result.current.view;
     const submit = result.current.exposureDone;
     act(() => {
@@ -745,6 +809,7 @@ describe("the session screen", () => {
     });
     const { result } = renderHook(() => usePracticeSession("u1", transport));
     await waitFor(() => expect(result.current.view?.phase).toBe("exposure"));
+    act(() => result.current.block.start());
     act(() => result.current.exposureDone());
     const finishExposure = result.current.exposureDone;
     await act(async () => {
@@ -766,6 +831,7 @@ describe("the session screen", () => {
       .mockRejectedValueOnce(new Error("offline"))
       .mockReturnValueOnce(pending.promise);
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     fireEvent.click(screen.getByText("Continua"));
     await screen.findByText(/offline/u);
@@ -780,7 +846,8 @@ describe("the session screen", () => {
       pending.resolve(undefined);
       await pending.promise;
     });
-    await screen.findByText("cane");
+    await screen.findByRole("heading", { name: FINISHED });
+    expect(screen.queryByText("cane")).toBeNull();
     expect(persistAnswer.mock.calls[1]).toStrictEqual(
       persistAnswer.mock.calls[0]
     );
@@ -792,10 +859,11 @@ describe("the session screen", () => {
         <SessionScreen transport={transport} userId="u1" />
       </StrictMode>
     );
+    await startSession();
     await screen.findByText("cane");
     fireEvent.click(screen.getByText("Continua"));
-    await screen.findByText("Per ora hai finito");
-    await waitFor(() => expect(localStorage).toHaveLength(0));
+    await screen.findByRole("heading", { name: FINISHED });
+    await waitFor(() => expect(outboxKeys()).toHaveLength(0));
     expect(persistAnswer).toHaveBeenCalledOnce();
   });
 
@@ -803,6 +871,7 @@ describe("the session screen", () => {
     persistAnswer.mockRejectedValue(new Error("network down"));
 
     render(<SessionScreen transport={transport} userId="u1" />);
+    await startSession();
     await screen.findByText("cane");
     // The teaching completion cannot be saved.
     fireEvent.click(screen.getByText("Continua"));

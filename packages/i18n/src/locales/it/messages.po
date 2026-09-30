@@ -13,24 +13,44 @@ msgstr ""
 "Plural-Forms: \n"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "{correct}/{recalls} correct answers"
-msgstr "{correct}/{recalls} risposte corrette"
+#~ msgid "{correct}/{recalls} correct answers"
+#~ msgstr "{correct}/{recalls} risposte corrette"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "{introduced, plural, one {# new word} other {# new words}}"
-msgstr "{introduced, plural, one {# parola nuova} other {# parole nuove}}"
+#~ msgid "{introduced, plural, one {# new word} other {# new words}}"
+#~ msgstr "{introduced, plural, one {# parola nuova} other {# parole nuove}}"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "{minutes} min"
+msgstr "{minutes} min"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "{minutes} minutes"
+msgstr "{minutes} minuti"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "<0>Enter</0> = Good"
 msgstr "<0>Invio</0> = Normale"
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "A little practice, at your pace"
+#~ msgstr "Un po’ di pratica, al tuo ritmo"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "About {minutes} min left"
+msgstr "Mancano circa {minutes} min"
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "All done, for now"
-msgstr "Per ora hai finito"
+#~ msgid "All done, for now"
+#~ msgstr "Per ora hai finito"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Cancel"
 msgstr "Annulla"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Choose a short time goal. There is no answer deadline, and you can stop whenever you need."
+#~ msgstr "Scegli quanto tempo dedicare alla pratica. Non c’è un limite per rispondere e puoi fermarti quando vuoi."
 
 #: ../../apps/web/src/components/ui/sheet.tsx
 msgid "Close"
@@ -48,6 +68,10 @@ msgstr "in arrivo"
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Continue"
 msgstr "Continua"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Continue practicing"
+msgstr "Continua a esercitarti"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Could not check whether you're signed in. Try again."
@@ -93,6 +117,14 @@ msgstr "Esempio"
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #~ msgid "Example · not the answer to memorise"
 #~ msgstr "Esempio d’uso · non è la risposta da ricordare"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Finish"
+msgstr "Termina"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Finish this word at your own pace."
+msgstr "Completa questa parola con calma."
 
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #~ msgid "French"
@@ -162,8 +194,8 @@ msgstr "Menu"
 #~ msgstr "parola nuova · prova a indovinare"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Next word in about {minutes} min. Your session will resume automatically."
-msgstr "La prossima parola sarà pronta tra circa {minutes} min. La sessione riprenderà da sola."
+#~ msgid "Next word in about {minutes} min. Your session will resume automatically."
+#~ msgstr "La prossima parola sarà pronta tra circa {minutes} min. La sessione riprenderà da sola."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "not quite"
@@ -173,9 +205,29 @@ msgstr "non proprio"
 msgid "Open menu"
 msgstr "Apri menu"
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Pause"
+msgstr "Pausa"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Practice"
+msgstr "Pratica"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Practice time"
+msgstr "Tempo di pratica"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Practice time goal"
+msgstr "Tempo da dedicare alla pratica"
+
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Progress"
 msgstr "Progressi"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Progress through your practice time goal"
+#~ msgstr "Avanzamento rispetto al tempo scelto"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "Read, listen, and say the word aloud. We will ask you to recall it shortly."
@@ -192,6 +244,10 @@ msgstr "Ricarica la pagina"
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Request another link"
 msgstr "Richiedi un altro link"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Resume session"
+msgstr "Riprendi sessione"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "Select Listen to hear the pronunciation."
@@ -210,12 +266,28 @@ msgid "Session"
 msgstr "Sessione"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "session complete"
-msgstr "sessione completata"
+#~ msgid "session complete"
+#~ msgstr "sessione completata"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Session finished"
+msgstr "Sessione terminata"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Session paused"
+msgstr "Sessione in pausa"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Session progress"
+msgstr "Avanzamento della sessione"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Settings"
 msgstr "Impostazioni"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Show remaining time"
+#~ msgstr "Mostra il tempo rimanente"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "Sign in with an email link"
@@ -233,6 +305,14 @@ msgstr "Vai al contenuto"
 msgid "something went wrong"
 msgstr "qualcosa è andato storto"
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Start session"
+msgstr "Inizia sessione"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "This browser could not remember your session timer. Refreshing may reset the timer. Answer saving is separate."
+msgstr "Il browser non riesce a memorizzare il timer. Ricaricando la pagina, il timer potrebbe azzerarsi. Le risposte vengono salvate separatamente."
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "This browser does not support reading words aloud."
 msgstr "Questo browser non supporta la lettura ad alta voce."
@@ -240,6 +320,10 @@ msgstr "Questo browser non supporta la lettura ad alta voce."
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "This link is invalid or has expired. Request a new one."
 msgstr "Questo link non è valido oppure è scaduto. Richiedine un altro."
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "This practice block is finished. Any remaining reviews stay scheduled."
+msgstr "Questa sessione è terminata. Gli eventuali ripassi rimanenti restano programmati."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "Try again"
@@ -258,8 +342,8 @@ msgstr "scrivi la parola in francese"
 #~ msgstr "Note d’uso"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Well done"
-msgstr "Ottimo lavoro"
+#~ msgid "Well done"
+#~ msgstr "Ottimo lavoro"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Words"
@@ -273,14 +357,18 @@ msgstr "Scrivi solo la parola francese. Il contesto chiarisce il significato: no
 msgid "Write the French expression you learned."
 msgstr "Scrivi l’espressione francese che hai imparato."
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "You reached the end of available practice in this block. More reviews may be due later."
+msgstr "Hai completato la pratica disponibile in questa sessione. Altri ripassi potrebbero essere pronti più tardi."
+
 #. placeholder {0}: view.typed || "—"
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "you wrote: <0>{0}</0>"
 msgstr "hai scritto: <0>{0}</0>"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "you're all caught up"
-msgstr "sei in pari"
+#~ msgid "you're all caught up"
+#~ msgstr "sei in pari"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "you@example.com"
@@ -289,3 +377,7 @@ msgstr "nome@esempio.it"
 #: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "Your answers have been saved. Reload to pick up where you left off."
 msgstr "Le tue risposte sono salvate. Ricarica la pagina per riprendere da dove hai lasciato."
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+#~ msgid "Your timer is paused. Resume when you are ready."
+#~ msgstr "Il timer è in pausa. Riprendi quando vuoi."
