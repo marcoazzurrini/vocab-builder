@@ -92,7 +92,7 @@ export const DictionaryEntry = ({
       <Button
         type="button"
         size="xl"
-        className="max-w-full"
+        className="w-full max-w-full sm:w-auto"
         onClick={onContinue}
       >
         <Trans>Continue</Trans>

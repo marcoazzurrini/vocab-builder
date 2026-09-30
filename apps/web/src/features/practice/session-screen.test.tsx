@@ -439,7 +439,12 @@ describe("the session screen", () => {
     const user = userEvent.setup();
     persistAnswer.mockRejectedValueOnce(new SyncConflict());
     render(
-      <AppShell email="learner@example.com" onSignOut={vi.fn<() => void>()}>
+      <AppShell
+        email="learner@example.com"
+        section="session"
+        onSectionChange={vi.fn<() => void>()}
+        onSignOut={vi.fn<() => void>()}
+      >
         <SessionScreen transport={transport} userId="u1" />
       </AppShell>
     );
@@ -452,7 +457,7 @@ describe("the session screen", () => {
 
     await user.click(trigger);
     let dialog = await screen.findByRole("alertdialog", { name: deleteLabel });
-    // A closed navigation Sheet must not suppress the recovery dialog's backdrop.
+    // App navigation must not suppress the recovery dialog's backdrop.
     expect({
       hasBackdrop:
         document.querySelector('[data-slot="alert-dialog-overlay"]') !== null,

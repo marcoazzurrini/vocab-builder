@@ -9,10 +9,12 @@ import { Wordmark } from "./wordmark";
 
 export const Sidebar = ({
   email,
+  sessionActive = true,
   onClose,
   onSignOut,
 }: {
   email: string | null;
+  sessionActive?: boolean;
   onClose: () => void;
   onSignOut: () => void;
 }) => {
@@ -30,9 +32,9 @@ export const Sidebar = ({
       <nav className="flex flex-col gap-1" aria-label={t`Menu`}>
         <Button
           type="button"
-          variant="secondary"
+          variant={sessionActive ? "secondary" : "ghost"}
           className="justify-start"
-          aria-current="page"
+          aria-current={sessionActive ? "page" : undefined}
           onClick={onClose}
         >
           <Trans>Session</Trans>

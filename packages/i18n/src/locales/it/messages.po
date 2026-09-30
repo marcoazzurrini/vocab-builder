@@ -40,6 +40,10 @@ msgstr "<0>Invio</0> = Normale"
 msgid "About {minutes} min left"
 msgstr "Mancano circa {minutes} min"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+msgid "Account"
+msgstr "Account"
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "All done, for now"
 #~ msgstr "Per ora hai finito"
@@ -57,8 +61,8 @@ msgid "Close"
 msgstr "Chiudi"
 
 #: ../../apps/web/src/components/patterns/app-shell.tsx
-msgid "Close menu"
-msgstr "Chiudi menu"
+#~ msgid "Close menu"
+#~ msgstr "Chiudi menu"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "coming soon"
@@ -158,6 +162,7 @@ msgstr "Significato in italiano"
 #~ msgid "Learn · new entry"
 #~ msgstr "Impara · nuova parola"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Learning language"
 msgstr "Lingua studiata"
@@ -180,11 +185,14 @@ msgstr "Ascolta"
 msgid "Loading…"
 msgstr "Caricamento…"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+msgid "Main navigation"
+msgstr "Navigazione principale"
+
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #~ msgid "Meaning in this lesson"
 #~ msgstr "Significato in questa lezione"
 
-#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Menu"
 msgstr "Menu"
@@ -202,8 +210,8 @@ msgid "not quite"
 msgstr "non proprio"
 
 #: ../../apps/web/src/components/patterns/app-shell.tsx
-msgid "Open menu"
-msgstr "Apri menu"
+#~ msgid "Open menu"
+#~ msgstr "Apri menu"
 
 #: ../../apps/web/src/features/practice/block-controls.tsx
 msgid "Pause"
@@ -261,6 +269,7 @@ msgstr "Invia link"
 msgid "Sending…"
 msgstr "Invio in corso…"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Session"
 msgstr "Sessione"
@@ -293,6 +302,7 @@ msgstr "Impostazioni"
 msgid "Sign in with an email link"
 msgstr "Accedi con un link via email"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Sign out"
 msgstr "Esci"

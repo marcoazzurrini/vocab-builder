@@ -4,6 +4,7 @@ import { signOut, useSession } from "@vocab/authentication/client";
 import { useState } from "react";
 
 import { AppShell } from "@/components/patterns/app-shell";
+import type { AppSection } from "@/components/patterns/app-shell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { ErrorBoundary } from "./features/practice/error-boundary";
@@ -15,6 +16,7 @@ const App = () => {
   const session = useSession();
   const { user, isPending, error: sessionError } = session;
   const [error, setError] = useState(false);
+  const [section, setSection] = useState<AppSection>("session");
   const { documentIdentity } = useRouteContext({ from: "__root__" });
   const identityChanged = useSessionDocument(session, documentIdentity.userId);
 
@@ -28,6 +30,8 @@ const App = () => {
   return (
     <AppShell
       email={user.email}
+      section={section}
+      onSectionChange={setSection}
       onSignOut={async () => {
         try {
           await signOut();
@@ -36,16 +40,22 @@ const App = () => {
           setError(true);
         }
       }}
+      notice={
+        error && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              <Trans>Could not sign out. Try again.</Trans>
+            </AlertDescription>
+          </Alert>
+        )
+      }
     >
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            <Trans>Could not sign out. Try again.</Trans>
-          </AlertDescription>
-        </Alert>
-      )}
       <ErrorBoundary>
-        <SessionScreen key={user.id} userId={user.id} />
+        <SessionScreen
+          key={user.id}
+          userId={user.id}
+          active={section === "session"}
+        />
       </ErrorBoundary>
     </AppShell>
   );

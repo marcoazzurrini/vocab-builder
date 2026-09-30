@@ -69,6 +69,7 @@ const DurationChoice = ({ practice }: { practice: Practice }) => {
   return (
     <ToggleGroup
       aria-label={t`Practice time goal`}
+      className="w-full sm:w-fit"
       variant="outline"
       value={[String(practice.blockState.preferences.minutes)]}
       onValueChange={(values) => {
@@ -83,6 +84,7 @@ const DurationChoice = ({ practice }: { practice: Practice }) => {
       {BLOCK_MINUTES.map((minutes) => (
         <ToggleGroupItem
           key={minutes}
+          className="flex-1 sm:flex-none"
           value={String(minutes)}
           aria-label={t`${minutes} minutes`}
         >
@@ -109,18 +111,22 @@ export const BlockPanel = ({ practice }: { practice: Practice }) => {
     setup: t`Start session`,
   }[phase];
   return (
-    <section className="flex flex-col items-start gap-6 py-4 sm:py-8">
+    <section className="flex flex-col items-stretch gap-6 py-4 sm:items-start sm:py-8">
       <h1
         ref={heading}
         tabIndex={-1}
-        className="font-serif text-3xl leading-tight font-normal tracking-tight text-balance"
+        className="text-3xl leading-tight font-semibold tracking-tight text-balance outline-none lg:font-serif lg:font-normal"
       >
         {title}
       </h1>
       {phase === "setup" && (
         <>
           <DurationChoice practice={practice} />
-          <Button size="lg" onClick={() => practice.start()}>
+          <Button
+            size="lg"
+            className="w-full sm:w-fit"
+            onClick={() => practice.start()}
+          >
             <Trans>Start session</Trans>
           </Button>
         </>

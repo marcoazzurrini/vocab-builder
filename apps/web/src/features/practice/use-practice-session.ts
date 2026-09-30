@@ -93,7 +93,8 @@ const reducePractice = (
 /** Owns a user's session, durable answers, recovery, and safe reloads. Mount keyed by user ID. */
 export const usePracticeSession = (
   userId: string,
-  transport: PracticeTransport = practiceTransport
+  transport: PracticeTransport = practiceTransport,
+  active = true
 ) => {
   const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(reducePractice, {
@@ -102,7 +103,8 @@ export const usePracticeSession = (
   });
   const { controller: block, state: blockState } = usePracticeBlock(
     userId,
-    state.screen.status === "ready" &&
+    active &&
+      state.screen.status === "ready" &&
       !["caughtUp", "done"].includes(state.screen.view.phase)
   );
   // The engine has one owner. Snapshot identity rejects stale event handlers,

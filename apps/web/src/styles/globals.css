@@ -8,6 +8,7 @@
 
 @theme inline {
   --font-heading: var(--font-sans);
+  --color-navigation-active: var(--navigation-active);
   --font-sans: "Geist Variable", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -50,6 +51,7 @@
 }
 
 :root {
+  --navigation-active: oklch(0.52 0.19 255);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -86,6 +88,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --navigation-active: oklch(0.76 0.13 250);
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
@@ -130,6 +133,89 @@
   html {
     @apply font-sans;
     color-scheme: light dark;
+    -webkit-text-size-adjust: 100%;
+  }
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled):active {
+    opacity: 0.75;
+  }
+  input {
+    scroll-margin-block: 6rem;
+  }
+}
+
+.app-header {
+  padding: calc(1rem + env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right)) 0.75rem
+    max(1.25rem, env(safe-area-inset-left));
+}
+
+.app-content {
+  padding: 1.5rem max(1.25rem, env(safe-area-inset-right))
+    calc(6rem + env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+}
+
+.mobile-navigation {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 20;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.375rem max(1rem, env(safe-area-inset-right))
+    max(0.5rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 90%, transparent);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+@media (width < 64rem) {
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  [data-slot="button"],
+  [data-slot="toggle-group-item"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  [data-slot="input"] {
+    min-height: 3rem;
+    font-size: 1rem;
+  }
+}
+
+@media (width >= 64rem) {
+  .app-content {
+    padding: 5rem max(1.5rem, env(safe-area-inset-right))
+      max(1.5rem, env(safe-area-inset-bottom))
+      max(1.5rem, env(safe-area-inset-left));
+  }
+  .mobile-navigation {
+    display: none;
+  }
+}
+
+/* Suppress page-level refresh gestures only in the installed app, not ordinary browser pages. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .mobile-navigation {
+    background: var(--background);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 

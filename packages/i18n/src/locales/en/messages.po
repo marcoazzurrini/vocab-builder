@@ -41,6 +41,10 @@ msgstr "<0>Enter</0> = Good"
 msgid "About {minutes} min left"
 msgstr "About {minutes} min left"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+msgid "Account"
+msgstr "Account"
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "All done, for now"
 #~ msgstr "All done, for now"
@@ -58,8 +62,8 @@ msgid "Close"
 msgstr "Close"
 
 #: ../../apps/web/src/components/patterns/app-shell.tsx
-msgid "Close menu"
-msgstr "Close menu"
+#~ msgid "Close menu"
+#~ msgstr "Close menu"
 
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "coming soon"
@@ -159,6 +163,7 @@ msgstr "Italian cue"
 #~ msgid "Learn · new entry"
 #~ msgstr "Learn · new entry"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Learning language"
 msgstr "Learning language"
@@ -181,11 +186,14 @@ msgstr "Listen"
 msgid "Loading…"
 msgstr "Loading…"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
+msgid "Main navigation"
+msgstr "Main navigation"
+
 #: ../../apps/web/src/features/practice/dictionary-entry.tsx
 #~ msgid "Meaning in this lesson"
 #~ msgstr "Meaning in this lesson"
 
-#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Menu"
 msgstr "Menu"
@@ -203,8 +211,8 @@ msgid "not quite"
 msgstr "not quite"
 
 #: ../../apps/web/src/components/patterns/app-shell.tsx
-msgid "Open menu"
-msgstr "Open menu"
+#~ msgid "Open menu"
+#~ msgstr "Open menu"
 
 #: ../../apps/web/src/features/practice/block-controls.tsx
 msgid "Pause"
@@ -262,6 +270,7 @@ msgstr "Send link"
 msgid "Sending…"
 msgstr "Sending…"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Session"
 msgstr "Session"
@@ -294,6 +303,7 @@ msgstr "Settings"
 msgid "Sign in with an email link"
 msgstr "Sign in with an email link"
 
+#: ../../apps/web/src/components/patterns/app-shell.tsx
 #: ../../apps/web/src/components/patterns/sidebar.tsx
 msgid "Sign out"
 msgstr "Sign out"

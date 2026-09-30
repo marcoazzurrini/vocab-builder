@@ -52,7 +52,7 @@ export const SignIn = ({
   };
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-sm flex-col gap-6 px-6 pt-20 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col gap-6 px-[max(1.5rem,env(safe-area-inset-left),env(safe-area-inset-right))] pt-[calc(4rem+env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pt-20">
       <h1 className="text-2xl font-semibold text-balance">
         <Wordmark />
       </h1>
@@ -75,6 +75,9 @@ export const SignIn = ({
                 type="email"
                 required
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                enterKeyHint="send"
                 placeholder={t`you@example.com`}
               />
             </Field>

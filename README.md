@@ -38,6 +38,8 @@ Existing due work comes before new words. Ending a block does not mark remaining
 
 On the HTTPS deployment, use your browser's install action. On iPhone or iPad, open the site in Safari and choose Share → Add to Home Screen (enable Open as Web App if offered). Installation adds a standalone app window; an internet connection is still required for sign-in and practice. There is no service worker or offline cache, and installation does not change answer persistence or authentication.
 
+Compact layouts use bottom navigation for Session and Account instead of a hamburger menu. Larger layouts retain the sidebar. The mobile layout uses system typography, safe-area spacing, and larger touch targets. Switching to Account preserves the current answer and stops the practice clock until you return; explicitly paused sessions stay paused. Keyboard placement, status-bar contrast, and home-indicator spacing still need verification in the installed iPhone app.
+
 The manifest lives in `apps/web/public/manifest.webmanifest`. Installation icons use the app's colors and are generated from `apps/web/public/favicon.svg`. To regenerate the checked-in PNGs after changing that SVG, run from the repository root:
 
 ```sh

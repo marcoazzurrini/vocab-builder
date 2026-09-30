@@ -44,7 +44,8 @@ export const Route = createRootRouteWithContext<{
     meta: [
       { charSet: "utf-8" },
       {
-        content: "width=device-width, initial-scale=1.0, viewport-fit=cover",
+        content:
+          "width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content",
         name: "viewport",
       },
       {
@@ -56,6 +57,13 @@ export const Route = createRootRouteWithContext<{
         content: "#0a0a0a",
         media: "(prefers-color-scheme: dark)",
         name: "theme-color",
+      },
+      { content: "light dark", name: "color-scheme" },
+      { content: "yes", name: "mobile-web-app-capable" },
+      { content: "yes", name: "apple-mobile-web-app-capable" },
+      {
+        content: "default",
+        name: "apple-mobile-web-app-status-bar-style",
       },
       { title: "vocab-builder" },
     ],

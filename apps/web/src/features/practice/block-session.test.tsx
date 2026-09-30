@@ -52,15 +52,25 @@ const mount = async (data = snapshot(), userId = "u1") => {
       Promise.resolve({ settings: DEFAULT_SETTINGS, snapshot: data }),
     persistAnswer: save,
   };
-  const result = render(
+  const tree = (active: boolean) => (
     <I18nProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
-        <SessionScreen userId={userId} transport={transport} />
+        <div hidden={!active}>
+          <SessionScreen
+            userId={userId}
+            transport={transport}
+            active={active}
+          />
+        </div>
       </QueryClientProvider>
     </I18nProvider>
   );
+  const result = render(tree(true));
   await advance(1);
-  return result;
+  return {
+    ...result,
+    setActive: (active: boolean) => result.rerender(tree(active)),
+  };
 };
 const start = async () => {
   fireEvent.click(screen.getByRole("button", { name: "Start session" }));
@@ -92,6 +102,39 @@ describe("bounded practice sessions", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByRole("progressbar")).toBeNull();
     expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("excludes time in Account and preserves the current draft when returning", async () => {
+    const { setActive } = await mount();
+    await start();
+    const input = screen.getByRole("textbox");
+    fireEvent.change(input, { target: { value: "chi" } });
+    await advance(60_000);
+    const bar = screen.getByRole("progressbar");
+    const progress = bar.getAttribute("aria-valuenow");
+    setActive(false);
+    await advance(120_000);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(bar.getAttribute("aria-valuenow")).toBe(progress);
+    expect(save).not.toHaveBeenCalled();
+    setActive(true);
+    expect(screen.getByDisplayValue("chi")).toBe(input);
+    await advance(30_000);
+    expect(bar.getAttribute("aria-valuenow")).toBe("30");
+  });
+
+  it("does not resume an explicitly paused session after visiting Account", async () => {
+    const { setActive } = await mount();
+    await start();
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    setActive(false);
+    await advance(120_000);
+    setActive(true);
+    expect(
+      screen.getByRole("heading", { name: "Session paused" })
+    ).toBeDefined();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(save).not.toHaveBeenCalled();
   });
 
   it("shows remaining time without a toggle during practice or pause", async () => {

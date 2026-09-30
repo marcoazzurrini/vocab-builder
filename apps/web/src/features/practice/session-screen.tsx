@@ -46,7 +46,7 @@ const Prompt = ({
     </p>
     <h1
       lang="it"
-      className="font-serif text-4xl leading-tight font-normal tracking-tight text-pretty [overflow-wrap:anywhere] sm:text-5xl"
+      className="text-4xl leading-tight font-semibold tracking-tight text-pretty [overflow-wrap:anywhere] lg:font-serif lg:text-5xl lg:font-normal"
     >
       {meaning ?? gloss}
     </h1>
@@ -201,7 +201,7 @@ const Feedback = ({
     </p>
     <p
       lang="fr"
-      className="font-serif text-5xl leading-tight font-normal tracking-tight [overflow-wrap:anywhere]"
+      className="text-5xl leading-tight font-semibold tracking-tight [overflow-wrap:anywhere] lg:font-serif lg:font-normal"
     >
       {view.expected}
     </p>
@@ -228,9 +228,11 @@ const Feedback = ({
 export const SessionScreen = ({
   userId,
   transport,
+  active = true,
 }: {
   userId: string;
   transport?: PracticeTransport;
+  active?: boolean;
 }) => {
   const { t } = useLingui();
   const effortLabel: Record<Effort, string> = {
@@ -238,7 +240,7 @@ export const SessionScreen = ({
     good: t`Good`,
     hard: t`Hard`,
   };
-  const practice = usePracticeSession(userId, transport);
+  const practice = usePracticeSession(userId, transport, active);
   const { view, loadError, writeError, blockState } = practice;
   const [audioError, setAudioError] = useState<SpeechFailure | null>(null);
   const [draft, setDraft] = useState<{
@@ -259,18 +261,18 @@ export const SessionScreen = ({
 
   // One clean exposure: see it, hear it, say it (§2, §6).
   useEffect(() => {
-    if (exposureAnswer && blockState.phase === "running") {
+    if (active && exposureAnswer && blockState.phase === "running") {
       speak(exposureAnswer, setAudioError);
     }
     return () => window.speechSynthesis?.cancel();
-  }, [exposureAnswer, blockState.phase]);
+  }, [active, exposureAnswer, blockState.phase]);
 
   useEffect(() => {
-    if (phase === "recall" && blockState.phase === "running") {
+    if (active && phase === "recall" && blockState.phase === "running") {
       inputRef.current?.focus();
     }
     // eslint-disable-next-line react/exhaustive-effect-dependencies -- A new card must refocus the remounted input even when its phase is unchanged.
-  }, [phase, promptGloss, blockState.phase]);
+  }, [active, phase, promptGloss, blockState.phase]);
 
   const act = (fn: () => void) => {
     fn();
@@ -342,6 +344,7 @@ export const SessionScreen = ({
                     ref={inputRef}
                     value={typed}
                     onChange={(e) => setDraft({ text: e.target.value, view })}
+                    enterKeyHint="done"
                     autoComplete="off"
                     autoCapitalize="off"
                     autoCorrect="off"
@@ -355,6 +358,7 @@ export const SessionScreen = ({
                   <Button
                     key={effort}
                     size="lg"
+                    className="flex-1 sm:flex-none"
                     type={effort === "good" ? "submit" : "button"}
                     variant={effort === "good" ? "default" : "ghost"}
                     onClick={
@@ -367,7 +371,7 @@ export const SessionScreen = ({
                   </Button>
                 ))}
               </div>
-              <p className="text-muted-foreground text-xs">
+              <p className="text-muted-foreground hidden text-xs lg:block">
                 <Trans>
                   <Kbd>Enter</Kbd> = Good
                 </Trans>
