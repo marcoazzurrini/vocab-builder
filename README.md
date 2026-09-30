@@ -87,7 +87,7 @@ Workspaces export TypeScript source, so the app bundles their production entrypo
 - [Local development, database workflow, and production deployment](docs/development.md)
 - [Interface languages and translation workflow](packages/i18n/README.md)
 
-The original live catalogue import and Cloudflare deployment are complete. The new French Lexique catalogue is a separate local-only pilot; its generated Italian cues remain drafts. See the catalogue guide before importing or publishing it. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker.
+Cloudflare deployment and the French Lexique family import are complete. Production has the 1,000-family curriculum active: 1,084 teaching targets with Italian prompts. Its generated cues remain drafts. See the catalogue guide before importing or publishing it. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker, but do not import catalogue data.
 
 ## Conventions
 

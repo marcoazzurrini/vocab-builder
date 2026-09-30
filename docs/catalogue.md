@@ -10,7 +10,7 @@ This is the consolidated record of the vocabulary-source research, cue decisions
 - Link related lemmas without treating family membership as evidence that every member is mastered. Family coverage and lemma coverage are separate counts.
 - Keep one meaning-to-L2 production activity. Introduction, reveal, typed recall, orthographic comparison and FSRS behavior remain unchanged.
 - No saved-word collection feature or speculative domain taxonomy is required. Named source-backed lists can share entries.
-- Implementation and import are **local only**. Do not deploy or apply remote migrations without a separate decision.
+- Imports default to local D1. Production family imports require explicit `--remote` and separate authorization; they are not part of automatic code deployments.
 - Preserve existing word IDs, cards, attempts, authentication records and user settings. No progress reset accompanies the new catalogue.
 
 ## Minimum information
@@ -54,9 +54,9 @@ Migration `0005_family_curriculum.sql` adds `catalogue_forms`, `catalogue_family
 
 The activity now starts with teaching, not guessing. Dictionary-style presentation separates the French headword, Italian meaning, grammar, context, explanation, and labelled usage example. Recall contains only the meaning and non-answer context, with an explicit request for the word or taught expression. Explanations and examples appear only during teaching and feedback. Per-word/form grading and the FSRS algorithm are unchanged; teaching itself is unrated. Sentence writing, grammar-rule scheduling, and family mastery inference remain outside this pilot.
 
-Migration `0006_teach_first.sql` adds durable, append-only teaching completions and first-recall eligibility while preserving historical guesses, recalls, and cards. Migration `0007_dictionary_presentations.sql` adds versioned `catalogue_presentations`, linked to existing prompts without rewriting their historical cue or answer. `presentations.ts` supplies separate meaning/context fields and authored clarifications for frequent entries, including **être: essere**, with **être à la maison / essere a casa** as a labelled example—not the answer to memorise. This is improved draft teaching copy, not independent review of every entry. Reimporting the family curriculum installs it locally; substantive presentation changes require a new presentation version.
+Migration `0006_teach_first.sql` adds durable, append-only teaching completions and first-recall eligibility while preserving historical guesses, recalls, and cards. Migration `0007_dictionary_presentations.sql` adds versioned `catalogue_presentations`, linked to existing prompts without rewriting their historical cue or answer. `presentations.ts` supplies separate meaning/context fields and authored clarifications for frequent entries, including **être: essere**, with **être à la maison / essere a casa** as a labelled example—not the answer to memorise. This is improved draft teaching copy, not independent review of every entry. Reimporting the family curriculum installs it in the selected database; substantive presentation changes require a new presentation version.
 
-Both inherited and new machine-authored cues remain drafts unless explicitly reviewed. `--allow-drafts` permits local personal evaluation only. It is not independent linguistic review, and valid synonyms can still fail the existing exact-target grader. Corrections to published cues need versioning and a deliberate history policy.
+Both inherited and new machine-authored cues remain drafts unless explicitly reviewed. `--allow-drafts` acknowledges personal evaluation of unreviewed content, including an explicitly authorized production import. It is not independent linguistic review, and valid synonyms can still fail the existing exact-target grader. Corrections to published cues need versioning and a deliberate history policy.
 
 ## Legacy JSON package, version 1
 
@@ -91,9 +91,9 @@ The uniqueness key for legacy word imports now includes prompt language. It no l
 
 Prompt content, source versions and sense identity have database immutability guards. Identical reimports are allowed. Reinterpreting an existing sense or changing a published cue under the same prompt version is rejected; it requires an explicit new identity/version and, where appropriate, an explicit progress-transition policy. Automatic transfer of progress across changed cues or prompt languages is not implemented.
 
-Activating a new default list limits new introductions to its membership, while previously introduced legacy targets remain available for review. Staging alone does not expose newly created draft projections. Switching prompt language does not rewrite or discard the old learning history.
+Activating a new default list limits new introductions to its membership, while previously introduced legacy targets remain available for review. Staging alone does not expose newly created draft projections after the import completes. Shared existing words can receive updated ranks and dictionary presentations before default-list activation; staging is not completely invisible. Switching prompt language does not rewrite or discard the old learning history.
 
-The server supports saving prompt language; a settings UI control is deferred. The default remains Italian. The catalogue importer is explicitly local-only and offers no remote flag.
+The server supports saving prompt language; a settings UI control is deferred. The default remains Italian. The catalogue importer defaults to local D1; only the family importer supports explicit `--remote`.
 
 ## French extraction
 
@@ -221,11 +221,38 @@ bun run catalogue:import:families --allow-drafts --activate
 
 The checked-in family resource and curriculum can be imported without rerunning extraction or downloading Lexique. `catalogue:import` remains available for the previous lemma package; use `catalogue:import:families` for the dogfood curriculum.
 
-The importer creates another local SQL backup before its transactional D1 batch, compares card/attempt counts before and after, and reports list membership/family totals. Reimporting the same package is supported. The explicit draft flag authorizes local evaluation, not publication or a human-review claim.
+The importer creates another local SQL backup before its transactional D1 batch, compares card/attempt counts before and after, and reports list membership/family totals. Reimporting the same package is supported. The explicit draft flag acknowledges evaluation of drafts, not a human-review claim. It does not itself authorize a production write.
 
 Original `bun run db:seed` remains available for the legacy fixture. Do not confuse its hand-assigned ranks with Lexique measurements.
 
-## Family dogfood local activation
+## Authorized production family import
+
+Code deployments and catalogue data imports are separate operations. Apply the required schema migrations first. Confirm the account and D1 binding in `apps/web/wrangler.jsonc` before running:
+
+```sh
+# Explicitly authorized production operation; default remains local without --remote.
+bun run catalogue:import:families --remote --allow-drafts --activate
+```
+
+The remote importer exports production D1 into `apps/web/.wrangler/catalogue-backups/`, a private ignored directory. Backups contain authentication and learning data; do not commit or share them. It never copies the local database into production.
+
+Before writing, it rehearses the compiled import against that backup in an in-memory SQLite database. Existing word identities and teaching payloads, authentication records, settings, and learning history must remain unchanged. Only runtime frequency ranks may change. Constraint conflicts fail rather than replacing or deleting existing records.
+
+The importer stages one SQL file, then verifies resource and curriculum hashes, 1,000 families, 1,049 lemmas, 12,498 forms, 1,084 targets and presentations, 35 selected forms, and foreign keys. History counts may increase during concurrent practice but must not decrease. Only successful verification permits the separate default-list activation. Reimporting the same version is safe; changed published content requires a new version.
+
+Wrangler's remote file import temporarily blocks database requests and rolls back that file if import fails. Do not split the file into independently committed batches. A later verification failure leaves activation undone, but a successfully staged file remains installed. Do not automatically restore the full backup: that could erase concurrent learning or authentication changes. Investigate and retry the same resource or deliberately select the previous default list.
+
+The content remains `machine_draft`, with independent linguistic review and accepted-alternative grading still outstanding.
+
+## Production activation — 2026-09-30
+
+- `fr-it-families-1000-curriculum-v1` is active in production for French targets with Italian prompts.
+- Verified 1,000 families, 1,049 lemmas, 12,498 observed forms, and 1,084 teaching targets/presentations, including 35 selected forms.
+- Exported the production backup and successfully rehearsed the import before writing. Existing learning-history counts were unchanged; all 50 original word identities and payloads were preserved, with 16 exact matches reused. Production now stores 1,118 word projections in total, including retained legacy entries.
+- Independent post-import queries confirmed the active list and no foreign-key violations. The production site returned HTTP 200.
+- Full CI passed with 842 tests. All 1,084 catalogue prompts remain `machine_draft`; this deployment does not imply independent linguistic review.
+
+## Historical family dogfood local activation
 
 - `bun run check` passed with 717 tests across the workspace, including migration, curriculum, per-form FSRS persistence, and exposure/feedback-only explanation coverage. `bun run build` passed.
 - A repeated family import activated `fr-it-families-1000-curriculum-v1` successfully without changing card or attempt counts.
@@ -235,7 +262,7 @@ Original `bun run db:seed` remains available for the legacy fixture. Do not conf
 - Start the app with `bun run dev`, then open the URL printed by Vite. Local setup uses `AUTH_EMAIL_MODE=log`; the sign-in link appears in the development terminal instead of being sent by email.
 - The current browser session must finish saving any pending answer before reloading to pick up a newly activated curriculum.
 
-## Previous lemma-pilot verification
+## Historical lemma-pilot verification
 
 - `bun run check` passed: formatting, lint, dependency boundaries, type checks, translation checks, and **707 tests** across the workspace.
 - `bun run build` passed.

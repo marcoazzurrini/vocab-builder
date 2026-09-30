@@ -42,7 +42,7 @@ export const compileCurriculum = (
     curriculum.steps.some((s) => s.status !== "reviewed")
   ) {
     throw new Error(
-      "Machine-authored cues require explicit --allow-drafts for local dogfooding."
+      "Machine-authored cues require explicit --allow-drafts for personal evaluation."
     );
   }
   const statements: Statement[] = [];
@@ -284,7 +284,12 @@ export const compileCurriculum = (
     );
   }
   return {
-    data: { id: curriculum.id },
+    data: {
+      contentHash: hash(curriculum),
+      id: curriculum.id,
+      resourceHash: hash(resource),
+      sourceId: resource.source.id,
+    },
     families: resource.families.length,
     familyMembers: resource.lemmas.length,
     forms: resource.forms.length,

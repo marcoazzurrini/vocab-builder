@@ -46,7 +46,7 @@ bun run dev
 
 Local D1 state lives under `apps/web/.wrangler/`. When moving an existing checkout, preserve its `.dev.vars`, `.wrangler/`, and `exports/` under `apps/web/`; do not recreate or reseed an existing database merely because the project moved.
 
-The family importer installs the checked-in French/Italian dogfood curriculum locally; `--allow-drafts` acknowledges that its cues still need independent review. It creates a backup before importing. See [the catalogue guide](catalogue.md) for the family definition, source frequencies, and curriculum policy.
+The family importer installs the checked-in French/Italian dogfood curriculum locally by default; `--allow-drafts` acknowledges that its cues still need independent review. It creates a backup before importing. Separately authorized production imports use `bun run catalogue:import:families --remote --allow-drafts --activate`, with a production backup, local rehearsal, staging verification, and separate activation. See [the catalogue guide](catalogue.md) for safety details, the family definition, source frequencies, and curriculum policy.
 
 The legacy `bun run db:seed` command remains available for the original fixture. The checked-in `packages/database/scripts/words.json` preserves all 50 original seed entries and the later question-mark corrections. Its IDs are deterministic because the old SQL seed generated IDs inside Postgres. Importing a live export into an empty D1 instead preserves live IDs and creation dates.
 

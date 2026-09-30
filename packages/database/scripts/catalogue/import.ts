@@ -8,8 +8,9 @@ import { getPlatformProxy } from "wrangler";
 
 import { compileCatalogue } from "./compile";
 import { compileCurriculum } from "./compile-curriculum";
+import { importRemoteCurriculum } from "./remote";
 
-// Intentionally local-only. There is no remote flag or automatic deployment path.
+// Local by default. Remote family imports require an explicit flag and a verified backup.
 if (import.meta.main) {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -18,11 +19,15 @@ if (import.meta.main) {
       "allow-drafts": { default: false, type: "boolean" },
       config: { type: "string" },
       families: { default: false, type: "boolean" },
+      remote: { default: false, type: "boolean" },
       resource: { type: "string" },
     },
   });
   if (!values.config || positionals.length > 1) {
     throw new Error("Provide --config and at most one catalogue JSON file.");
+  }
+  if (values.remote && !values.families) {
+    throw new Error("Remote catalogue imports require --families.");
   }
   const input =
     positionals[0] ??
@@ -31,7 +36,7 @@ if (import.meta.main) {
       import.meta.url
     );
   const options = {
-    activate: values.activate,
+    activate: values.activate && !values.remote,
     allowDrafts: values["allow-drafts"],
   };
   const compiled = values.families
@@ -47,6 +52,10 @@ if (import.meta.main) {
       )
     : compileCatalogue(JSON.parse(await readFile(input, "utf-8")), options);
   const config = path.resolve(values.config);
+  if (values.remote && "targets" in compiled) {
+    await importRemoteCurriculum(compiled, config, values.activate);
+    process.exit(0);
+  }
   const directory = path.dirname(config);
   const backupDirectory = path.join(directory, ".wrangler/catalogue-backups");
   await mkdir(backupDirectory, { recursive: true });
