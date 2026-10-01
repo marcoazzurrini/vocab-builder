@@ -40,6 +40,17 @@ const snapshot = (): ReviewSnapshot => ({
 });
 let queryClient: QueryClient;
 const save = vi.fn<PracticeTransport["persistAnswer"]>();
+const deferred = () => {
+  // SAFETY: Promise executors run synchronously before this helper returns.
+  let release!: () => void;
+  let fail!: (reason: Error) => void;
+  // eslint-disable-next-line promise/avoid-new -- Tests control acknowledgement order; ES2023 lacks Promise.withResolvers.
+  const promise = new Promise<void>((resolve, reject) => {
+    release = resolve;
+    fail = reject;
+  });
+  return { promise, reject: fail, resolve: release };
+};
 const advance = async (ms: number) => {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
@@ -331,6 +342,157 @@ describe("bounded practice sessions", () => {
     );
   });
 
+  it("explains an unavailable restart and starts recall only when it becomes due", async () => {
+    const data = snapshot();
+    const nextDueAt = new Date(Date.now() + 60_000);
+    data.teachings = [
+      {
+        initialRecallAt: nextDueAt.toISOString(),
+        reviewedAt: new Date().toISOString(),
+        wordId: word.id,
+      },
+    ];
+    await mount(data);
+    await start();
+    expect({
+      canContinue:
+        screen.queryByRole("button", { name: "Continue practicing" }) !== null,
+      heading: screen.getByRole("heading", { name: "You're caught up" })
+        .textContent,
+      showsNextDue:
+        screen.queryByText(/Nothing is due right now\. Next review:/u) !== null,
+    }).toStrictEqual({
+      canContinue: false,
+      heading: "You're caught up",
+      showsNextDue: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    await advance(1);
+    expect({
+      answer: screen.queryByRole("textbox"),
+      heading: screen.getByRole("heading", { name: "You're caught up" })
+        .textContent,
+    }).toStrictEqual({ answer: null, heading: "You're caught up" });
+    await advance(60_000);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    await advance(1);
+    expect(screen.getByRole("textbox")).toBeDefined();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("explains an empty catalogue instead of offering an impossible continuation", async () => {
+    await mount({ cards: [], guesses: [], words: [] });
+    await start();
+    expect(
+      screen.getByRole("heading", { name: "You're caught up" })
+    ).toBeDefined();
+    expect(
+      screen.getByText(/No more practice is available right now/u)
+    ).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: "Continue practicing" })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    await advance(1);
+    expect(
+      screen.getByRole("heading", { name: "You're caught up" })
+    ).toBeDefined();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("restores the new-word budget after a time-limited block", async () => {
+    const data = snapshot();
+    data.words.push({
+      ...word,
+      freqRank: 2,
+      gloss: "gatto",
+      id: "w2",
+      text: "chat",
+    });
+    await mount(data);
+    await start();
+    await advance(301_000);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "chien" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Good" }));
+    // Keep the reviewed word in the catalogue, with its acknowledged schedule.
+    data.cards = [
+      {
+        schedule: JSON.stringify({
+          difficulty: 5,
+          due: new Date(Date.now() + 60_000),
+          elapsed_days: 0,
+          lapses: 0,
+          last_review: new Date(),
+          learning_steps: 0,
+          reps: 1,
+          scheduled_days: 0,
+          stability: 1,
+          state: 1,
+        }),
+        wordId: word.id,
+      },
+    ];
+    await advance(1);
+    expect(
+      screen.getByRole("heading", { name: "Session finished" })
+    ).toBeDefined();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Continue practicing" })
+    );
+    await advance(1);
+    expect(screen.getByRole("heading", { name: "chat" })).toBeDefined();
+  });
+
+  it("waits for an outstanding teaching write before checking for more practice", async () => {
+    const pending = deferred();
+    save.mockReturnValueOnce(pending.promise);
+    const data: ReviewSnapshot = { cards: [], guesses: [], words: [word] };
+    await mount(data);
+    await start();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await advance(1);
+    const check = screen.getByRole("button", { name: "Check again" });
+    fireEvent.click(check);
+    await advance(1);
+    expect(screen.queryByRole("heading", { name: "chien" })).toBeNull();
+    // A detached control cannot trigger another restart or another answer.
+    fireEvent.click(check);
+    data.teachings = [
+      {
+        initialRecallAt: new Date(Date.now() + 60_000).toISOString(),
+        reviewedAt: new Date().toISOString(),
+        wordId: word.id,
+      },
+    ];
+    pending.resolve();
+    await advance(1);
+    expect(
+      screen.getByRole("heading", { name: "You're caught up" })
+    ).toBeDefined();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(save).toHaveBeenCalledOnce();
+  });
+
+  it("keeps write recovery available when a restart's outstanding save fails", async () => {
+    const pending = deferred();
+    save.mockReturnValueOnce(pending.promise);
+    await mount({ cards: [], guesses: [], words: [word] });
+    await start();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await advance(1);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    await advance(1);
+    pending.reject(new Error("network down"));
+    await advance(1);
+    expect(screen.getByRole("alert").textContent).toContain("network down");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "chien" })).toBeNull();
+    expect(save).toHaveBeenCalledOnce();
+  });
+
   it("stays finished rather than restarting when a first recall becomes due", async () => {
     await mount({ cards: [], guesses: [], words: [word] });
     expect(speech.speak).not.toHaveBeenCalled();
@@ -338,14 +500,14 @@ describe("bounded practice sessions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await advance(1);
     expect(
-      screen.getByRole("heading", { name: "Session finished" })
+      screen.getByRole("heading", { name: "You're caught up" })
     ).toBeDefined();
     await advance(120_000);
     act(() => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
     expect(
-      screen.getByRole("heading", { name: "Session finished" })
+      screen.getByRole("heading", { name: "You're caught up" })
     ).toBeDefined();
     expect(save).toHaveBeenCalledOnce();
     expect(save.mock.calls[0]?.[0].phase).toBe("teach");

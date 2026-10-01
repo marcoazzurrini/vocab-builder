@@ -53,6 +53,10 @@ msgid "Cancel"
 msgstr "Annulla"
 
 #: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Check again"
+msgstr "Controlla di nuovo"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
 #~ msgid "Choose a short time goal. There is no answer deadline, and you can stop whenever you need."
 #~ msgstr "Scegli quanto tempo dedicare alla pratica. Non c’è un limite per rispondere e puoi fermarti quando vuoi."
 
@@ -155,8 +159,8 @@ msgid "If this email address has access, you'll receive a link at <0>{sentTo}</0
 msgstr "Se questo indirizzo email è autorizzato ad accedere, riceverai un link a <0>{sentTo}</0>. Aprilo su questo dispositivo."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Italian cue"
-msgstr "Significato in italiano"
+#~ msgid "Italian cue"
+#~ msgstr "Significato in italiano"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "Learn · new entry"
@@ -205,9 +209,17 @@ msgstr "Menu"
 #~ msgid "Next word in about {minutes} min. Your session will resume automatically."
 #~ msgstr "La prossima parola sarà pronta tra circa {minutes} min. La sessione riprenderà da sola."
 
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "No more practice is available right now. Check again tomorrow for new words."
+msgstr "Per ora non ci sono altri esercizi disponibili. Controlla domani se ci sono nuove parole."
+
 #: ../../apps/web/src/features/practice/session-screen.tsx
 msgid "not quite"
 msgstr "non proprio"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "Nothing is due right now. Next review: {nextDue}. Check again later for reviews or new words."
+msgstr "Per ora non ci sono ripassi in programma. Prossimo ripasso: {nextDue}. Controlla più tardi se ci sono ripassi o nuove parole."
 
 #: ../../apps/web/src/components/patterns/app-shell.tsx
 #~ msgid "Open menu"
@@ -242,8 +254,8 @@ msgstr "Progressi"
 #~ msgstr "Leggi, ascolta e ripeti la parola ad alta voce. Tra poco ti chiederemo di ricordarla."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Recall"
-msgstr "Ricorda"
+#~ msgid "Recall"
+#~ msgstr "Ricorda"
 
 #: ../../apps/web/src/features/practice/error-boundary.tsx
 msgid "Reload"
@@ -360,16 +372,20 @@ msgid "Words"
 msgstr "Parole"
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Write only the French word. The context clarifies its meaning; do not translate the whole description."
-msgstr "Scrivi solo la parola francese. Il contesto chiarisce il significato: non tradurre tutta la descrizione."
+#~ msgid "Write only the French word. The context clarifies its meaning; do not translate the whole description."
+#~ msgstr "Scrivi solo la parola francese. Il contesto chiarisce il significato: non tradurre tutta la descrizione."
 
 #: ../../apps/web/src/features/practice/session-screen.tsx
-msgid "Write the French expression you learned."
-msgstr "Scrivi l’espressione francese che hai imparato."
+#~ msgid "Write the French expression you learned."
+#~ msgstr "Scrivi l’espressione francese che hai imparato."
+
+#: ../../apps/web/src/features/practice/session-screen.tsx
+#~ msgid "Write the French word."
+#~ msgstr "Scrivi la parola francese."
 
 #: ../../apps/web/src/features/practice/block-controls.tsx
-msgid "You reached the end of available practice in this block. More reviews may be due later."
-msgstr "Hai completato la pratica disponibile in questa sessione. Altri ripassi potrebbero essere pronti più tardi."
+#~ msgid "You reached the end of available practice in this block. More reviews may be due later."
+#~ msgstr "Hai completato la pratica disponibile in questa sessione. Altri ripassi potrebbero essere pronti più tardi."
 
 #. placeholder {0}: view.typed || "—"
 #: ../../apps/web/src/features/practice/session-screen.tsx
@@ -379,6 +395,10 @@ msgstr "hai scritto: <0>{0}</0>"
 #: ../../apps/web/src/features/practice/session-screen.tsx
 #~ msgid "you're all caught up"
 #~ msgstr "sei in pari"
+
+#: ../../apps/web/src/features/practice/block-controls.tsx
+msgid "You're caught up"
+msgstr "Sei in pari"
 
 #: ../../apps/web/src/features/sign-in/sign-in.tsx
 msgid "you@example.com"

@@ -178,6 +178,58 @@
 }
 
 @media (width < 64rem) {
+  /* The shell follows Safari's visible area; only content, never actions, scrolls. */
+  .app-shell {
+    position: fixed;
+    inset: var(--visible-top, 0px) 0 auto;
+    height: var(--visible-height, 100dvh);
+    min-height: 0;
+  }
+  .app-header {
+    flex-shrink: 0;
+    padding-top: calc(0.5rem + env(safe-area-inset-top));
+    padding-bottom: 0.25rem;
+  }
+  .app-content {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.75rem;
+  }
+  .session-region:not([hidden]),
+  .practice-running:not([hidden]),
+  .practice-frame {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .practice-frame {
+    gap: 0.75rem;
+    padding-block: 0;
+  }
+  .practice-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+  .practice-actions {
+    flex-shrink: 0;
+  }
+  .mobile-navigation {
+    position: static;
+    flex-shrink: 0;
+  }
+  /* Keep the cue and grading controls available above the software keyboard. */
+  .app-shell[data-keyboard="true"] .app-header,
+  .app-shell[data-keyboard="true"] .mobile-navigation {
+    display: none;
+  }
+  .app-shell[data-keyboard="true"] .app-content {
+    padding-bottom: 0.5rem;
+  }
   html {
     font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   }

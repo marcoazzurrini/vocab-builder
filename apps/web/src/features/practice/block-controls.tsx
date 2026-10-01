@@ -33,31 +33,39 @@ export const BlockProgress = ({ practice }: { practice: Practice }) => {
       ? t`Finish this word at your own pace.`
       : t`About ${minutes} min left`;
   return (
-    <section aria-label={t`Session progress`} className="flex flex-col gap-3">
-      <Progress
-        value={Math.floor((elapsedMs / (preferences.minutes * 60_000)) * 100)}
-        aria-valuetext={label}
-      >
-        <ProgressLabel className="sr-only">
-          <Trans>Practice time</Trans>
-        </ProgressLabel>
-        <span className="text-muted-foreground ml-auto text-sm tabular-nums">
-          {label}
-        </span>
-      </Progress>
-      <div className="flex justify-end gap-2">
-        <Button
-          variant="ghost"
-          onClick={() => practice.block.pause(performance.now())}
-        >
-          <Trans>Pause</Trans>
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => practice.block.finish(performance.now())}
-        >
-          <Trans>Finish</Trans>
-        </Button>
+    <section
+      aria-label={t`Session progress`}
+      className="flex shrink-0 flex-col gap-2"
+    >
+      <div>
+        <p className="text-muted-foreground text-sm tabular-nums">{label}</p>
+        <div className="flex items-center gap-3">
+          <Progress
+            className="min-w-0 flex-1"
+            value={Math.floor(
+              (elapsedMs / (preferences.minutes * 60_000)) * 100
+            )}
+            aria-valuetext={label}
+          >
+            <ProgressLabel className="sr-only">
+              <Trans>Practice time</Trans>
+            </ProgressLabel>
+          </Progress>
+          <div className="flex shrink-0 justify-end gap-1">
+            <Button
+              variant="ghost"
+              onClick={() => practice.block.pause(performance.now())}
+            >
+              <Trans>Pause</Trans>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => practice.block.finish(performance.now())}
+            >
+              <Trans>Finish</Trans>
+            </Button>
+          </div>
+        </div>
       </div>
       <StorageNotice practice={practice} />
     </section>
@@ -96,8 +104,19 @@ const DurationChoice = ({ practice }: { practice: Practice }) => {
 };
 
 export const BlockPanel = ({ practice }: { practice: Practice }) => {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const { phase, reason } = practice.blockState;
+  const waiting =
+    phase === "complete" &&
+    (reason === "caughtUp" || reason === "done") &&
+    (practice.view?.phase === "caughtUp" || practice.view?.phase === "done");
+  const nextDue =
+    practice.view?.phase === "caughtUp"
+      ? i18n.date(practice.view.nextDueAt, {
+          dateStyle: "short",
+          timeStyle: "short",
+        })
+      : null;
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (phase !== "running") {
@@ -105,7 +124,7 @@ export const BlockPanel = ({ practice }: { practice: Practice }) => {
     }
   }, [phase]);
   const title = {
-    complete: t`Session finished`,
+    complete: waiting ? t`You're caught up` : t`Session finished`,
     paused: t`Session paused`,
     running: t`Practice`,
     setup: t`Start session`,
@@ -147,12 +166,19 @@ export const BlockPanel = ({ practice }: { practice: Practice }) => {
       {phase === "complete" && (
         <>
           <p className="text-muted-foreground max-w-prose text-base leading-relaxed text-pretty">
-            {reason === "caughtUp" || reason === "done" ? (
+            {waiting && nextDue && (
               <Trans>
-                You reached the end of available practice in this block. More
-                reviews may be due later.
+                Nothing is due right now. Next review: {nextDue}. Check again
+                later for reviews or new words.
               </Trans>
-            ) : (
+            )}
+            {waiting && !nextDue && (
+              <Trans>
+                No more practice is available right now. Check again tomorrow
+                for new words.
+              </Trans>
+            )}
+            {!waiting && (
               <Trans>
                 This practice block is finished. Any remaining reviews stay
                 scheduled.
@@ -164,7 +190,11 @@ export const BlockPanel = ({ practice }: { practice: Practice }) => {
               <Trans>Finish</Trans>
             </Button>
             <Button variant="outline" onClick={() => practice.start()}>
-              <Trans>Continue practicing</Trans>
+              {waiting ? (
+                <Trans>Check again</Trans>
+              ) : (
+                <Trans>Continue practicing</Trans>
+              )}
             </Button>
           </div>
         </>

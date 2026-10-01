@@ -1,9 +1,21 @@
+import { readFileSync } from "node:fs";
+
 import type { EntryPresentation } from "@vocab/spaced-repetition";
+import * as v from "valibot";
 
 import type { CurriculumStep } from "./curriculum";
 import { contentHash } from "./hash";
 
-export const PRESENTATION_VERSION = 1;
+export const PRESENTATION_VERSION = 2;
+
+// Same selected senses, expressed as familiar Italian equivalents. Homographs
+// such as dire and film are valid translations, not leaked French examples.
+const meaningCues = v.parse(
+  v.record(v.string(), v.pipe(v.string(), v.minLength(1))),
+  JSON.parse(
+    readFileSync(new URL("meaning-cues.json", import.meta.url), "utf-8")
+  )
+);
 
 export type EditorialEntry = Pick<
   EntryPresentation,
@@ -11,7 +23,7 @@ export type EditorialEntry = Pick<
 >;
 const entry = (
   meaning: string,
-  context: string,
+  context: string | null,
   explanation: string,
   text: string,
   translation: string
@@ -79,8 +91,8 @@ const editorial = new Map<string, EditorialEntry>([
   [
     "dire",
     entry(
-      "esprimere a parole",
-      "Il verbo usato per comunicare qualcosa con le parole.",
+      "dire",
+      null,
       "Il verbo francese dire si scrive come quello italiano. L'esempio mostra un suo uso; la risposta è solo dire.",
       "dire la vérité",
       "dire la verità"
@@ -259,11 +271,15 @@ const grammarLabels = new Map([
   ["VER", "verbo · infinito"],
 ]);
 
+const formMeanings = new Map([["aller/va", "va"]]);
+
 export const presentationSourceHash = contentHash({
   editorial: [...editorial],
+  formMeanings: Object.fromEntries(formMeanings),
   grammar: Object.fromEntries(grammarLabels),
+  meaningCues,
   policy:
-    "Separate the final parenthetical qualifier from the Italian meaning. Keep the historical cue and answer immutable. Form prompts request the verb without a pronoun. Usage examples and explanations are teaching-only.",
+    "Use direct Italian equivalents, including shared French/Italian spellings. Keep disambiguation separate from the meaning. Keep historical cues and answers immutable. Form prompts retain person and tense and request the verb without a pronoun. Usage examples and explanations are teaching-only.",
   version: PRESENTATION_VERSION,
 });
 
@@ -281,16 +297,27 @@ const splitCue = (cue: string) => {
   };
 };
 
+const grammaticalQualifiers = (context: string | null) =>
+  context?.match(/\b(?:maschile|femminile|singolare|plurale)\b/gu) ?? [];
+
 export const presentationFor = (step: CurriculumStep): EntryPresentation => {
   const cue = splitCue(step.cue);
   const authored = step.form_id ? undefined : editorial.get(step.text);
+  const correctedCue = step.form_id ? undefined : meaningCues[step.text];
+  const corrected = correctedCue ? splitCue(correctedCue) : undefined;
+  // Do not lose gender/number requirements when shortening a lexical cue.
+  const qualifiers = corrected ? grammaticalQualifiers(cue.context) : [];
+  const grammar = grammarLabels.get(step.part_of_speech);
+  const meaning = step.form_id
+    ? (formMeanings.get(`${step.lemma}/${step.text}`) ?? cue.meaning)
+    : (corrected?.meaning ?? authored?.meaning ?? cue.meaning);
   return {
-    context: authored?.context ?? cue.context,
+    context: (corrected ?? authored ?? cue).context,
     example: authored?.example ?? null,
     explanation: authored?.explanation ?? step.note,
     grammar: step.form_id
       ? "verbo · presente · senza pronome"
-      : (grammarLabels.get(step.part_of_speech) ?? null),
-    meaning: authored?.meaning ?? cue.meaning,
+      : [grammar, ...qualifiers].filter(Boolean).join(" · ") || null,
+    meaning,
   };
 };

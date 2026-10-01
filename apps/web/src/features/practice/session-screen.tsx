@@ -40,13 +40,10 @@ const Prompt = ({
   context?: string | null;
   grammar?: string | null;
 }) => (
-  <div className="flex flex-col gap-4">
-    <p className="text-muted-foreground text-xs tracking-widest uppercase">
-      <Trans>Italian cue</Trans>
-    </p>
+  <div className="flex flex-col gap-2">
     <h1
       lang="it"
-      className="text-4xl leading-tight font-semibold tracking-tight text-pretty [overflow-wrap:anywhere] lg:font-serif lg:text-5xl lg:font-normal"
+      className="text-3xl leading-tight font-semibold tracking-tight text-pretty [overflow-wrap:anywhere] lg:font-serif lg:text-5xl lg:font-normal"
     >
       {meaning ?? gloss}
     </h1>
@@ -158,19 +155,6 @@ const RevealNote = ({ text }: { text?: string }) =>
     <p className="text-muted-foreground text-sm text-pretty">{text}</p>
   ) : null;
 
-const RecallInstruction = ({ kind }: { kind: "word" | "chunk" }) => (
-  <p className="text-muted-foreground text-sm leading-relaxed">
-    {kind === "word" ? (
-      <Trans>
-        Write only the French word. The context clarifies its meaning; do not
-        translate the whole description.
-      </Trans>
-    ) : (
-      <Trans>Write the French expression you learned.</Trans>
-    )}
-  </p>
-);
-
 const AudioStatus = ({ error }: { error: SpeechFailure | null }) => {
   const { t } = useLingui();
   // A blocked autoplay attempt needs no callout: Listen remains available.
@@ -195,34 +179,41 @@ const Feedback = ({
   view: Extract<SessionView, { phase: "feedback" }>;
   onContinue: () => void;
 }) => (
-  <>
-    <p className="text-destructive text-sm">
-      <Trans>not quite</Trans>
-    </p>
-    <p
-      lang="fr"
-      className="text-5xl leading-tight font-semibold tracking-tight [overflow-wrap:anywhere] lg:font-serif lg:font-normal"
-    >
-      {view.expected}
-    </p>
-    {view.presentation && (
-      <p lang="it" className="text-xl text-pretty">
-        {view.presentation.meaning}
+  <div className="flex min-h-0 flex-1 flex-col gap-4 lg:gap-8">
+    <div className="practice-scroll flex flex-col gap-3 lg:gap-6">
+      <p className="text-destructive text-sm">
+        <Trans>not quite</Trans>
       </p>
-    )}
-    <RevealNote text={view.presentation?.explanation ?? view.revealNote} />
-    {/* No diff highlighting: finding the difference is the point (§2). */}
-    <p className="text-muted-foreground text-sm text-pretty [overflow-wrap:anywhere]">
-      <Trans>
-        you wrote: <b>{view.typed || "—"}</b>
-      </Trans>
-    </p>
-    <div className="flex flex-wrap gap-2">
-      <Button type="button" onClick={onContinue}>
+      <p
+        lang="fr"
+        className="text-5xl leading-tight font-semibold tracking-tight [overflow-wrap:anywhere] lg:font-serif lg:font-normal"
+      >
+        {view.expected}
+      </p>
+      {view.presentation && (
+        <p lang="it" className="text-xl text-pretty">
+          {view.presentation.meaning}
+        </p>
+      )}
+      <RevealNote text={view.presentation?.explanation ?? view.revealNote} />
+      {/* No diff highlighting: finding the difference is the point (§2). */}
+      <p className="text-muted-foreground text-sm text-pretty [overflow-wrap:anywhere]">
+        <Trans>
+          you wrote: <b>{view.typed || "—"}</b>
+        </Trans>
+      </p>
+    </div>
+    <div className="practice-actions flex flex-wrap gap-2">
+      <Button
+        type="button"
+        size="lg"
+        className="w-full sm:w-auto"
+        onClick={onContinue}
+      >
         <Trans>Continue</Trans>
       </Button>
     </div>
-  </>
+  </div>
 );
 
 export const SessionScreen = ({
@@ -269,7 +260,7 @@ export const SessionScreen = ({
 
   useEffect(() => {
     if (active && phase === "recall" && blockState.phase === "running") {
-      inputRef.current?.focus();
+      inputRef.current?.focus({ preventScroll: true });
     }
     // eslint-disable-next-line react/exhaustive-effect-dependencies -- A new card must refocus the remounted input even when its phase is unchanged.
   }, [active, phase, promptGloss, blockState.phase]);
@@ -300,10 +291,10 @@ export const SessionScreen = ({
     <>
       {blockState.phase === "paused" && <BlockPanel practice={practice} />}
       {/* Keep the current input mounted while paused, including its draft. */}
-      <div hidden={blockState.phase === "paused"}>
+      <div className="practice-running" hidden={blockState.phase === "paused"}>
         {/* A new card remounts its input; the effect above restores answer focus. */}
         <div
-          className="flex flex-col gap-8 py-4 sm:py-8"
+          className="practice-frame flex flex-col gap-8 py-4 sm:py-8"
           key={`${view.phase}:${promptGloss ?? ""}`}
         >
           <BlockProgress practice={practice} />
@@ -322,54 +313,55 @@ export const SessionScreen = ({
           )}
           {view.phase === "recall" && (
             <form
-              className="flex flex-col gap-6"
+              className="flex min-h-0 flex-1 flex-col gap-3 lg:gap-6"
               onSubmit={(e) => {
                 e.preventDefault();
                 // Enter means Good: no separate grading decision on the default path.
                 act(() => practice.submitRecall(typed, "good"));
               }}
             >
-              <p className="text-muted-foreground text-xs tracking-widest uppercase">
-                <Trans>Recall</Trans>
-              </p>
-              <Prompt {...view.prompt} />
-              <RecallInstruction kind={view.prompt.kind} />
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="recall-answer" className="sr-only">
-                    <Trans>type the French word</Trans>
-                  </FieldLabel>
-                  <Input
-                    id="recall-answer"
-                    ref={inputRef}
-                    value={typed}
-                    onChange={(e) => setDraft({ text: e.target.value, view })}
-                    enterKeyHint="done"
-                    autoComplete="off"
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                </Field>
-              </FieldGroup>
-              <div className="flex flex-wrap gap-2">
-                {/* The session decides which effort choices are offered. */}
-                {view.efforts.map((effort) => (
-                  <Button
-                    key={effort}
-                    size="lg"
-                    className="flex-1 sm:flex-none"
-                    type={effort === "good" ? "submit" : "button"}
-                    variant={effort === "good" ? "default" : "ghost"}
-                    onClick={
-                      effort === "good"
-                        ? undefined
-                        : () => act(() => practice.submitRecall(typed, effort))
-                    }
-                  >
-                    {effortLabel[effort]}
-                  </Button>
-                ))}
+              <div className="practice-scroll flex flex-col gap-2">
+                <Prompt {...view.prompt} />
+              </div>
+              <div className="practice-actions flex flex-col gap-3">
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="recall-answer" className="sr-only">
+                      <Trans>type the French word</Trans>
+                    </FieldLabel>
+                    <Input
+                      id="recall-answer"
+                      ref={inputRef}
+                      value={typed}
+                      onChange={(e) => setDraft({ text: e.target.value, view })}
+                      enterKeyHint="done"
+                      autoComplete="off"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  </Field>
+                </FieldGroup>
+                <div className="flex flex-wrap gap-2">
+                  {/* The session decides which effort choices are offered. */}
+                  {view.efforts.map((effort) => (
+                    <Button
+                      key={effort}
+                      size="lg"
+                      className="flex-1 sm:flex-none"
+                      type={effort === "good" ? "submit" : "button"}
+                      variant={effort === "good" ? "default" : "ghost"}
+                      onClick={
+                        effort === "good"
+                          ? undefined
+                          : () =>
+                              act(() => practice.submitRecall(typed, effort))
+                      }
+                    >
+                      {effortLabel[effort]}
+                    </Button>
+                  ))}
+                </div>
               </div>
               <p className="text-muted-foreground hidden text-xs lg:block">
                 <Trans>

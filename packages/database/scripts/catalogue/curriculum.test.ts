@@ -109,6 +109,48 @@ it("separates a form's meaning from its person and keeps its worked explanation 
   expect(presentationFor(step).example).toBeNull();
 });
 
+it("uses direct Italian equivalents for every corrected cue without rewriting historical prompts", async () => {
+  const corrections = await load("meaning-cues.json");
+  const before = structuredClone(curriculum);
+  expect(Object.keys(corrections)).toHaveLength(282);
+  for (const [text, cue] of Object.entries(corrections)) {
+    const steps = curriculum.steps.filter((s) => s.text === text && !s.form_id);
+    expect(steps.length).toBeGreaterThan(0);
+    for (const step of steps) {
+      const [meaning = ""] = String(cue).split(" (");
+      expect(presentationFor(step).meaning).toBe(meaning);
+    }
+  }
+  expect(curriculum).toEqual(before);
+});
+
+it.each([
+  ["dire", "dire", null],
+  ["film", "film", null],
+  ["regarder", "guardare", null],
+  ["savoir", "sapere", "Conoscere un fatto o un'informazione."],
+  ["va", "va", "lui/lei; verbo andare"],
+])(
+  "makes %s recognisable without making learners guess a paraphrase",
+  (text, meaning, context) => {
+    const step = curriculum.steps.find((s) => s.text === text);
+    if (!step) {
+      throw new Error(`Missing ${text} fixture`);
+    }
+    expect(presentationFor(step)).toMatchObject({ context, meaning });
+  }
+);
+
+it("keeps gender information after shortening lexical cues", () => {
+  const step = curriculum.steps.find((s) => s.text === "agent");
+  if (!step) {
+    throw new Error("Missing agent fixture");
+  }
+  expect(presentationFor(step).meaning).toBe("agente");
+  expect(presentationFor(step).grammar).toContain("maschile");
+  expect(presentationFor(step).context).toBe("incaricato");
+});
+
 it("hashes equivalent objects identically without ignoring lesson order", () => {
   const { families, forms, ...rest } = resource;
   const reordered = { ...rest, families, forms };

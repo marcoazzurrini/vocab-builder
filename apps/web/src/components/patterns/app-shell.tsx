@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 import { Sidebar } from "./sidebar";
+import { useVisibleViewport } from "./use-visible-viewport";
 import { Wordmark } from "./wordmark";
 
 export type AppSection = "session" | "account";
@@ -28,9 +29,10 @@ export const AppShell = ({
 }) => {
   const { t } = useLingui();
   const name = email.split("@")[0] || email;
+  const viewportRef = useVisibleViewport();
 
   return (
-    <div className="app-shell flex min-h-dvh">
+    <div ref={viewportRef} className="app-shell flex min-h-dvh">
       <a
         href="#main-content"
         className="focus:bg-background focus:text-foreground focus:ring-ring sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:p-3 focus:ring-2"
@@ -45,7 +47,7 @@ export const AppShell = ({
           onSignOut={onSignOut}
         />
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="app-body flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="app-header flex items-center justify-between gap-4 lg:hidden">
           <span className="text-lg font-semibold tracking-tight">
             <Wordmark />
@@ -61,7 +63,11 @@ export const AppShell = ({
         >
           {notice}
           {/* Keep practice mounted: switching sections must not discard a draft or pending answer. */}
-          <section hidden={section !== "session"} aria-label={t`Session`}>
+          <section
+            className="session-region"
+            hidden={section !== "session"}
+            aria-label={t`Session`}
+          >
             {children}
           </section>
           <section

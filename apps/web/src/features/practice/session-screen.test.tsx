@@ -120,7 +120,8 @@ const startSession = async () => {
   );
 };
 
-const FINISHED = /^(?:Session finished|Sessione terminata)$/u;
+const FINISHED =
+  /^(?:Session finished|Sessione terminata|You're caught up|Sei in pari)$/u;
 const CONTINUE_PRACTICING = /^(?:Continue practicing|Continua a esercitarti)$/u;
 const outboxKeys = () =>
   Object.keys(window.localStorage).filter((key) =>
@@ -217,7 +218,8 @@ describe("the session screen", () => {
       screen.queryByText("être à la maison"),
       screen.queryByText(ETRE.presentation?.explanation ?? ""),
       screen.queryByText(ETRE.gloss),
-    ]).toStrictEqual([null, null, null, null]);
+      screen.queryByText("Scrivi la parola francese."),
+    ]).toStrictEqual([null, null, null, null, null]);
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "être à la maison" },
     });
@@ -358,7 +360,11 @@ describe("the session screen", () => {
       textbox: screen.queryByRole("textbox"),
     }).toStrictEqual({ finished: true, loads: 2, textbox: null });
 
-    fireEvent.click(screen.getByRole("button", { name: CONTINUE_PRACTICING }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /^(?:Check again|Controlla di nuovo)$/u,
+      })
+    );
     await screen.findByRole("textbox", {
       name: "scrivi la parola in francese",
     });

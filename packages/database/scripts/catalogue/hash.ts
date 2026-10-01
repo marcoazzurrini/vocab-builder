@@ -11,7 +11,9 @@ type CatalogueHashInput =
   | readonly [CurationRow[], typeof formLessons]
   | {
       editorial: readonly (readonly [string, EditorialEntry])[];
+      formMeanings: Readonly<Record<string, string>>;
       grammar: Readonly<Record<string, string>>;
+      meaningCues: Readonly<Record<string, string>>;
       policy: string;
       version: number;
     };
