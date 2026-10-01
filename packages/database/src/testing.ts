@@ -2,7 +2,10 @@ import { readFile, readdir, mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import type { D1Database } from "@cloudflare/workers-types";
+import type {
+  D1Database,
+  D1PreparedStatement,
+} from "@cloudflare/workers-types";
 import { getPlatformProxy } from "wrangler";
 
 import { connect } from "./connection";
@@ -41,7 +44,26 @@ export const testDatabase = async () => {
       persist: false,
       remoteBindings: false,
     });
-    const binding = worker.env.DB;
+    const rawBinding = worker.env.DB;
+    // Miniflare serializes proxy arguments before asynchronous dispatch. Keep
+    // statement proxies alive until the batch settles so its finalizer cannot
+    // release their remote handles while the request is still in flight.
+    const pendingBatches = new Map<symbol, D1PreparedStatement[]>();
+    const binding: D1Database = {
+      batch: async <T>(statements: D1PreparedStatement[]) => {
+        const operation = Symbol("pending batch");
+        pendingBatches.set(operation, statements);
+        try {
+          return await rawBinding.batch<T>(statements);
+        } finally {
+          pendingBatches.delete(operation);
+        }
+      },
+      dump: () => rawBinding.dump(),
+      exec: (query) => rawBinding.exec(query),
+      prepare: (query) => rawBinding.prepare(query),
+      withSession: (bookmark) => rawBinding.withSession(bookmark),
+    };
     const directory = new URL("../migrations/", import.meta.url);
     const entries = await readdir(directory);
     const files = entries.filter((file) => file.endsWith(".sql")).toSorted();
