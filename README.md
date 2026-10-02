@@ -89,7 +89,7 @@ Workspaces export TypeScript source, so the app bundles their production entrypo
 - [Local development, database workflow, and production deployment](docs/development.md)
 - [Interface languages and translation workflow](packages/i18n/README.md)
 
-Cloudflare deployment and the French Lexique family import are complete. Production has the 1,000-family curriculum active: 1,084 teaching targets with Italian prompts. Its generated cues remain drafts. See the catalogue guide before importing or publishing it. Cloudflare Builds is configured for the Bun workspace commands documented in the deployment guide. Pushes to `main` run checks and deploy the existing Worker, but do not import catalogue data.
+Production has the 1,000-family curriculum active: 1,084 teaching targets with Italian prompts. Its generated cues remain drafts. See the catalogue guide before importing or publishing it. Required PR checks protect `main`; GitHub Actions builds and deploys merged changes to the existing Worker. The separate Cloudflare Builds integration is disabled. Deployments never import catalogue data or apply database migrations. The full importer needs efficiency fixes before another production run. See the deployment guide for verification limits and emergency procedures.
 
 ## Conventions
 

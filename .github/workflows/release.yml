@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# Finish an active deployment before starting another. Never interrupt uploads.
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.repository == 'marcoazzurrini/vocab-builder'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://vocab-builder.marcoazzurrini.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      # Required PR checks have already run the full suite against the merge result.
+      # Build once here; Wrangler uploads this output without repeating CI.
+      - name: Build production artifact
+        run: bun run build
+      - name: Deploy the checked-out revision
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bun run wrangler deploy --tag "$GITHUB_SHA" --message "GitHub release $GITHUB_SHA"
+      - name: Check public endpoints (not an authenticated learning test)
+        env:
+          APP_URL: https://vocab-builder.marcoazzurrini.com
+        run: |
+          node --input-type=module <<'JS'
+          const base = process.env.APP_URL;
+          const options = { redirect: 'error', signal: AbortSignal.timeout(15000) };
+          const home = await fetch(base, options);
+          if (home.status !== 200 || !home.headers.get('content-type')?.includes('text/html')) {
+            throw new Error(`Homepage check failed: HTTP ${home.status}`);
+          }
+          const session = await fetch(`${base}/api/auth/get-session`, {
+            redirect: 'error', signal: AbortSignal.timeout(15000),
+          });
+          if (session.status !== 200 || await session.json() !== null) {
+            throw new Error(`Signed-out session check failed: HTTP ${session.status}`);
+          }
+          console.log('Homepage and signed-out session checks passed. Authenticated learning is not covered.');
+          JS
+      - name: Record release result
+        if: always()
+        env:
+          RELEASE_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "## Production release: $RELEASE_STATUS"
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo "No catalogue imports or database migrations are run by this workflow."
+            echo "Smoke checks cover public endpoints only, not signed-in learning or saving progress."
+            echo "A failed post-deployment check does not automatically roll back the Worker."
+          } >> "$GITHUB_STEP_SUMMARY"
