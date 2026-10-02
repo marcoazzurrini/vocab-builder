@@ -27,7 +27,7 @@ exports/
 logs/
 *.log
 .cache/
-.pi/tasks/
+.pi/
 .vite/
 *.tsbuildinfo
 coverage/
