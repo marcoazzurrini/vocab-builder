@@ -16,7 +16,7 @@ Raw scanner reports, downloaded workflow logs, local database state, incident di
 
 ## Redistribution notices
 
-See [third-party notices](../THIRD_PARTY_NOTICES.md) for Lexique-derived data and bundled fonts. The Lexique archive's explicit CC BY-SA 4.0 declaration is preserved together with the documented website-link discrepancy. The full raw Lexique corpus is not published. Public visibility does not independently license the original application source code.
+See the single [third-party notices file](../apps/web/public/third-party-notices.txt) for Lexique-derived data and bundled fonts. It records the archive's CC BY-SA 4.0 declaration, links to the full terms, documents the website-link discrepancy, and includes the full shared font licence. The full raw Lexique corpus is not published. Public visibility does not independently license the original application source code.
 
 ## Release security
 

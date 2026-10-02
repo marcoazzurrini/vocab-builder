@@ -1,9 +1,34 @@
+THIRD-PARTY NOTICES
+
+Lexique vocabulary data
+----------------------
+The catalogue uses French lemmas, frequencies, grammatical observations and
+forms extracted from Lexique 4.00. Italian cues, teaching notes, selected senses
+and curriculum decisions are project additions. This attribution concerns the
+reused dataset, not ownership of individual French words or the application code.
+
+Source: https://lexique.org/
+Archive: https://lexique.org/databases/Lexique400/Lexique400.zip
+Archive SHA-256: 8ed5a64373ae798f0485a2a35848c09286b6694c6859abeaab6806594c046993
+Credit: Boris New, Christophe Pallier, Manuel Gimenes, Jessica Bourgin,
+Gauvain Schalchli, Ronald Peereman, Sophie Dufour, Christian Lachaud and
+other Lexique contributors.
+
+Licence: Creative Commons Attribution-ShareAlike 4.0 International.
+Terms: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+The derived catalogue data files, including earlier versions, retain these
+attribution and share-alike terms. This does not license application/tooling code.
+The raw source corpus is not included. The pinned archive README declares
+CC BY-SA 4.0; the website displays that label but links to CC BY-NC 4.0.
+We rely on the archive's declaration, not a claimed clarification of its website.
+
+Bundled fonts
+-------------
+Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)
 Copyright 2017 The Spectral Project Authors (https://github.com/productiontype/Spectral)
 
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is copied below, and is also available with a FAQ at:
-https://openfontlicense.org
-
+Both bundled fonts, including historical copies, use the following SIL Open
+Font License 1.1. Its complete terms are retained once for both fonts.
 
 -----------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
