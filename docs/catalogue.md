@@ -111,7 +111,7 @@ The server supports saving prompt language; a settings UI control is deferred. T
 
 These counts have different units. The roughly 140,000 forms in older Lexique 3 were not a 140,000-token corpus. Corpus size includes repetitions; vocabulary entry count does not. Subtitle frequency is useful evidence, not a guarantee of conversational or pedagogical priority.
 
-The pinned archive README declares CC BY-SA 4.0. The website displays that label while linking to CC BY-NC 4.0. The repository follows the explicit declaration supplied with the pinned source archive, preserves the original README, and includes attribution and the full CC BY-SA 4.0 terms in [third-party notices](../THIRD_PARTY_NOTICES.md). Derived catalogue data is distributed under those share-alike terms. The website discrepancy remains documented; no claim of upstream clarification is made.
+Lexique supplies the candidate lemmas, frequencies and forms used to construct our selected word families; Italian cues and teaching decisions are project additions. Source credits and licence information are consolidated in [third-party notices](../apps/web/public/third-party-notices.txt), which also documents the archive/website licence discrepancy.
 
 ### Deterministic selection policy
 
